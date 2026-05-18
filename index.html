@@ -3,687 +3,414 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Trucking">
+<meta name="apple-mobile-web-app-title" content="Elevator Compare">
 <meta name="theme-color" content="#1e5a3c">
 <link rel="manifest" href="manifest.json">
-<title>Trucking Calculator</title>
+<title>Elevator Comparison</title>
 <style>
-/* ─── Reset & base ─────────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-:root {
-  --green:   #1e5a3c;
-  --green2:  #163f2a;
-  --green-l: #f0fdf4;
-  --green-m: #a8e6bf;
-  --yellow:  #fefce8;
-  --yellow-b: #fde68a;
-  --slate:   #1e293b;
-  --slate-m: #64748b;
-  --slate-l: #f8fafc;
-  --border:  #e2e8f0;
-  --white:   #ffffff;
-  --rad:     12px;
-  --safe-b:  env(safe-area-inset-bottom, 0px);
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
+  --slate:#1e293b;--slate-m:#64748b;--border:#e2e8f0;
+  --white:#fff;--rad:12px;
+  --safe-b:env(safe-area-inset-bottom,0px);
 }
-html { height: 100%; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f0fdf4;
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  color: var(--slate);
-}
-
-/* ─── Header ───────────────────────────────────────────────────────────────── */
-#app-header {
-  background: var(--green);
-  color: white;
-  padding: 12px 16px;
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-
-.header-left { display: flex; align-items: center; gap: 10px; }
-
-.truck-icon {
-  background: rgba(255,255,255,0.15);
-  border-radius: 10px;
-  width: 38px; height: 38px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-
-#header-title { font-size: 1rem; font-weight: 700; line-height: 1.1; }
-#header-sub   { font-size: 0.72rem; color: var(--green-m); margin-top: 1px; }
-
-.total-pill {
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 999px;
-  padding: 6px 14px;
-  text-align: right;
-  flex-shrink: 0;
-}
-#pill-total  { font-size: 1.1rem; font-weight: 800; line-height: 1; }
-#pill-sub    { font-size: 0.65rem; color: var(--green-m); margin-top: 1px; }
-
-/* ─── Scroll area ──────────────────────────────────────────────────────────── */
-#scroll-area {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 14px 14px;
-  padding-bottom: calc(72px + var(--safe-b) + 8px);
-}
-
-/* ─── Sections ─────────────────────────────────────────────────────────────── */
-.section { display: none; }
-.section.active { display: block; }
-
-/* ─── Cards ────────────────────────────────────────────────────────────────── */
-.card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--rad);
-  padding: 16px;
-  margin-bottom: 12px;
-}
-.card-title {
-  font-size: 0.67rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--slate-m);
-  margin-bottom: 12px;
-}
-
-/* ─── Chip grids ───────────────────────────────────────────────────────────── */
-.chip-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.chip {
-  padding: 11px 6px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--white);
-  cursor: pointer;
-  text-align: center;
-  color: #475569;
-  transition: all 0.12s;
-  min-height: 44px;
-  display: flex; align-items: center; justify-content: center;
-}
-.chip:active { transform: scale(0.96); }
-.chip.active { background: var(--green); color: white; border-color: var(--green); }
-
-.method-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.method-btn {
-  padding: 13px 12px;
-  font-size: 0.87rem;
-  font-weight: 500;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--white);
-  cursor: pointer;
-  text-align: left;
-  color: #475569;
-  transition: all 0.12s;
-  min-height: 48px;
-}
-.method-btn:active { transform: scale(0.97); }
-.method-btn.active { background: var(--green); color: white; border-color: var(--green); }
-
-/* ─── Form fields ──────────────────────────────────────────────────────────── */
-.field { margin-bottom: 16px; }
-.field:last-child { margin-bottom: 0; }
-
-label {
-  display: block;
-  font-size: 0.83rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 6px;
-}
-.hint { font-size: 0.72rem; color: #94a3b8; margin-top: 4px; }
-
-.input-wrap { position: relative; }
-.input-prefix, .input-suffix {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  color: #94a3b8; font-size: 0.9rem; pointer-events: none;
-}
-.input-prefix { left: 13px; }
-.input-suffix { right: 13px; }
-
-input[type="number"] {
-  width: 100%;
-  padding: 13px 14px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  font-size: 1rem;
-  color: var(--slate);
-  outline: none;
-  background: white;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  -webkit-appearance: none;
-  appearance: none;
-}
-input[type="number"]:focus {
-  border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(30,90,60,0.12);
-}
-input.has-prefix { padding-left: 30px; }
-input.has-suffix { padding-right: 36px; }
-input[readonly]  { background: var(--slate-l); color: var(--slate-m); }
-
-/* ─── Toggle ───────────────────────────────────────────────────────────────── */
-.toggle-row {
-  display: flex; align-items: center; gap: 12px;
-  cursor: pointer; user-select: none;
-}
-.toggle {
-  width: 50px; height: 28px;
-  border-radius: 999px; background: #cbd5e1;
-  position: relative; flex-shrink: 0;
-  transition: background 0.2s; cursor: pointer; border: none;
-}
-.toggle.on { background: var(--green); }
-.toggle::after {
-  content: ''; position: absolute;
-  top: 4px; left: 4px;
-  width: 20px; height: 20px;
-  border-radius: 50%; background: white;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-  transition: transform 0.2s;
-}
-.toggle.on::after { transform: translateX(22px); }
-.toggle-label { font-size: 0.88rem; color: #475569; font-weight: 500; }
-
-/* ─── Advanced ─────────────────────────────────────────────────────────────── */
-.adv-toggle {
-  background: none; border: none; cursor: pointer;
-  font-size: 0.84rem; color: var(--slate-m);
-  display: flex; align-items: center; gap: 5px;
-  padding: 8px 0 0; min-height: 44px; width: 100%;
-}
-.adv-toggle:active { opacity: 0.7; }
-.adv-section { border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 4px; display: none; }
-.adv-section.open { display: block; }
-
-/* ─── Results ──────────────────────────────────────────────────────────────── */
-.total-card {
-  background: linear-gradient(135deg, var(--green), var(--green2));
-  border-radius: var(--rad);
-  padding: 22px;
-  color: white;
-  margin-bottom: 12px;
-}
-.total-card-label { font-size: 0.78rem; color: var(--green-m); font-weight: 600; margin-bottom: 4px; }
-#res-total        { font-size: 3rem; font-weight: 800; letter-spacing: -1.5px; line-height: 1; }
-#res-sub          { font-size: 0.82rem; color: var(--green-m); margin-top: 8px; }
-
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-.stat-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--rad); padding: 14px; }
-.stat-label { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #94a3b8; margin-bottom: 3px; }
-.stat-value { font-size: 1.3rem; font-weight: 700; color: var(--slate); }
-.stat-sub   { font-size: 0.72rem; color: #94a3b8; margin-top: 2px; }
-
-.bd-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 0; border-bottom: 1px solid #f8fafc;
-  font-size: 0.87rem;
-}
-.bd-row:last-child  { border-bottom: none; padding-bottom: 0; }
-.bd-label { color: var(--slate-m); }
-.bd-value { font-weight: 600; color: var(--slate); text-align: right; }
-.bd-total .bd-label { color: var(--slate); font-weight: 700; font-size: 0.95rem; }
-.bd-total .bd-value { color: var(--green); font-size: 1.05rem; }
-
-.unit-card {
-  background: var(--yellow); border: 1px solid var(--yellow-b);
-  border-radius: var(--rad); padding: 16px; margin-bottom: 12px;
-}
-.unit-card .card-title { color: #92400e; }
-.unit-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.88rem; }
-.unit-row span:first-child { color: #78350f; }
-.unit-row span:last-child  { font-weight: 700; color: #451a03; }
-.warn { color: #d97706; font-weight: 600; }
-
-/* ─── Bottom nav ───────────────────────────────────────────────────────────── */
-#bottom-nav {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--white);
-  border-top: 1px solid var(--border);
-  display: flex;
-  padding-bottom: var(--safe-b);
-  box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
-  z-index: 100;
-}
-.nav-btn {
-  flex: 1; background: none; border: none; cursor: pointer;
-  padding: 10px 0 8px;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-size: 0.72rem; font-weight: 600; color: var(--slate-m);
-  transition: color 0.12s;
-  min-height: 58px;
-}
-.nav-btn:active { opacity: 0.7; }
-.nav-btn.active { color: var(--green); }
-.nav-btn svg { width: 22px; height: 22px; }
-.nav-btn span { font-size: 0.7rem; font-weight: 600; }
-
-/* ─── Scrollbar hide ───────────────────────────────────────────────────────── */
-#scroll-area::-webkit-scrollbar { display: none; }
-#scroll-area { -ms-overflow-style: none; scrollbar-width: none; }
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0fdf4;display:flex;flex-direction:column;color:var(--slate);overflow:hidden}
+#hdr{background:var(--green);color:white;flex-shrink:0;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-icon{background:rgba(255,255,255,.15);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#hdr-title{font-size:.95rem;font-weight:700}
+#hdr-sub{font-size:.68rem;color:var(--green-m);margin-top:1px}
+#winner-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:5px 12px;text-align:right;flex-shrink:0;display:none}
+#winner-label{font-size:.62rem;color:var(--green-m);font-weight:600}
+#winner-val{font-size:.88rem;font-weight:800;line-height:1.2}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;padding-bottom:calc(70px + var(--safe-b) + 8px)}
+#scroll::-webkit-scrollbar{display:none}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#elev-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.elev-card{background:var(--white);border:2px solid var(--border);border-radius:var(--rad);padding:12px;transition:border-color .2s}
+.elev-card.winner{border-color:var(--green);background:#f0fdf4}
+.elev-name-row{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.elev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dot-a{background:#3b82f6}.dot-b{background:#f59e0b}
+.elev-name{font-size:.8rem;font-weight:700;color:var(--slate)}
+.winner-badge{margin-left:auto;background:var(--green);color:white;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;display:none}
+.elev-card.winner .winner-badge{display:block}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px}
+.hint{font-size:.68rem;color:#94a3b8;margin-top:3px}
+.input-wrap{position:relative}
+.pfx,.sfx{position:absolute;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.85rem;pointer-events:none}
+.pfx{left:10px}.sfx{right:10px}
+input[type=number],input[type=text]{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.95rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
+input.pfx-in{padding-left:24px}
+.toggle{width:44px;height:24px;border-radius:999px;background:#cbd5e1;position:relative;flex-shrink:0;border:none;cursor:pointer;transition:background .2s}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
+.toggle.on::after{transform:translateX(20px)}
+#net-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:10px}
+.net-box{background:var(--white);border:2px solid var(--border);border-radius:var(--rad);padding:14px;text-align:center;transition:border-color .2s,background .2s}
+.net-box.winner{border-color:var(--green);background:#f0fdf4}
+.net-box-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate-m);margin-bottom:2px}
+.net-box-price{font-size:1.6rem;font-weight:800;letter-spacing:-.5px;line-height:1}
+.net-box-sub{font-size:.68rem;color:var(--slate-m);margin-top:3px}
+.net-box.winner .net-box-sub{color:var(--green)}
+.vs-circle{width:36px;height:36px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--slate-m);flex-shrink:0}
+.diff-banner{background:linear-gradient(135deg,var(--green),var(--green2));color:white;border-radius:var(--rad);padding:14px 16px;text-align:center;margin-bottom:10px;display:none}
+.diff-banner-label{font-size:.72rem;color:var(--green-m);font-weight:600;margin-bottom:2px}
+.diff-banner-val{font-size:1.4rem;font-weight:800;letter-spacing:-.5px}
+.diff-banner-sub{font-size:.75rem;color:var(--green-m);margin-top:4px}
+#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-b);box-shadow:0 -2px 12px rgba(0,0,0,.06);z-index:100}
+.nbtn{flex:1;background:none;border:none;cursor:pointer;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate-m);transition:color .12s;min-height:56px}
+.nbtn:active{opacity:.7}
+.nbtn.active{color:var(--green)}
+.nbtn svg{width:20px;height:20px}
+.nbtn span{font-size:.68rem;font-weight:600}
+.sec{display:none}
+.sec.active{display:block}
+.reset-btn{width:100%;padding:13px;background:white;border:1.5px solid var(--border);border-radius:10px;font-size:.87rem;font-weight:600;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:4px}
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<div id="app-header">
-  <div class="header-left">
-    <div class="truck-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-           stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/>
-        <rect x="9" y="11" width="14" height="10" rx="2"/>
-        <circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-      </svg>
+<div id="hdr">
+  <div id="hdr-top">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="hdr-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div>
+        <div id="hdr-title">Elevator Compare</div>
+        <div id="hdr-sub">Net price after hauling</div>
+      </div>
     </div>
-    <div>
-      <div id="header-title">Trucking Calc</div>
-      <div id="header-sub">Tap to configure</div>
+    <div id="winner-pill">
+      <div id="winner-label">Best price</div>
+      <div id="winner-val">—</div>
     </div>
-  </div>
-  <div class="total-pill">
-    <div id="pill-total">$0.00</div>
-    <div id="pill-sub">Total charge</div>
   </div>
 </div>
 
-<!-- Scroll area -->
-<div id="scroll-area">
+<div id="scroll">
 
-  <!-- ══ CONFIGURE TAB ══════════════════════════════════════════════════════ -->
-  <div id="sec-configure" class="section active">
-
-    <div class="card">
-      <div class="card-title">Material</div>
-      <div class="chip-grid" id="material-grid">
-        <button class="chip active" data-material="corn"       onclick="selectMaterial(this)">Corn</button>
-        <button class="chip"        data-material="soybeans"   onclick="selectMaterial(this)">Soybeans</button>
-        <button class="chip"        data-material="wheat"      onclick="selectMaterial(this)">Wheat</button>
-        <button class="chip"        data-material="oats"       onclick="selectMaterial(this)">Oats</button>
-        <button class="chip"        data-material="barley"     onclick="selectMaterial(this)">Barley</button>
-        <button class="chip"        data-material="fertilizer" onclick="selectMaterial(this)">Fertilizer</button>
-        <button class="chip"        data-material="limestone"  onclick="selectMaterial(this)">Limestone</button>
-        <button class="chip"        data-material="seed"       onclick="selectMaterial(this)">Seed</button>
-        <button class="chip"        data-material="other"      onclick="selectMaterial(this)">Other</button>
-      </div>
-    </div>
+  <!-- COMPARE TAB -->
+  <div id="sec-compare" class="sec active">
 
     <div class="card">
-      <div class="card-title">Pricing Method</div>
-      <div class="method-grid" id="method-grid">
-        <button class="method-btn active" data-method="per_bushel" onclick="selectMethod(this)">Per Bushel</button>
-        <button class="method-btn"        data-method="per_ton"    onclick="selectMethod(this)">Per Ton</button>
-        <button class="method-btn"        data-method="per_mile"   onclick="selectMethod(this)">Per Mile</button>
-        <button class="method-btn"        data-method="per_load"   onclick="selectMethod(this)">Per Load (Flat)</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Load Details</div>
-
-      <div class="field">
-        <label for="num-loads">Number of Loads</label>
-        <input type="number" id="num-loads" inputmode="decimal" min="1" value="10" oninput="calc()">
-      </div>
-
-      <div class="field" id="row-bushels">
-        <label for="bushels-per-load">Bushels per Load</label>
-        <input type="number" id="bushels-per-load" inputmode="decimal" min="0" value="900" oninput="calc()">
-        <div class="hint" id="hint-bu">≈ 22.5 tons per load (56 lbs/bu)</div>
-      </div>
-
-      <div class="field" id="row-tons">
-        <label for="tons-per-load">Tons per Load</label>
-        <input type="number" id="tons-per-load" inputmode="decimal" min="0" step="0.5" value="22" oninput="calc()">
-      </div>
-
-      <div class="field">
-        <label for="miles-one-way">Miles (one-way)</label>
-        <input type="number" id="miles-one-way" inputmode="decimal" min="0" step="0.1" value="20" oninput="calc()">
-      </div>
-
-      <div class="field">
-        <div class="toggle-row" onclick="toggleRoundTrip()">
-          <button class="toggle" id="rt-toggle" type="button"></button>
-          <span class="toggle-label" id="rt-label">Round trip (20.0 mi per load)</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Rate</div>
-
-      <div class="field">
-        <label for="rate" id="rate-label">Rate (Per Bushel)</label>
-        <div class="input-wrap">
-          <span class="input-prefix">$</span>
-          <input type="number" id="rate" class="has-prefix" inputmode="decimal" min="0" step="0.01" value="0.12" oninput="calc()">
-        </div>
-      </div>
-
-      <button class="adv-toggle" type="button" onclick="toggleAdv()">
-        <svg id="adv-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-        Advanced options
-      </button>
-
-      <div class="adv-section" id="adv-section">
-        <div class="field">
-          <label for="min-charge">Minimum Charge per Load</label>
-          <div class="input-wrap">
-            <span class="input-prefix">$</span>
-            <input type="number" id="min-charge" class="has-prefix" inputmode="decimal" min="0" step="0.01" placeholder="0.00" oninput="calc()">
+      <div class="card-title">Grain Info</div>
+      <div class="row3">
+        <div class="field" style="margin-bottom:0">
+          <label>Futures Price</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="futures" class="pfx-in" inputmode="decimal" step="0.01" value="4.50" oninput="calc()">
           </div>
         </div>
         <div class="field" style="margin-bottom:0">
-          <label for="fuel-surcharge">Fuel Surcharge %</label>
-          <div class="input-wrap">
-            <input type="number" id="fuel-surcharge" class="has-suffix" inputmode="decimal" min="0" max="100" step="0.1" placeholder="0" oninput="calc()">
-            <span class="input-suffix">%</span>
+          <label>Bu / Load</label>
+          <input type="number" id="bu-load" inputmode="decimal" value="900" oninput="applyRate();calc()">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Total Bushels</label>
+          <input type="number" id="total-bu" inputmode="decimal" value="10000" oninput="calc()">
+        </div>
+      </div>
+    </div>
+
+    <div id="elev-grid">
+      <!-- Elevator A -->
+      <div class="elev-card" id="card-a">
+        <div class="elev-name-row">
+          <div class="elev-dot dot-a"></div>
+          <div class="elev-name">Elevator A</div>
+          <div class="winner-badge">Best</div>
+        </div>
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="name-a" placeholder="Elevator A" oninput="calc()">
+        </div>
+        <div class="field">
+          <label>Basis</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="basis-a" class="pfx-in" inputmode="decimal" step="0.01" value="-0.25" oninput="calc()">
+          </div>
+          <div class="hint" id="cash-a">Cash: —</div>
+        </div>
+        <div class="field">
+          <label>Miles (one-way)</label>
+          <input type="number" id="miles-a" inputmode="decimal" step="0.1" value="10" oninput="applyRate();calc()">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Haul Cost / Bu</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="haul-a" class="pfx-in" inputmode="decimal" step="0.001" value="0.10" oninput="calc()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Elevator B -->
+      <div class="elev-card" id="card-b">
+        <div class="elev-name-row">
+          <div class="elev-dot dot-b"></div>
+          <div class="elev-name">Elevator B</div>
+          <div class="winner-badge">Best</div>
+        </div>
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="name-b" placeholder="Elevator B" oninput="calc()">
+        </div>
+        <div class="field">
+          <label>Basis</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="basis-b" class="pfx-in" inputmode="decimal" step="0.01" value="-0.15" oninput="calc()">
+          </div>
+          <div class="hint" id="cash-b">Cash: —</div>
+        </div>
+        <div class="field">
+          <label>Miles (one-way)</label>
+          <input type="number" id="miles-b" inputmode="decimal" step="0.1" value="25" oninput="applyRate();calc()">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Haul Cost / Bu</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="haul-b" class="pfx-in" inputmode="decimal" step="0.001" value="0.18" oninput="calc()">
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Reset button inside configure -->
-    <button onclick="resetAll()" style="
-      width:100%; padding:14px; background:white; border:1.5px solid var(--border);
-      border-radius:10px; font-size:0.9rem; font-weight:600; color:var(--slate-m);
-      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-      margin-bottom:4px;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-        <path d="M3 3v5h5"/>
-      </svg>
-      Reset All
+    <!-- Rate helper -->
+    <div class="card">
+      <div class="card-title">Haul Rate Helper — calculates cost/bu from miles</div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label>Your Rate ($ / mile)</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="rate-mi" class="pfx-in" inputmode="decimal" step="0.01" placeholder="e.g. 3.50" oninput="applyRate()">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Trip Type</label>
+          <div style="display:flex;align-items:center;gap:10px;padding-top:7px">
+            <button class="toggle" id="rt-tog" type="button" onclick="toggleRT()"></button>
+            <span style="font-size:.82rem;color:#475569" id="rt-lbl">One-way</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="reset-btn" onclick="resetAll()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Reset
     </button>
   </div>
 
-  <!-- ══ RESULTS TAB ════════════════════════════════════════════════════════ -->
-  <div id="sec-results" class="section">
+  <!-- RESULTS TAB -->
+  <div id="sec-results" class="sec">
 
-    <div class="total-card">
-      <div class="total-card-label">Total Trucking Charge</div>
-      <div id="res-total">$0.00</div>
-      <div id="res-sub">0 loads &nbsp;•&nbsp; $0.00 per load</div>
+    <div id="net-compare">
+      <div class="net-box" id="net-box-a">
+        <div class="net-box-label" id="res-name-a">Elevator A</div>
+        <div class="net-box-price" id="net-price-a" style="color:#3b82f6">—</div>
+        <div class="net-box-sub" id="net-sub-a">/bushel net</div>
+      </div>
+      <div class="vs-circle">VS</div>
+      <div class="net-box" id="net-box-b">
+        <div class="net-box-label" id="res-name-b">Elevator B</div>
+        <div class="net-box-price" id="net-price-b" style="color:#f59e0b">—</div>
+        <div class="net-box-sub" id="net-sub-b">/bushel net</div>
+      </div>
     </div>
 
-    <div class="stat-grid" id="stat-grid"></div>
-
-    <div class="card">
-      <div class="card-title">Charge Breakdown</div>
-      <div id="breakdown-rows"></div>
+    <div class="diff-banner" id="diff-banner">
+      <div class="diff-banner-label">Haul to <span id="diff-winner"></span> and earn</div>
+      <div class="diff-banner-val" id="diff-val">—</div>
+      <div class="diff-banner-sub" id="diff-sub">more on your bushels</div>
     </div>
 
-    <div class="unit-card" id="unit-card" style="display:none">
-      <div class="card-title">Unit Cost Summary</div>
-      <div id="unit-rows"></div>
-    </div>
+    <div class="card" id="result-card" style="display:none">
+      <div class="card-title">Full Breakdown</div>
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;font-size:.82rem;align-items:center">
+        <div></div>
+        <div style="font-weight:700;color:#3b82f6;text-align:right" id="col-a">A</div>
+        <div style="font-weight:700;color:#f59e0b;text-align:right" id="col-b">B</div>
 
+        <div style="color:var(--slate-m);padding:7px 0 2px;border-top:1px solid #f1f5f9;grid-column:1/-1;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Price</div>
+        <div style="color:var(--slate-m)">Futures</div>
+        <div style="text-align:right;font-weight:600" id="r-fut-a">—</div>
+        <div style="text-align:right;font-weight:600" id="r-fut-b">—</div>
+        <div style="color:var(--slate-m)">Basis</div>
+        <div style="text-align:right;font-weight:600" id="r-bas-a">—</div>
+        <div style="text-align:right;font-weight:600" id="r-bas-b">—</div>
+        <div style="color:var(--slate-m)">Cash price</div>
+        <div style="text-align:right;font-weight:600" id="r-cash-a">—</div>
+        <div style="text-align:right;font-weight:600" id="r-cash-b">—</div>
+
+        <div style="color:var(--slate-m);padding:7px 0 2px;border-top:1px solid #f1f5f9;grid-column:1/-1;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Hauling</div>
+        <div style="color:var(--slate-m)">Miles</div>
+        <div style="text-align:right;font-weight:600" id="r-mi-a">—</div>
+        <div style="text-align:right;font-weight:600" id="r-mi-b">—</div>
+        <div style="color:var(--slate-m)">Cost / bu</div>
+        <div style="text-align:right;font-weight:600;color:#ef4444" id="r-haul-a">—</div>
+        <div style="text-align:right;font-weight:600;color:#ef4444" id="r-haul-b">—</div>
+
+        <div style="color:var(--slate-m);padding:7px 0 2px;border-top:1px solid #f1f5f9;grid-column:1/-1;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Result</div>
+        <div style="font-weight:700;color:var(--slate)">Net / bushel</div>
+        <div style="text-align:right;font-weight:800;font-size:.95rem" id="r-net-a">—</div>
+        <div style="text-align:right;font-weight:800;font-size:.95rem" id="r-net-b">—</div>
+        <div style="color:var(--slate-m)">Total bushels</div>
+        <div style="text-align:right;font-weight:600" id="r-tbu-a">—</div>
+        <div style="text-align:right;font-weight:600" id="r-tbu-b">—</div>
+        <div style="font-weight:700;color:var(--slate)">Total revenue</div>
+        <div style="text-align:right;font-weight:800;font-size:.95rem" id="r-rev-a">—</div>
+        <div style="text-align:right;font-weight:800;font-size:.95rem" id="r-rev-b">—</div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Bottom navigation -->
-<nav id="bottom-nav">
-  <button class="nav-btn active" id="nav-configure" onclick="showTab('configure')">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<nav id="bnav">
+  <button class="nbtn active" id="nav-compare" onclick="showTab('compare')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
       <circle cx="12" cy="12" r="3"/>
     </svg>
-    <span>Configure</span>
+    <span>Compare</span>
   </button>
-  <button class="nav-btn" id="nav-results" onclick="showTab('results')">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-      <line x1="6" y1="20" x2="6" y2="14"/>
+  <button class="nbtn" id="nav-results" onclick="showTab('results')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
     </svg>
     <span>Results</span>
   </button>
 </nav>
 
 <script>
-// ── Data ──────────────────────────────────────────────────────────────────────
-const MATERIALS = {
-  corn:       { label:'Corn',       unit:'bushel', lbs:56, buPerLoad:900 },
-  soybeans:   { label:'Soybeans',   unit:'bushel', lbs:60, buPerLoad:850 },
-  wheat:      { label:'Wheat',      unit:'bushel', lbs:60, buPerLoad:850 },
-  oats:       { label:'Oats',       unit:'bushel', lbs:32, buPerLoad:1000 },
-  barley:     { label:'Barley',     unit:'bushel', lbs:48, buPerLoad:900 },
-  fertilizer: { label:'Fertilizer', unit:'ton',    tonsPerLoad:22 },
-  limestone:  { label:'Limestone',  unit:'ton',    tonsPerLoad:22 },
-  seed:       { label:'Seed',       unit:'ton',    tonsPerLoad:20 },
-  other:      { label:'Other',      unit:'ton',    tonsPerLoad:20 },
-};
+let roundTrip=false;
+function fmt(n,d=2){return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function fmtC(n,d=2){return(n<0?'-$':'$')+fmt(Math.abs(n),d);}
+function fmtSign(n,d=2){return(n>=0?'+$':'-$')+fmt(Math.abs(n),d);}
+function v(id){return parseFloat(document.getElementById(id).value)||0;}
+function t(id){return document.getElementById(id).value.trim();}
+function set(id,val){document.getElementById(id).textContent=val;}
 
-const DEFAULT_RATES = { per_bushel:'0.12', per_ton:'8.00', per_mile:'4.00', per_load:'350.00' };
-const METHOD_LABELS = { per_bushel:'Per Bushel', per_ton:'Per Ton', per_mile:'Per Mile', per_load:'Per Load (Flat)' };
-
-// ── State ─────────────────────────────────────────────────────────────────────
-let material  = 'corn';
-let method    = 'per_bushel';
-let roundTrip = false;
-let advOpen   = false;
-let activeTab = 'configure';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function fmt(n, d = 2) { return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-function fmtC(n)       { return '$' + fmt(n); }
-function v(id)         { return parseFloat(document.getElementById(id).value) || 0; }
-
-// ── Tab switching ─────────────────────────────────────────────────────────────
-function showTab(tab) {
-  activeTab = tab;
-  document.getElementById('sec-configure').classList.toggle('active', tab === 'configure');
-  document.getElementById('sec-results').classList.toggle('active', tab === 'results');
-  document.getElementById('nav-configure').classList.toggle('active', tab === 'configure');
-  document.getElementById('nav-results').classList.toggle('active', tab === 'results');
-  document.getElementById('scroll-area').scrollTop = 0;
-  document.getElementById('header-sub').textContent = tab === 'configure' ? 'Tap to configure' : 'Your estimate';
+function showTab(tab){
+  ['compare','results'].forEach(s=>{
+    document.getElementById('sec-'+s).classList.toggle('active',s===tab);
+    document.getElementById('nav-'+s).classList.toggle('active',s===tab);
+  });
+  document.getElementById('scroll').scrollTop=0;
 }
 
-// ── Material ──────────────────────────────────────────────────────────────────
-function selectMaterial(btn) {
-  material = btn.dataset.material;
-  document.querySelectorAll('#material-grid .chip').forEach(b => b.classList.toggle('active', b === btn));
-  const cfg = MATERIALS[material];
-  if (cfg.unit === 'bushel') document.getElementById('bushels-per-load').value = cfg.buPerLoad;
-  else                       document.getElementById('tons-per-load').value    = cfg.tonsPerLoad;
-  updateVisibility();
+function toggleRT(){
+  roundTrip=!roundTrip;
+  document.getElementById('rt-tog').classList.toggle('on',roundTrip);
+  document.getElementById('rt-lbl').textContent=roundTrip?'Round trip':'One-way';
+  applyRate();
+}
+
+function applyRate(){
+  const rate=v('rate-mi'), buLoad=v('bu-load');
+  if(!rate||!buLoad) return;
+  const mult=roundTrip?2:1;
+  ['a','b'].forEach(x=>{
+    const miles=v('miles-'+x);
+    if(miles) document.getElementById('haul-'+x).value=fmt((miles*mult*rate)/buLoad,3);
+  });
   calc();
 }
 
-// ── Method ────────────────────────────────────────────────────────────────────
-function selectMethod(btn) {
-  method = btn.dataset.method;
-  document.querySelectorAll('#method-grid .method-btn').forEach(b => b.classList.toggle('active', b === btn));
-  document.getElementById('rate').value = DEFAULT_RATES[method];
-  document.getElementById('rate-label').textContent = 'Rate (' + METHOD_LABELS[method] + ')';
-  updateVisibility();
-  calc();
-}
+function calc(){
+  const futures=v('futures'), buLoad=v('bu-load'), totalBu=v('total-bu');
+  const nameA=t('name-a')||'Elevator A', nameB=t('name-b')||'Elevator B';
+  const basisA=v('basis-a'), basisB=v('basis-b');
+  const milesA=v('miles-a'), milesB=v('miles-b');
+  const haulA=v('haul-a'),   haulB=v('haul-b');
 
-// ── Visibility ────────────────────────────────────────────────────────────────
-function updateVisibility() {
-  const cfg = MATERIALS[material];
-  const isBu = cfg.unit === 'bushel';
-  const needsQty = method !== 'per_mile' && method !== 'per_load';
-  document.getElementById('row-bushels').style.display = (isBu && needsQty)  ? 'block' : 'none';
-  document.getElementById('row-tons').style.display    = (!isBu && needsQty) ? 'block' : 'none';
-}
+  const cashA=futures+basisA, cashB=futures+basisB;
+  const netA=cashA-haulA,     netB=cashB-haulB;
+  const totalRevA=netA*totalBu, totalRevB=netB*totalBu;
+  const diff=Math.abs(netA-netB);
+  const winner=netA>=netB?'A':'B';
+  const winnerName=netA>=netB?nameA:nameB;
 
-// ── Round trip ────────────────────────────────────────────────────────────────
-function toggleRoundTrip() {
-  roundTrip = !roundTrip;
-  document.getElementById('rt-toggle').classList.toggle('on', roundTrip);
-  calc();
-}
+  // Cash hints
+  document.getElementById('cash-a').textContent='Cash: $'+fmt(cashA);
+  document.getElementById('cash-b').textContent='Cash: $'+fmt(cashB);
 
-// ── Advanced ──────────────────────────────────────────────────────────────────
-function toggleAdv() {
-  advOpen = !advOpen;
-  document.getElementById('adv-section').classList.toggle('open', advOpen);
-  document.getElementById('adv-icon').querySelector('polyline')
-    .setAttribute('points', advOpen ? '6 15 12 9 18 15' : '6 9 12 15 18 9');
-}
+  // Winner borders on compare tab
+  document.getElementById('card-a').classList.toggle('winner',winner==='A');
+  document.getElementById('card-b').classList.toggle('winner',winner==='B');
 
-// ── Calculation ───────────────────────────────────────────────────────────────
-function calc() {
-  const cfg      = MATERIALS[material];
-  const loads    = v('num-loads');
-  const bpl      = v('bushels-per-load');
-  const tpl      = v('tons-per-load');
-  const milesOW  = v('miles-one-way');
-  const miles    = milesOW * (roundTrip ? 2 : 1);
-  const rate     = v('rate');
-  const minC     = v('min-charge');
-  const fuelPct  = v('fuel-surcharge');
-  const lbs      = cfg.lbs || 56;
-  const tonsFromBu = (bpl * lbs) / 2000;
+  // Header pill
+  const pill=document.getElementById('winner-pill');
+  pill.style.display='block';
+  set('winner-val', winnerName+' +$'+fmt(diff,3)+'/bu');
 
-  // Update hints
-  document.getElementById('hint-bu').textContent =
-    '≈ ' + fmt(tonsFromBu, 2) + ' tons per load (' + lbs + ' lbs/bu)';
-  document.getElementById('rt-label').textContent =
-    'Round trip (' + fmt(roundTrip ? milesOW * 2 : milesOW, 1) + ' mi per load)';
+  // Net boxes
+  set('res-name-a',nameA); set('res-name-b',nameB);
+  set('net-price-a','$'+fmt(netA)); set('net-price-b','$'+fmt(netB));
+  document.getElementById('net-box-a').classList.toggle('winner',winner==='A');
+  document.getElementById('net-box-b').classList.toggle('winner',winner==='B');
+  set('net-sub-a',winner==='A'?'✓ Best net price':'/bushel net');
+  set('net-sub-b',winner==='B'?'✓ Best net price':'/bushel net');
 
-  // Totals
-  let totalBu = 0, totalTons = 0;
-  const totalMiles = loads * miles;
-  if (cfg.unit === 'bushel') { totalBu = loads * bpl; totalTons = loads * tonsFromBu; }
-  else                       { totalTons = loads * tpl; }
-
-  // Per-load charge
-  let cpl = 0;
-  if (method === 'per_bushel') cpl = rate * (cfg.unit === 'bushel' ? bpl : 0);
-  if (method === 'per_ton')    cpl = rate * (cfg.unit === 'bushel' ? tonsFromBu : tpl);
-  if (method === 'per_mile')   cpl = rate * miles;
-  if (method === 'per_load')   cpl = rate;
-
-  const minApplied = minC > 0 && cpl < minC;
-  if (minApplied) cpl = minC;
-
-  const baseTotal  = cpl * loads;
-  const fuelAmt    = baseTotal * (fuelPct / 100);
-  const grand      = baseTotal + fuelAmt;
-  const costPerBu  = totalBu   > 0 ? grand / totalBu   : 0;
-  const costPerTon = totalTons > 0 ? grand / totalTons : 0;
-  const costPerMi  = totalMiles > 0 ? grand / totalMiles : 0;
-
-  // ── Header pill ──────────────────────────────────────────────────────────
-  document.getElementById('pill-total').textContent = fmtC(grand);
-  document.getElementById('pill-sub').textContent   = fmt(loads, 0) + ' loads';
-
-  // ── Results tab ──────────────────────────────────────────────────────────
-  document.getElementById('res-total').textContent = fmtC(grand);
-  document.getElementById('res-sub').innerHTML =
-    fmt(loads, 0) + ' load' + (loads !== 1 ? 's' : '') +
-    ' &nbsp;•&nbsp; ' + fmtC(cpl) + ' per load';
-
-  // Stats
-  const stats = [];
-  if (totalBu > 0)    stats.push({ label:'Total Bushels', value: fmt(totalBu, 0) + ' bu', sub: fmtC(costPerBu) + '/bu' });
-  if (totalTons > 0)  stats.push({ label:'Total Tons',    value: fmt(totalTons, 1) + ' t', sub: fmtC(costPerTon) + '/ton' });
-  if (totalMiles > 0) stats.push({ label:'Total Miles',   value: fmt(totalMiles, 0) + ' mi', sub: fmtC(costPerMi) + '/mi' });
-  stats.push({ label:'Charge / Load', value: fmtC(cpl), sub: fmt(loads, 0) + ' loads' });
-
-  document.getElementById('stat-grid').innerHTML = stats.map(s =>
-    `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.value}</div><div class="stat-sub">${s.sub}</div></div>`
-  ).join('');
+  // Diff banner
+  const banner=document.getElementById('diff-banner');
+  if(diff>0.0005){
+    banner.style.display='block';
+    set('diff-winner',winnerName);
+    set('diff-val','$'+fmt(diff,3)+'/bu  →  $'+fmt(diff*totalBu,0)+' total');
+    set('diff-sub','more on '+fmt(totalBu,0)+' bushels');
+  } else {
+    banner.style.display='none';
+  }
 
   // Breakdown
-  const rows = [];
-  rows.push({ l: 'Rate', r: fmtC(rate) + ' / ' + METHOD_LABELS[method].replace('Per ', '').toLowerCase() });
-  if (method === 'per_bushel' && totalBu > 0)  rows.push({ l: 'Bushels hauled', r: fmt(totalBu, 0) + ' bu' });
-  if (method === 'per_ton'    && totalTons > 0) rows.push({ l: 'Tons hauled', r: fmt(totalTons, 2) + ' t' });
-  if (method === 'per_mile') rows.push({ l: 'Total miles', r: fmt(totalMiles, 0) + ' mi (' + fmt(miles, 1) + ' × ' + fmt(loads, 0) + ' loads)' });
-  if (method === 'per_load') rows.push({ l: 'Loads', r: fmt(loads, 0) });
-  if (minApplied)  rows.push({ l: '<span class="warn">Minimum charge applied</span>', r: '<span class="warn">' + fmtC(minC) + '/load</span>' });
-  rows.push({ l: 'Base total', r: fmtC(baseTotal) });
-  if (fuelAmt > 0) rows.push({ l: 'Fuel surcharge (' + fuelPct + '%)', r: '+ ' + fmtC(fuelAmt) });
+  set('col-a',nameA); set('col-b',nameB);
+  set('r-fut-a','$'+fmt(futures)); set('r-fut-b','$'+fmt(futures));
+  set('r-bas-a',fmtSign(basisA));  set('r-bas-b',fmtSign(basisB));
+  set('r-cash-a','$'+fmt(cashA));  set('r-cash-b','$'+fmt(cashB));
+  set('r-mi-a',milesA+' mi');      set('r-mi-b',milesB+' mi');
+  set('r-haul-a','-$'+fmt(haulA,3)); set('r-haul-b','-$'+fmt(haulB,3));
 
-  document.getElementById('breakdown-rows').innerHTML =
-    rows.map(r => `<div class="bd-row"><span class="bd-label">${r.l}</span><span class="bd-value">${r.r}</span></div>`).join('') +
-    `<div class="bd-row bd-total"><span class="bd-label">Grand Total</span><span class="bd-value">${fmtC(grand)}</span></div>`;
+  const netElA=document.getElementById('r-net-a'), netElB=document.getElementById('r-net-b');
+  set('r-net-a','$'+fmt(netA)); set('r-net-b','$'+fmt(netB));
+  netElA.style.color=winner==='A'?'var(--green)':'var(--slate)';
+  netElB.style.color=winner==='B'?'var(--green)':'var(--slate)';
 
-  // Unit costs
-  const uc = document.getElementById('unit-card');
-  if (totalBu > 0 || totalTons > 0) {
-    uc.style.display = 'block';
-    const ur = [];
-    if (totalBu > 0)    ur.push({ l:'Cost per bushel', r: fmtC(costPerBu)  + '/bu'  });
-    if (totalTons > 0)  ur.push({ l:'Cost per ton',    r: fmtC(costPerTon) + '/ton' });
-    if (totalMiles > 0) ur.push({ l:'Cost per mile',   r: fmtC(costPerMi)  + '/mi'  });
-    document.getElementById('unit-rows').innerHTML =
-      ur.map(r => `<div class="unit-row"><span>${r.l}</span><span>${r.r}</span></div>`).join('');
-  } else {
-    uc.style.display = 'none';
-  }
+  set('r-tbu-a',fmt(totalBu,0)+' bu'); set('r-tbu-b',fmt(totalBu,0)+' bu');
+  const revElA=document.getElementById('r-rev-a'), revElB=document.getElementById('r-rev-b');
+  set('r-rev-a','$'+fmt(totalRevA,0)); set('r-rev-b','$'+fmt(totalRevB,0));
+  revElA.style.color=winner==='A'?'var(--green)':'var(--slate)';
+  revElB.style.color=winner==='B'?'var(--green)':'var(--slate)';
+
+  document.getElementById('result-card').style.display='block';
 }
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
-function resetAll() {
-  material = 'corn'; method = 'per_bushel'; roundTrip = false; advOpen = false;
-  document.querySelectorAll('#material-grid .chip').forEach(b => b.classList.toggle('active', b.dataset.material === 'corn'));
-  document.querySelectorAll('#method-grid .method-btn').forEach(b => b.classList.toggle('active', b.dataset.method === 'per_bushel'));
-  document.getElementById('num-loads').value        = '10';
-  document.getElementById('bushels-per-load').value = '900';
-  document.getElementById('tons-per-load').value    = '22';
-  document.getElementById('miles-one-way').value    = '20';
-  document.getElementById('rate').value             = '0.12';
-  document.getElementById('min-charge').value       = '';
-  document.getElementById('fuel-surcharge').value   = '';
-  document.getElementById('rate-label').textContent = 'Rate (Per Bushel)';
-  document.getElementById('rt-toggle').classList.remove('on');
-  document.getElementById('adv-section').classList.remove('open');
-  document.getElementById('adv-icon').querySelector('polyline').setAttribute('points', '6 9 12 15 18 9');
-  updateVisibility();
-  calc();
-  showTab('configure');
+function resetAll(){
+  ['futures','bu-load','total-bu'].forEach((id,i)=>document.getElementById(id).value=['4.50','900','10000'][i]);
+  document.getElementById('name-a').value=''; document.getElementById('name-b').value='';
+  document.getElementById('basis-a').value='-0.25'; document.getElementById('basis-b').value='-0.15';
+  document.getElementById('miles-a').value='10';   document.getElementById('miles-b').value='25';
+  document.getElementById('haul-a').value='0.10';  document.getElementById('haul-b').value='0.18';
+  document.getElementById('rate-mi').value='';
+  roundTrip=false;
+  document.getElementById('rt-tog').classList.remove('on');
+  document.getElementById('rt-lbl').textContent='One-way';
+  calc(); showTab('compare');
 }
 
-// ── PWA service worker ────────────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-updateVisibility();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 calc();
 </script>
 </body>
