@@ -52,6 +52,7 @@ label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom
 input[type=number],input[type=text]{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.95rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
 input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
 input.pfx-in{padding-left:24px}
+input.sfx-in{padding-right:36px}
 .toggle{width:44px;height:24px;border-radius:999px;background:#cbd5e1;position:relative;flex-shrink:0;border:none;cursor:pointer;transition:background .2s}
 .toggle.on{background:var(--green)}
 .toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
@@ -77,19 +78,19 @@ input.pfx-in{padding-left:24px}
 .sec{display:none}
 .sec.active{display:block}
 .reset-btn{width:100%;padding:13px;background:white;border:1.5px solid var(--border);border-radius:10px;font-size:.87rem;font-weight:600;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:4px}
-/* Mode tabs */
 .mode-tabs{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px;margin-bottom:12px}
 .mode-tab{flex:1;background:none;border:none;padding:7px 4px;border-radius:6px;font-size:.75rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:background .15s,color .15s}
 .mode-tab.active{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.1)}
-/* Breakdown box */
-.breakdown-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:11px 12px;margin-top:10px;font-size:.78rem;color:#475569;line-height:1.8}
-.breakdown-row{display:flex;justify-content:space-between;align-items:baseline}
-.breakdown-label{color:#94a3b8}
-.breakdown-total{font-weight:700;color:var(--slate);border-top:1px solid #e2e8f0;margin-top:4px;padding-top:4px}
-.breakdown-cbu{font-size:.85rem;font-weight:800;color:var(--green)}
-.elev-section{margin-bottom:10px}
-.elev-section:last-child{margin-bottom:0}
-.elev-section-title{display:flex;align-items:center;gap:5px;font-weight:700;color:var(--slate);margin-bottom:4px;font-size:.8rem}
+.breakdown-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:11px 12px;margin-top:10px}
+.bd-elev{margin-bottom:10px}
+.bd-elev:last-child{margin-bottom:0}
+.bd-elev-title{display:flex;align-items:center;gap:5px;font-weight:700;color:var(--slate);margin-bottom:6px;font-size:.78rem}
+.bd-row{display:flex;justify-content:space-between;align-items:baseline;font-size:.75rem;line-height:1.7}
+.bd-lbl{color:#94a3b8;flex:1;padding-right:8px;font-size:.7rem}
+.bd-val{font-weight:600;color:var(--slate);white-space:nowrap}
+.bd-total{border-top:1px solid #e2e8f0;margin-top:4px;padding-top:5px;font-weight:700}
+.bd-cbu{font-size:.85rem;font-weight:800;color:var(--green)}
+.bd-divider{border:none;border-top:1px solid #e2e8f0;margin:8px 0}
 </style>
 </head>
 <body>
@@ -162,10 +163,17 @@ input.pfx-in{padding-left:24px}
           <label>Miles (one-way)</label>
           <input type="number" id="miles-a" inputmode="decimal" step="0.1" value="10" oninput="applyRate();calc()">
         </div>
+        <div class="field">
+          <label>Wait Time</label>
+          <div class="input-wrap">
+            <input type="number" id="wait-a" class="sfx-in" inputmode="decimal" step="1" placeholder="0" value="0" oninput="applyRate()">
+            <span class="sfx">min</span>
+          </div>
+        </div>
         <div class="field" style="margin-bottom:0">
           <label>Haul Cost / Bu</label>
           <div class="input-wrap"><span class="pfx">$</span>
-            <input type="number" id="haul-a" class="pfx-in" inputmode="decimal" step="0.001" value="" placeholder="0.000" oninput="calc()">
+            <input type="number" id="haul-a" class="pfx-in" inputmode="decimal" step="0.001" placeholder="0.000" oninput="calc()">
           </div>
           <div class="hint" id="haul-hint-a"></div>
         </div>
@@ -193,10 +201,17 @@ input.pfx-in{padding-left:24px}
           <label>Miles (one-way)</label>
           <input type="number" id="miles-b" inputmode="decimal" step="0.1" value="25" oninput="applyRate();calc()">
         </div>
+        <div class="field">
+          <label>Wait Time</label>
+          <div class="input-wrap">
+            <input type="number" id="wait-b" class="sfx-in" inputmode="decimal" step="1" placeholder="0" value="0" oninput="applyRate()">
+            <span class="sfx">min</span>
+          </div>
+        </div>
         <div class="field" style="margin-bottom:0">
           <label>Haul Cost / Bu</label>
           <div class="input-wrap"><span class="pfx">$</span>
-            <input type="number" id="haul-b" class="pfx-in" inputmode="decimal" step="0.001" value="" placeholder="0.000" oninput="calc()">
+            <input type="number" id="haul-b" class="pfx-in" inputmode="decimal" step="0.001" placeholder="0.000" oninput="calc()">
           </div>
           <div class="hint" id="haul-hint-b"></div>
         </div>
@@ -228,7 +243,7 @@ input.pfx-in{padding-left:24px}
             </div>
           </div>
         </div>
-        <div class="hint" style="margin-top:8px">Enter your rate and miles above — haul cost/bu fills automatically.</div>
+        <div class="hint" style="margin-top:8px">Haul cost/bu fills automatically from your rate × miles.</div>
       </div>
 
       <!-- Detailed mode -->
@@ -237,25 +252,42 @@ input.pfx-in{padding-left:24px}
           <div class="field" style="margin-bottom:0">
             <label>Fuel Efficiency</label>
             <div class="input-wrap">
-              <input type="number" id="mpg" inputmode="decimal" step="0.1" placeholder="e.g. 8" oninput="applyRate()" style="padding-right:42px">
+              <input type="number" id="mpg" class="sfx-in" inputmode="decimal" step="0.1" placeholder="e.g. 8" oninput="applyRate()">
               <span class="sfx">MPG</span>
             </div>
           </div>
           <div class="field" style="margin-bottom:0">
             <label>Fuel Price</label>
             <div class="input-wrap"><span class="pfx">$</span>
-              <input type="number" id="fuel-price" class="pfx-in" inputmode="decimal" step="0.01" placeholder="e.g. 3.50" oninput="applyRate()" style="padding-right:36px">
+              <input type="number" id="fuel-price" class="pfx-in sfx-in" inputmode="decimal" step="0.01" placeholder="e.g. 3.50" oninput="applyRate()">
               <span class="sfx">/ gal</span>
+            </div>
+          </div>
+        </div>
+        <div class="row2" style="margin-bottom:10px">
+          <div class="field" style="margin-bottom:0">
+            <label>Labor Rate</label>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" id="labor-rate" class="pfx-in sfx-in" inputmode="decimal" step="0.50" placeholder="e.g. 18" oninput="applyRate()">
+              <span class="sfx">/ hr</span>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Avg Drive Speed</label>
+            <div class="input-wrap">
+              <input type="number" id="avg-speed" class="sfx-in" inputmode="decimal" step="1" placeholder="e.g. 45" oninput="applyRate()">
+              <span class="sfx">mph</span>
             </div>
           </div>
         </div>
         <div class="row2">
           <div class="field" style="margin-bottom:0">
-            <label>Other Costs / Load</label>
+            <label>Wear &amp; Tear</label>
             <div class="input-wrap"><span class="pfx">$</span>
-              <input type="number" id="other-cost" class="pfx-in" inputmode="decimal" step="1" placeholder="0" value="0" oninput="applyRate()">
+              <input type="number" id="wear-rate" class="pfx-in sfx-in" inputmode="decimal" step="0.01" placeholder="e.g. 0.20" oninput="applyRate()">
+              <span class="sfx">/ mi</span>
             </div>
-            <div class="hint">driver pay, wear, etc.</div>
+            <div class="hint">tires, maintenance, etc.</div>
           </div>
           <div class="field" style="margin-bottom:0">
             <label>Trip Type</label>
@@ -266,29 +298,73 @@ input.pfx-in{padding-left:24px}
           </div>
         </div>
 
-        <!-- Live breakdown -->
+        <!-- Live cost breakdown -->
         <div class="breakdown-box" id="detail-breakdown" style="display:none">
-          <div class="elev-section" id="bd-a-section">
-            <div class="elev-section-title">
+
+          <div class="bd-elev">
+            <div class="bd-elev-title">
               <div class="elev-dot dot-a" style="width:8px;height:8px"></div>
               <span id="bd-a-name">Elevator A</span>
             </div>
-            <div class="breakdown-row"><span class="breakdown-label" id="bd-a-fuel-label">Fuel</span><span id="bd-a-fuel">—</span></div>
-            <div class="breakdown-row" id="bd-a-other-row"><span class="breakdown-label">Other costs</span><span id="bd-a-other">—</span></div>
-            <div class="breakdown-row breakdown-total"><span>Total / load</span><span id="bd-a-total">—</span></div>
-            <div class="breakdown-row" style="margin-top:2px"><span class="breakdown-label">÷ <span id="bd-a-buload">—</span> bu/load</span><span class="breakdown-cbu" id="bd-a-cbu">—/bu</span></div>
+            <div class="bd-row" id="bd-a-fuel-row">
+              <span class="bd-lbl" id="bd-a-fuel-lbl">Fuel</span>
+              <span class="bd-val" id="bd-a-fuel">—</span>
+            </div>
+            <div class="bd-row" id="bd-a-drive-row">
+              <span class="bd-lbl" id="bd-a-drive-lbl">Drive labor</span>
+              <span class="bd-val" id="bd-a-drive">—</span>
+            </div>
+            <div class="bd-row" id="bd-a-wait-row">
+              <span class="bd-lbl" id="bd-a-wait-lbl">Wait labor</span>
+              <span class="bd-val" id="bd-a-wait">—</span>
+            </div>
+            <div class="bd-row" id="bd-a-wear-row">
+              <span class="bd-lbl" id="bd-a-wear-lbl">Wear &amp; tear</span>
+              <span class="bd-val" id="bd-a-wear">—</span>
+            </div>
+            <div class="bd-row bd-total">
+              <span>Total / load</span>
+              <span class="bd-val" id="bd-a-total">—</span>
+            </div>
+            <div class="bd-row" style="margin-top:3px">
+              <span class="bd-lbl">÷ <span id="bd-a-buload">—</span> bu/load =</span>
+              <span class="bd-cbu" id="bd-a-cbu">—</span>
+            </div>
           </div>
-          <div style="border-top:1px solid #e2e8f0;margin:8px 0"></div>
-          <div class="elev-section" id="bd-b-section">
-            <div class="elev-section-title">
+
+          <hr class="bd-divider">
+
+          <div class="bd-elev">
+            <div class="bd-elev-title">
               <div class="elev-dot dot-b" style="width:8px;height:8px"></div>
               <span id="bd-b-name">Elevator B</span>
             </div>
-            <div class="breakdown-row"><span class="breakdown-label" id="bd-b-fuel-label">Fuel</span><span id="bd-b-fuel">—</span></div>
-            <div class="breakdown-row" id="bd-b-other-row"><span class="breakdown-label">Other costs</span><span id="bd-b-other">—</span></div>
-            <div class="breakdown-row breakdown-total"><span>Total / load</span><span id="bd-b-total">—</span></div>
-            <div class="breakdown-row" style="margin-top:2px"><span class="breakdown-label">÷ <span id="bd-b-buload">—</span> bu/load</span><span class="breakdown-cbu" id="bd-b-cbu">—/bu</span></div>
+            <div class="bd-row" id="bd-b-fuel-row">
+              <span class="bd-lbl" id="bd-b-fuel-lbl">Fuel</span>
+              <span class="bd-val" id="bd-b-fuel">—</span>
+            </div>
+            <div class="bd-row" id="bd-b-drive-row">
+              <span class="bd-lbl" id="bd-b-drive-lbl">Drive labor</span>
+              <span class="bd-val" id="bd-b-drive">—</span>
+            </div>
+            <div class="bd-row" id="bd-b-wait-row">
+              <span class="bd-lbl" id="bd-b-wait-lbl">Wait labor</span>
+              <span class="bd-val" id="bd-b-wait">—</span>
+            </div>
+            <div class="bd-row" id="bd-b-wear-row">
+              <span class="bd-lbl" id="bd-b-wear-lbl">Wear &amp; tear</span>
+              <span class="bd-val" id="bd-b-wear">—</span>
+            </div>
+            <div class="bd-row bd-total">
+              <span>Total / load</span>
+              <span class="bd-val" id="bd-b-total">—</span>
+            </div>
+            <div class="bd-row" style="margin-top:3px">
+              <span class="bd-lbl">÷ <span id="bd-b-buload">—</span> bu/load =</span>
+              <span class="bd-cbu" id="bd-b-cbu">—</span>
+            </div>
           </div>
+
         </div>
       </div>
     </div>
@@ -384,12 +460,12 @@ let roundTrip = false;
 let calcMode = 'simple';
 
 function fmt(n,d=2){return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
-function fmtC(n,d=2){return(n<0?'-$':'$')+fmt(Math.abs(n),d);}
 function fmtSign(n,d=2){return(n>=0?'+$':'-$')+fmt(Math.abs(n),d);}
 function v(id){return parseFloat(document.getElementById(id).value)||0;}
 function t(id){return document.getElementById(id).value.trim();}
 function set(id,val){document.getElementById(id).textContent=val;}
 function el(id){return document.getElementById(id);}
+function show(id,vis){el(id).style.display=vis?'':'none';}
 
 function showTab(tab){
   ['compare','results'].forEach(s=>{
@@ -403,8 +479,8 @@ function setMode(m){
   calcMode=m;
   el('tab-simple').classList.toggle('active',m==='simple');
   el('tab-detail').classList.toggle('active',m==='detail');
-  el('inputs-simple').style.display=m==='simple'?'':'none';
-  el('inputs-detail').style.display=m==='detail'?'':'none';
+  show('inputs-simple',m==='simple');
+  show('inputs-detail',m==='detail');
   applyRate();
 }
 
@@ -418,8 +494,7 @@ function toggleRT(){
 function applyRate(){
   const buLoad=v('bu-load');
   const mult=roundTrip?2:1;
-  const nameA=t('name-a')||'Elevator A';
-  const nameB=t('name-b')||'Elevator B';
+  const tripLabel=roundTrip?'RT':'OW';
 
   if(calcMode==='simple'){
     const rate=v('rate-mi');
@@ -427,45 +502,89 @@ function applyRate(){
     ['a','b'].forEach(x=>{
       const miles=v('miles-'+x);
       if(miles){
-        const cbu=(miles*mult*rate)/buLoad;
-        el('haul-'+x).value=fmt(cbu,3);
+        el('haul-'+x).value=fmt((miles*mult*rate)/buLoad,3);
         el('haul-hint-'+x).textContent=fmt(miles*mult,1)+' mi × $'+fmt(rate)+'/mi ÷ '+fmt(buLoad,0)+' bu';
       }
     });
-  } else {
-    const mpg=v('mpg');
-    const fuelPrice=v('fuel-price');
-    const other=v('other-cost');
-    const breakdown=el('detail-breakdown');
-
-    if(!mpg||!fuelPrice||!buLoad){
-      breakdown.style.display='none';
-      return;
-    }
-    breakdown.style.display='block';
-
-    ['a','b'].forEach(x=>{
-      const miles=v('miles-'+x);
-      const totalMi=miles*mult;
-      const gallons=totalMi/mpg;
-      const fuelCost=gallons*fuelPrice;
-      const totalCost=fuelCost+other;
-      const cbu=buLoad>0?totalCost/buLoad:0;
-
-      el('haul-'+x).value=fmt(cbu,3);
-      el('haul-hint-'+x).textContent='$'+fmt(totalCost,2)+'/load ÷ '+fmt(buLoad,0)+' bu';
-
-      const nm=x==='a'?nameA:nameB;
-      set('bd-'+x+'-name',nm);
-      set('bd-'+x+'-fuel-label',fmt(totalMi,1)+' mi ÷ '+fmt(mpg,1)+' MPG × $'+fmt(fuelPrice)+'/gal');
-      set('bd-'+x+'-fuel','$'+fmt(fuelCost,2));
-      el('bd-'+x+'-other-row').style.display=other?'flex':'none';
-      set('bd-'+x+'-other','$'+fmt(other,2));
-      set('bd-'+x+'-total','$'+fmt(totalCost,2));
-      set('bd-'+x+'-buload',fmt(buLoad,0));
-      set('bd-'+x+'-cbu','$'+fmt(cbu,3)+'/bu');
-    });
+    calc();
+    return;
   }
+
+  // Detailed mode
+  const mpg=v('mpg'), fuelPrice=v('fuel-price');
+  const laborRate=v('labor-rate'), avgSpeed=v('avg-speed');
+  const wearRate=v('wear-rate');
+  const hasSomething=mpg||fuelPrice||laborRate||wearRate;
+
+  if(!hasSomething||!buLoad){
+    show('detail-breakdown',false);
+    calc();
+    return;
+  }
+  show('detail-breakdown',true);
+
+  ['a','b'].forEach(x=>{
+    const miles=v('miles-'+x);
+    const waitMin=v('wait-'+x);
+    const totalMi=miles*mult;
+    const nm=x==='a'?(t('name-a')||'Elevator A'):(t('name-b')||'Elevator B');
+
+    // Fuel
+    const gallons=mpg&&totalMi?totalMi/mpg:0;
+    const fuelCost=gallons*fuelPrice;
+
+    // Drive labor
+    const driveHours=avgSpeed&&totalMi?totalMi/avgSpeed:0;
+    const driveCost=driveHours*laborRate;
+
+    // Wait labor
+    const waitHours=waitMin/60;
+    const waitCost=waitHours*laborRate;
+
+    // Wear & tear
+    const wearCost=totalMi*wearRate;
+
+    const totalCost=fuelCost+driveCost+waitCost+wearCost;
+    const cbu=buLoad?totalCost/buLoad:0;
+
+    el('haul-'+x).value=fmt(cbu,3);
+    el('haul-hint-'+x).textContent='$'+fmt(totalCost,2)+'/load ÷ '+fmt(buLoad,0)+' bu';
+
+    set('bd-'+x+'-name',nm);
+
+    const showFuel=!!(mpg&&fuelPrice&&miles);
+    show('bd-'+x+'-fuel-row',showFuel);
+    if(showFuel){
+      set('bd-'+x+'-fuel-lbl',fmt(totalMi,1)+' mi ÷ '+fmt(mpg,1)+' MPG × $'+fmt(fuelPrice)+'/gal');
+      set('bd-'+x+'-fuel','$'+fmt(fuelCost,2));
+    }
+
+    const showDrive=!!(laborRate&&avgSpeed&&miles);
+    show('bd-'+x+'-drive-row',showDrive);
+    if(showDrive){
+      set('bd-'+x+'-drive-lbl',fmt(totalMi,1)+' mi ÷ '+fmt(avgSpeed,0)+' mph = '+fmt(driveHours,2)+' hr × $'+fmt(laborRate)+'/hr');
+      set('bd-'+x+'-drive','$'+fmt(driveCost,2));
+    }
+
+    const showWait=!!(laborRate&&waitMin>0);
+    show('bd-'+x+'-wait-row',showWait);
+    if(showWait){
+      set('bd-'+x+'-wait-lbl',fmt(waitMin,0)+' min ÷ 60 = '+fmt(waitHours,2)+' hr × $'+fmt(laborRate)+'/hr');
+      set('bd-'+x+'-wait','$'+fmt(waitCost,2));
+    }
+
+    const showWear=!!(wearRate&&miles);
+    show('bd-'+x+'-wear-row',showWear);
+    if(showWear){
+      set('bd-'+x+'-wear-lbl',fmt(totalMi,1)+' mi × $'+fmt(wearRate,3)+'/mi');
+      set('bd-'+x+'-wear','$'+fmt(wearCost,2));
+    }
+
+    set('bd-'+x+'-total','$'+fmt(totalCost,2));
+    set('bd-'+x+'-buload',fmt(buLoad,0));
+    set('bd-'+x+'-cbu','$'+fmt(cbu,3)+'/bu');
+  });
+
   calc();
 }
 
@@ -483,19 +602,15 @@ function calc(){
   const winner=netA>=netB?'A':'B';
   const winnerName=netA>=netB?nameA:nameB;
 
-  // Cash hints
   el('cash-a').textContent='Cash: $'+fmt(cashA);
   el('cash-b').textContent='Cash: $'+fmt(cashB);
 
-  // Winner borders on compare tab
   el('card-a').classList.toggle('winner',winner==='A');
   el('card-b').classList.toggle('winner',winner==='B');
 
-  // Header pill
-  el('winner-pill').style.display='block';
-  set('winner-val', winnerName+' +$'+fmt(diff,3)+'/bu');
+  show('winner-pill',true);
+  set('winner-val',winnerName+' +$'+fmt(diff,3)+'/bu');
 
-  // Net boxes
   set('res-name-a',nameA); set('res-name-b',nameB);
   set('net-price-a','$'+fmt(netA)); set('net-price-b','$'+fmt(netB));
   el('net-box-a').classList.toggle('winner',winner==='A');
@@ -503,18 +618,15 @@ function calc(){
   set('net-sub-a',winner==='A'?'✓ Best net price':'/bushel net');
   set('net-sub-b',winner==='B'?'✓ Best net price':'/bushel net');
 
-  // Diff banner
-  const banner=el('diff-banner');
   if(diff>0.0005){
-    banner.style.display='block';
+    show('diff-banner',true);
     set('diff-winner',winnerName);
     set('diff-val','$'+fmt(diff,3)+'/bu  →  $'+fmt(diff*totalBu,0)+' total');
     set('diff-sub','more on '+fmt(totalBu,0)+' bushels');
   } else {
-    banner.style.display='none';
+    show('diff-banner',false);
   }
 
-  // Breakdown table
   set('col-a',nameA); set('col-b',nameB);
   set('r-fut-a','$'+fmt(futures)); set('r-fut-b','$'+fmt(futures));
   set('r-bas-a',fmtSign(basisA)); set('r-bas-b',fmtSign(basisB));
@@ -534,19 +646,22 @@ function calc(){
   revElA.style.color=winner==='A'?'var(--green)':'var(--slate)';
   revElB.style.color=winner==='B'?'var(--green)':'var(--slate)';
 
-  el('result-card').style.display='block';
+  show('result-card',true);
 }
 
 function resetAll(){
   ['futures','bu-load','total-bu'].forEach((id,i)=>el(id).value=['4.50','900','10000'][i]);
-  el('name-a').value=''; el('name-b').value='';
+  ['name-a','name-b'].forEach(id=>el(id).value='');
   el('basis-a').value='-0.25'; el('basis-b').value='-0.15';
   el('miles-a').value='10'; el('miles-b').value='25';
+  el('wait-a').value='0'; el('wait-b').value='0';
   el('haul-a').value=''; el('haul-b').value='';
+  ['haul-hint-a','haul-hint-b'].forEach(id=>set(id,''));
   el('rate-mi').value='';
-  el('mpg').value=''; el('fuel-price').value=''; el('other-cost').value='0';
-  el('haul-hint-a').textContent=''; el('haul-hint-b').textContent='';
-  el('detail-breakdown').style.display='none';
+  el('mpg').value=''; el('fuel-price').value='';
+  el('labor-rate').value=''; el('avg-speed').value='';
+  el('wear-rate').value='';
+  show('detail-breakdown',false);
   roundTrip=false;
   ['rt-tog','rt-tog2'].forEach(id=>el(id).classList.remove('on'));
   ['rt-lbl','rt-lbl2'].forEach(id=>set(id,'One-way'));
