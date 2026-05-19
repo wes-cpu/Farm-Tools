@@ -77,6 +77,19 @@ input.pfx-in{padding-left:24px}
 .sec{display:none}
 .sec.active{display:block}
 .reset-btn{width:100%;padding:13px;background:white;border:1.5px solid var(--border);border-radius:10px;font-size:.87rem;font-weight:600;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:4px}
+/* Mode tabs */
+.mode-tabs{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px;margin-bottom:12px}
+.mode-tab{flex:1;background:none;border:none;padding:7px 4px;border-radius:6px;font-size:.75rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:background .15s,color .15s}
+.mode-tab.active{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+/* Breakdown box */
+.breakdown-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:11px 12px;margin-top:10px;font-size:.78rem;color:#475569;line-height:1.8}
+.breakdown-row{display:flex;justify-content:space-between;align-items:baseline}
+.breakdown-label{color:#94a3b8}
+.breakdown-total{font-weight:700;color:var(--slate);border-top:1px solid #e2e8f0;margin-top:4px;padding-top:4px}
+.breakdown-cbu{font-size:.85rem;font-weight:800;color:var(--green)}
+.elev-section{margin-bottom:10px}
+.elev-section:last-child{margin-bottom:0}
+.elev-section-title{display:flex;align-items:center;gap:5px;font-weight:700;color:var(--slate);margin-bottom:4px;font-size:.8rem}
 </style>
 </head>
 <body>
@@ -152,8 +165,9 @@ input.pfx-in{padding-left:24px}
         <div class="field" style="margin-bottom:0">
           <label>Haul Cost / Bu</label>
           <div class="input-wrap"><span class="pfx">$</span>
-            <input type="number" id="haul-a" class="pfx-in" inputmode="decimal" step="0.001" value="0.10" oninput="calc()">
+            <input type="number" id="haul-a" class="pfx-in" inputmode="decimal" step="0.001" value="" placeholder="0.000" oninput="calc()">
           </div>
+          <div class="hint" id="haul-hint-a"></div>
         </div>
       </div>
 
@@ -182,27 +196,98 @@ input.pfx-in{padding-left:24px}
         <div class="field" style="margin-bottom:0">
           <label>Haul Cost / Bu</label>
           <div class="input-wrap"><span class="pfx">$</span>
-            <input type="number" id="haul-b" class="pfx-in" inputmode="decimal" step="0.001" value="0.18" oninput="calc()">
+            <input type="number" id="haul-b" class="pfx-in" inputmode="decimal" step="0.001" value="" placeholder="0.000" oninput="calc()">
           </div>
+          <div class="hint" id="haul-hint-b"></div>
         </div>
       </div>
     </div>
 
-    <!-- Rate helper -->
+    <!-- Haul Cost Calculator -->
     <div class="card">
-      <div class="card-title">Haul Rate Helper — calculates cost/bu from miles</div>
-      <div class="row2">
-        <div class="field" style="margin-bottom:0">
-          <label>Your Rate ($ / mile)</label>
-          <div class="input-wrap"><span class="pfx">$</span>
-            <input type="number" id="rate-mi" class="pfx-in" inputmode="decimal" step="0.01" placeholder="e.g. 3.50" oninput="applyRate()">
+      <div class="card-title">Haul Cost Calculator</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-simple" onclick="setMode('simple')">Simple ($/mile)</button>
+        <button class="mode-tab" id="tab-detail" onclick="setMode('detail')">Detailed Breakdown</button>
+      </div>
+
+      <!-- Simple mode -->
+      <div id="inputs-simple">
+        <div class="row2">
+          <div class="field" style="margin-bottom:0">
+            <label>Your Rate ($ / mile)</label>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" id="rate-mi" class="pfx-in" inputmode="decimal" step="0.01" placeholder="e.g. 3.50" oninput="applyRate()">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Trip Type</label>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:7px">
+              <button class="toggle" id="rt-tog" type="button" onclick="toggleRT()"></button>
+              <span style="font-size:.82rem;color:#475569" id="rt-lbl">One-way</span>
+            </div>
           </div>
         </div>
-        <div class="field" style="margin-bottom:0">
-          <label>Trip Type</label>
-          <div style="display:flex;align-items:center;gap:10px;padding-top:7px">
-            <button class="toggle" id="rt-tog" type="button" onclick="toggleRT()"></button>
-            <span style="font-size:.82rem;color:#475569" id="rt-lbl">One-way</span>
+        <div class="hint" style="margin-top:8px">Enter your rate and miles above — haul cost/bu fills automatically.</div>
+      </div>
+
+      <!-- Detailed mode -->
+      <div id="inputs-detail" style="display:none">
+        <div class="row2" style="margin-bottom:10px">
+          <div class="field" style="margin-bottom:0">
+            <label>Fuel Efficiency</label>
+            <div class="input-wrap">
+              <input type="number" id="mpg" inputmode="decimal" step="0.1" placeholder="e.g. 8" oninput="applyRate()" style="padding-right:42px">
+              <span class="sfx">MPG</span>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Fuel Price</label>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" id="fuel-price" class="pfx-in" inputmode="decimal" step="0.01" placeholder="e.g. 3.50" oninput="applyRate()" style="padding-right:36px">
+              <span class="sfx">/ gal</span>
+            </div>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field" style="margin-bottom:0">
+            <label>Other Costs / Load</label>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" id="other-cost" class="pfx-in" inputmode="decimal" step="1" placeholder="0" value="0" oninput="applyRate()">
+            </div>
+            <div class="hint">driver pay, wear, etc.</div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Trip Type</label>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:7px">
+              <button class="toggle" id="rt-tog2" type="button" onclick="toggleRT()"></button>
+              <span style="font-size:.82rem;color:#475569" id="rt-lbl2">One-way</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live breakdown -->
+        <div class="breakdown-box" id="detail-breakdown" style="display:none">
+          <div class="elev-section" id="bd-a-section">
+            <div class="elev-section-title">
+              <div class="elev-dot dot-a" style="width:8px;height:8px"></div>
+              <span id="bd-a-name">Elevator A</span>
+            </div>
+            <div class="breakdown-row"><span class="breakdown-label" id="bd-a-fuel-label">Fuel</span><span id="bd-a-fuel">—</span></div>
+            <div class="breakdown-row" id="bd-a-other-row"><span class="breakdown-label">Other costs</span><span id="bd-a-other">—</span></div>
+            <div class="breakdown-row breakdown-total"><span>Total / load</span><span id="bd-a-total">—</span></div>
+            <div class="breakdown-row" style="margin-top:2px"><span class="breakdown-label">÷ <span id="bd-a-buload">—</span> bu/load</span><span class="breakdown-cbu" id="bd-a-cbu">—/bu</span></div>
+          </div>
+          <div style="border-top:1px solid #e2e8f0;margin:8px 0"></div>
+          <div class="elev-section" id="bd-b-section">
+            <div class="elev-section-title">
+              <div class="elev-dot dot-b" style="width:8px;height:8px"></div>
+              <span id="bd-b-name">Elevator B</span>
+            </div>
+            <div class="breakdown-row"><span class="breakdown-label" id="bd-b-fuel-label">Fuel</span><span id="bd-b-fuel">—</span></div>
+            <div class="breakdown-row" id="bd-b-other-row"><span class="breakdown-label">Other costs</span><span id="bd-b-other">—</span></div>
+            <div class="breakdown-row breakdown-total"><span>Total / load</span><span id="bd-b-total">—</span></div>
+            <div class="breakdown-row" style="margin-top:2px"><span class="breakdown-label">÷ <span id="bd-b-buload">—</span> bu/load</span><span class="breakdown-cbu" id="bd-b-cbu">—/bu</span></div>
           </div>
         </div>
       </div>
@@ -295,37 +380,92 @@ input.pfx-in{padding-left:24px}
 </nav>
 
 <script>
-let roundTrip=false;
+let roundTrip = false;
+let calcMode = 'simple';
+
 function fmt(n,d=2){return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
 function fmtC(n,d=2){return(n<0?'-$':'$')+fmt(Math.abs(n),d);}
 function fmtSign(n,d=2){return(n>=0?'+$':'-$')+fmt(Math.abs(n),d);}
 function v(id){return parseFloat(document.getElementById(id).value)||0;}
 function t(id){return document.getElementById(id).value.trim();}
 function set(id,val){document.getElementById(id).textContent=val;}
+function el(id){return document.getElementById(id);}
 
 function showTab(tab){
   ['compare','results'].forEach(s=>{
-    document.getElementById('sec-'+s).classList.toggle('active',s===tab);
-    document.getElementById('nav-'+s).classList.toggle('active',s===tab);
+    el('sec-'+s).classList.toggle('active',s===tab);
+    el('nav-'+s).classList.toggle('active',s===tab);
   });
-  document.getElementById('scroll').scrollTop=0;
+  el('scroll').scrollTop=0;
+}
+
+function setMode(m){
+  calcMode=m;
+  el('tab-simple').classList.toggle('active',m==='simple');
+  el('tab-detail').classList.toggle('active',m==='detail');
+  el('inputs-simple').style.display=m==='simple'?'':'none';
+  el('inputs-detail').style.display=m==='detail'?'':'none';
+  applyRate();
 }
 
 function toggleRT(){
   roundTrip=!roundTrip;
-  document.getElementById('rt-tog').classList.toggle('on',roundTrip);
-  document.getElementById('rt-lbl').textContent=roundTrip?'Round trip':'One-way';
+  ['rt-tog','rt-tog2'].forEach(id=>el(id).classList.toggle('on',roundTrip));
+  ['rt-lbl','rt-lbl2'].forEach(id=>set(id,roundTrip?'Round trip':'One-way'));
   applyRate();
 }
 
 function applyRate(){
-  const rate=v('rate-mi'), buLoad=v('bu-load');
-  if(!rate||!buLoad) return;
+  const buLoad=v('bu-load');
   const mult=roundTrip?2:1;
-  ['a','b'].forEach(x=>{
-    const miles=v('miles-'+x);
-    if(miles) document.getElementById('haul-'+x).value=fmt((miles*mult*rate)/buLoad,3);
-  });
+  const nameA=t('name-a')||'Elevator A';
+  const nameB=t('name-b')||'Elevator B';
+
+  if(calcMode==='simple'){
+    const rate=v('rate-mi');
+    if(!rate||!buLoad) return;
+    ['a','b'].forEach(x=>{
+      const miles=v('miles-'+x);
+      if(miles){
+        const cbu=(miles*mult*rate)/buLoad;
+        el('haul-'+x).value=fmt(cbu,3);
+        el('haul-hint-'+x).textContent=fmt(miles*mult,1)+' mi × $'+fmt(rate)+'/mi ÷ '+fmt(buLoad,0)+' bu';
+      }
+    });
+  } else {
+    const mpg=v('mpg');
+    const fuelPrice=v('fuel-price');
+    const other=v('other-cost');
+    const breakdown=el('detail-breakdown');
+
+    if(!mpg||!fuelPrice||!buLoad){
+      breakdown.style.display='none';
+      return;
+    }
+    breakdown.style.display='block';
+
+    ['a','b'].forEach(x=>{
+      const miles=v('miles-'+x);
+      const totalMi=miles*mult;
+      const gallons=totalMi/mpg;
+      const fuelCost=gallons*fuelPrice;
+      const totalCost=fuelCost+other;
+      const cbu=buLoad>0?totalCost/buLoad:0;
+
+      el('haul-'+x).value=fmt(cbu,3);
+      el('haul-hint-'+x).textContent='$'+fmt(totalCost,2)+'/load ÷ '+fmt(buLoad,0)+' bu';
+
+      const nm=x==='a'?nameA:nameB;
+      set('bd-'+x+'-name',nm);
+      set('bd-'+x+'-fuel-label',fmt(totalMi,1)+' mi ÷ '+fmt(mpg,1)+' MPG × $'+fmt(fuelPrice)+'/gal');
+      set('bd-'+x+'-fuel','$'+fmt(fuelCost,2));
+      el('bd-'+x+'-other-row').style.display=other?'flex':'none';
+      set('bd-'+x+'-other','$'+fmt(other,2));
+      set('bd-'+x+'-total','$'+fmt(totalCost,2));
+      set('bd-'+x+'-buload',fmt(buLoad,0));
+      set('bd-'+x+'-cbu','$'+fmt(cbu,3)+'/bu');
+    });
+  }
   calc();
 }
 
@@ -334,38 +474,37 @@ function calc(){
   const nameA=t('name-a')||'Elevator A', nameB=t('name-b')||'Elevator B';
   const basisA=v('basis-a'), basisB=v('basis-b');
   const milesA=v('miles-a'), milesB=v('miles-b');
-  const haulA=v('haul-a'),   haulB=v('haul-b');
+  const haulA=v('haul-a'), haulB=v('haul-b');
 
   const cashA=futures+basisA, cashB=futures+basisB;
-  const netA=cashA-haulA,     netB=cashB-haulB;
+  const netA=cashA-haulA, netB=cashB-haulB;
   const totalRevA=netA*totalBu, totalRevB=netB*totalBu;
   const diff=Math.abs(netA-netB);
   const winner=netA>=netB?'A':'B';
   const winnerName=netA>=netB?nameA:nameB;
 
   // Cash hints
-  document.getElementById('cash-a').textContent='Cash: $'+fmt(cashA);
-  document.getElementById('cash-b').textContent='Cash: $'+fmt(cashB);
+  el('cash-a').textContent='Cash: $'+fmt(cashA);
+  el('cash-b').textContent='Cash: $'+fmt(cashB);
 
   // Winner borders on compare tab
-  document.getElementById('card-a').classList.toggle('winner',winner==='A');
-  document.getElementById('card-b').classList.toggle('winner',winner==='B');
+  el('card-a').classList.toggle('winner',winner==='A');
+  el('card-b').classList.toggle('winner',winner==='B');
 
   // Header pill
-  const pill=document.getElementById('winner-pill');
-  pill.style.display='block';
+  el('winner-pill').style.display='block';
   set('winner-val', winnerName+' +$'+fmt(diff,3)+'/bu');
 
   // Net boxes
   set('res-name-a',nameA); set('res-name-b',nameB);
   set('net-price-a','$'+fmt(netA)); set('net-price-b','$'+fmt(netB));
-  document.getElementById('net-box-a').classList.toggle('winner',winner==='A');
-  document.getElementById('net-box-b').classList.toggle('winner',winner==='B');
+  el('net-box-a').classList.toggle('winner',winner==='A');
+  el('net-box-b').classList.toggle('winner',winner==='B');
   set('net-sub-a',winner==='A'?'✓ Best net price':'/bushel net');
   set('net-sub-b',winner==='B'?'✓ Best net price':'/bushel net');
 
   // Diff banner
-  const banner=document.getElementById('diff-banner');
+  const banner=el('diff-banner');
   if(diff>0.0005){
     banner.style.display='block';
     set('diff-winner',winnerName);
@@ -375,38 +514,42 @@ function calc(){
     banner.style.display='none';
   }
 
-  // Breakdown
+  // Breakdown table
   set('col-a',nameA); set('col-b',nameB);
   set('r-fut-a','$'+fmt(futures)); set('r-fut-b','$'+fmt(futures));
-  set('r-bas-a',fmtSign(basisA));  set('r-bas-b',fmtSign(basisB));
-  set('r-cash-a','$'+fmt(cashA));  set('r-cash-b','$'+fmt(cashB));
-  set('r-mi-a',milesA+' mi');      set('r-mi-b',milesB+' mi');
-  set('r-haul-a','-$'+fmt(haulA,3)); set('r-haul-b','-$'+fmt(haulB,3));
+  set('r-bas-a',fmtSign(basisA)); set('r-bas-b',fmtSign(basisB));
+  set('r-cash-a','$'+fmt(cashA)); set('r-cash-b','$'+fmt(cashB));
+  set('r-mi-a',milesA+' mi'); set('r-mi-b',milesB+' mi');
+  set('r-haul-a',haulA>0?'-$'+fmt(haulA,3):'$0.000');
+  set('r-haul-b',haulB>0?'-$'+fmt(haulB,3):'$0.000');
 
-  const netElA=document.getElementById('r-net-a'), netElB=document.getElementById('r-net-b');
+  const netElA=el('r-net-a'), netElB=el('r-net-b');
   set('r-net-a','$'+fmt(netA)); set('r-net-b','$'+fmt(netB));
   netElA.style.color=winner==='A'?'var(--green)':'var(--slate)';
   netElB.style.color=winner==='B'?'var(--green)':'var(--slate)';
 
   set('r-tbu-a',fmt(totalBu,0)+' bu'); set('r-tbu-b',fmt(totalBu,0)+' bu');
-  const revElA=document.getElementById('r-rev-a'), revElB=document.getElementById('r-rev-b');
+  const revElA=el('r-rev-a'), revElB=el('r-rev-b');
   set('r-rev-a','$'+fmt(totalRevA,0)); set('r-rev-b','$'+fmt(totalRevB,0));
   revElA.style.color=winner==='A'?'var(--green)':'var(--slate)';
   revElB.style.color=winner==='B'?'var(--green)':'var(--slate)';
 
-  document.getElementById('result-card').style.display='block';
+  el('result-card').style.display='block';
 }
 
 function resetAll(){
-  ['futures','bu-load','total-bu'].forEach((id,i)=>document.getElementById(id).value=['4.50','900','10000'][i]);
-  document.getElementById('name-a').value=''; document.getElementById('name-b').value='';
-  document.getElementById('basis-a').value='-0.25'; document.getElementById('basis-b').value='-0.15';
-  document.getElementById('miles-a').value='10';   document.getElementById('miles-b').value='25';
-  document.getElementById('haul-a').value='0.10';  document.getElementById('haul-b').value='0.18';
-  document.getElementById('rate-mi').value='';
+  ['futures','bu-load','total-bu'].forEach((id,i)=>el(id).value=['4.50','900','10000'][i]);
+  el('name-a').value=''; el('name-b').value='';
+  el('basis-a').value='-0.25'; el('basis-b').value='-0.15';
+  el('miles-a').value='10'; el('miles-b').value='25';
+  el('haul-a').value=''; el('haul-b').value='';
+  el('rate-mi').value='';
+  el('mpg').value=''; el('fuel-price').value=''; el('other-cost').value='0';
+  el('haul-hint-a').textContent=''; el('haul-hint-b').textContent='';
+  el('detail-breakdown').style.display='none';
   roundTrip=false;
-  document.getElementById('rt-tog').classList.remove('on');
-  document.getElementById('rt-lbl').textContent='One-way';
+  ['rt-tog','rt-tog2'].forEach(id=>el(id).classList.remove('on'));
+  ['rt-lbl','rt-lbl2'].forEach(id=>set(id,'One-way'));
   calc(); showTab('compare');
 }
 
