@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seifert Farms — Grain Cost of Carry Calculator</title>
+<style>
+:root {
+  --green-dark: #1d4e2a;
+  --green-mid:  #2d7a3e;
+  --green-light:#e8f4e8;
+  --gold:       #c07e10;
+  --gold-light: #fdf5e0;
+  --parchment:  #f7f4ed;
+  --border:     #ccc8b8;
+  --text:       #2a2a2a;
+  --muted:      #666;
+  --red:        #b83228;
+  --shadow:     0 2px 10px rgba(0,0,0,.11);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+     background:var(--parchment);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── Header ── */
+header{background:var(--green-dark);color:#fff;padding:18px 24px;display:flex;align-items:center;gap:14px}
+header .logo{font-size:2rem}
+header h1{font-size:1.35rem;font-weight:800;letter-spacing:-.3px}
+header p{font-size:.8rem;opacity:.75;margin-top:2px}
+
+/* ── Crop tabs ── */
+.crop-tabs{background:var(--green-mid);display:flex;padding:0 20px;gap:2px}
+.crop-tab{padding:11px 22px;cursor:pointer;color:rgba(255,255,255,.65);font-weight:700;font-size:.85rem;
+          border-bottom:3px solid transparent;transition:all .18s;display:flex;align-items:center;gap:6px}
+.crop-tab.active{color:#fff;border-bottom-color:var(--gold)}
+.crop-tab:hover:not(.active){color:rgba(255,255,255,.9);background:rgba(255,255,255,.08)}
+
+/* ── Layout ── */
+.main{max-width:1260px;margin:0 auto;padding:22px 20px;display:grid;
+      grid-template-columns:1fr 360px;gap:20px;align-items:start}
+@media(max-width:920px){.main{grid-template-columns:1fr}}
+
+/* ── Cards ── */
+.card{background:#fff;border-radius:10px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:18px}
+.card:last-child{margin-bottom:0}
+.card-hd{background:var(--green-dark);color:#fff;padding:10px 16px;font-weight:700;font-size:.78rem;
+         text-transform:uppercase;letter-spacing:.7px;display:flex;align-items:center;gap:7px}
+.card-hd.gold{background:var(--gold)}
+.card-bd{padding:16px}
+
+/* ── Sections inside card ── */
+.sec{margin-bottom:16px}
+.sec:last-child{margin-bottom:0}
+.sec-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+           color:var(--muted);margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+
+/* ── Field grid ── */
+.fg{display:grid;gap:10px;margin-bottom:10px}
+.fg.col2{grid-template-columns:1fr 1fr}
+.fg.col3{grid-template-columns:1fr 1fr 1fr}
+.fg.col1{grid-template-columns:1fr}
+.fg:last-child{margin-bottom:0}
+.field{display:flex;flex-direction:column;gap:3px}
+
+label{font-size:.75rem;font-weight:700;color:var(--muted)}
+.hint{font-size:.7rem;color:#999;margin-top:1px}
+
+.iw{position:relative;display:flex;align-items:center}
+.pfx,.sfx{position:absolute;font-size:.82rem;font-weight:700;color:var(--muted);pointer-events:none}
+.pfx{left:8px} .sfx{right:8px}
+
+input[type="number"],input[type="month"],select{
+  width:100%;padding:8px 9px;border:1.5px solid var(--border);border-radius:6px;
+  font-size:.88rem;background:#fff;transition:border-color .2s;
+  -moz-appearance:textfield}
+input[type="number"]::-webkit-inner-spin-button{opacity:1}
+input[type="number"]:focus,select:focus{outline:none;border-color:var(--green-mid)}
+.has-pfx input{padding-left:22px}
+.has-sfx input{padding-right:30px}
+
+/* ── Derived value pill ── */
+.dv{display:flex;align-items:center;padding:7px 10px;background:var(--green-light);
+    border-radius:6px;border:1.5px solid #a0d0a0;font-size:.88rem;font-weight:800;
+    color:var(--green-dark);min-height:36px}
+.dv.neg{background:#fde8e8;border-color:#f0aaaa;color:var(--red)}
+.dv.warn{background:#fff8e1;border-color:#f0c040;color:#6b4800}
+
+/* ── Toggle ── */
+.toggle{display:flex;border:1.5px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:12px}
+.toggle button{flex:1;padding:8px;border:none;cursor:pointer;font-size:.78rem;font-weight:700;
+               color:var(--muted);background:#fff;transition:all .18s}
+.toggle button.on{background:var(--green-dark);color:#fff}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:.78rem;white-space:nowrap}
+th{background:var(--green-dark);color:#fff;padding:7px 9px;text-align:right;
+   font-size:.7rem;font-weight:700;letter-spacing:.4px}
+th:first-child{text-align:left;border-radius:0}
+td{padding:6px 9px;border-bottom:1px solid #eee;text-align:right}
+td:first-child{text-align:left;font-weight:600}
+tr:nth-child(even) td{background:#fafafa}
+tr.total-row td{background:var(--green-light)!important;font-weight:800;color:var(--green-dark)}
+.tbl-note{font-size:.7rem;color:var(--muted);font-style:italic;margin-top:8px;
+          padding:7px 10px;background:var(--gold-light);border-left:3px solid var(--gold);border-radius:0 4px 4px 0}
+
+/* ── Results panel ── */
+.results-panel{position:sticky;top:22px}
+.r-hd{background:var(--gold);color:#fff;padding:11px 16px;font-weight:800;font-size:.82rem;
+      letter-spacing:.4px;border-radius:10px 10px 0 0}
+.r-body{background:#fff;border:1px solid var(--border);border-top:none}
+.r-section{padding:13px 16px;border-bottom:1px solid #eee}
+.r-section:last-child{border-bottom:none}
+.r-sec-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+             color:var(--muted);margin-bottom:9px}
+.r-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0}
+.r-row .lbl{font-size:.78rem;color:var(--muted)}
+.r-row .val{font-size:.85rem;font-weight:800;color:var(--text)}
+.r-row .val.pos{color:var(--green-dark)}
+.r-row .val.neg{color:var(--red)}
+.r-divider{height:1px;background:var(--border);margin:6px 0}
+.r-total{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0 4px;
+         border-top:2px solid var(--green-dark);margin-top:4px}
+.r-total .lbl{font-size:.82rem;font-weight:700}
+.r-total .val{font-size:.95rem;font-weight:900;color:var(--green-dark)}
+
+.breakeven-box{background:var(--green-light);padding:14px 16px;border-top:2px solid var(--green-mid)}
+.be-title{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+          color:var(--green-dark);margin-bottom:10px}
+.be-big{text-align:center;margin:6px 0 12px}
+.be-big .num{font-size:2rem;font-weight:900;line-height:1;color:var(--green-dark)}
+.be-big .sub{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:3px}
+
+.net-box{padding:13px 16px;border-top:1px solid var(--border)}
+.net-title{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+           color:var(--gold);margin-bottom:10px}
+.net-total{display:flex;justify-content:space-between;align-items:baseline;
+           padding:8px 0 0;border-top:2px solid currentColor;margin-top:5px}
+.net-total .lbl{font-size:.82rem;font-weight:700}
+.net-total .val{font-size:1.1rem;font-weight:900}
+
+.verdict{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:0 0 10px 10px}
+.verdict.pos{background:#e8f4e8}
+.verdict.neg{background:#fde8e8}
+.verdict.neu{background:#f0f0f0}
+.verdict .icon{font-size:1.3rem;flex-shrink:0;line-height:1.2}
+.verdict .txt{font-size:.8rem;font-weight:600;line-height:1.45}
+.verdict.pos .txt{color:var(--green-dark)}
+.verdict.neg .txt{color:var(--red)}
+.verdict.neu .txt{color:var(--muted)}
+
+/* ── Benchmarks card ── */
+.bench-card{background:#fff;border-radius:10px;box-shadow:var(--shadow);padding:14px 16px;margin-top:14px}
+.bench-title{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+             color:var(--muted);margin-bottom:10px}
+.bench-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;
+           border-bottom:1px solid #f0f0f0;font-size:.76rem}
+.bench-row:last-child{border-bottom:none}
+.bench-row .bl{color:var(--muted)}
+.bench-row .bv{font-weight:700;color:var(--text)}
+
+.sep{height:1px;background:var(--border);margin:12px 0}
+
+/* ── Contract ladder table ── */
+.ctbl-wrap{overflow-x:auto;margin-top:8px}
+.ctbl{width:100%;border-collapse:collapse;font-size:.79rem;white-space:nowrap}
+.ctbl thead th{background:var(--green-dark);color:#fff;padding:7px 9px;font-size:.69rem;
+               font-weight:700;letter-spacing:.4px;text-align:center}
+.ctbl thead th:first-child{text-align:left}
+.ctbl td{padding:5px 7px;border-bottom:1px solid #eee;vertical-align:middle;text-align:center}
+.ctbl td:first-child{text-align:left}
+.c-row{cursor:pointer;transition:background .12s}
+.c-row:hover td{background:#f0f9f0}
+.c-row.sel td{background:var(--gold-light)!important;border-bottom-color:#e0c870}
+.c-row.sel{box-shadow:inset 3px 0 0 var(--gold)}
+.cc{white-space:nowrap;font-size:.78rem}
+.ctbl input[type="month"],.ctbl input[type="number"]{
+  border:1.5px solid var(--border);border-radius:4px;padding:4px 6px;
+  font-size:.78rem;width:100%;background:#fff;min-width:0;-moz-appearance:textfield}
+.ctbl .has-pfx input[type="number"]{padding-left:18px}
+.ctbl .pfx{font-size:.72rem}
+.tgt-radio{width:16px;height:16px;cursor:pointer;accent-color:var(--gold);display:block;margin:0 auto}
+.basis-lbl-ref{font-size:.7rem;color:var(--muted);margin-bottom:4px}
+.basis-lbl-ref strong{color:var(--green-dark)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🌾</div>
+  <div>
+    <h1>Grain Cost of Carry Calculator</h1>
+    <p>Seifert Farms — Storage Decision Analysis</p>
+  </div>
+</header>
+
+<div class="crop-tabs">
+  <div class="crop-tab active" onclick="setCrop('corn')">🌽 Corn</div>
+  <div class="crop-tab" onclick="setCrop('soybeans')">🫘 Soybeans</div>
+  <div class="crop-tab" onclick="setCrop('wheat')">🌾 Wheat</div>
+</div>
+
+<div class="main">
+
+  <!-- ═══════════════ LEFT COLUMN ═══════════════ -->
+  <div>
+
+    <!-- Card 1: Current Market -->
+    <div class="card">
+      <div class="card-hd">📊 Current Market Position</div>
+      <div class="card-bd">
+
+        <div class="sec">
+          <div class="sec-title">Cash Price — Futures &amp; Basis</div>
+          <div class="fg col3">
+            <div class="field">
+              <label>Nearby Futures Price</label>
+              <div class="iw has-pfx">
+                <span class="pfx">$</span>
+                <input type="number" id="futuresPrice" step="0.01" value="4.20" oninput="calc()">
+              </div>
+              <span class="hint">Current nearby contract</span>
+            </div>
+            <div class="field">
+              <label>Current Basis</label>
+              <div class="iw has-pfx">
+                <span class="pfx">$</span>
+                <input type="number" id="currentBasis" step="0.01" value="-0.35" oninput="calc()">
+              </div>
+              <span class="hint">Negative = below futures (typical at harvest)</span>
+            </div>
+            <div class="field">
+              <label>Current Cash Price</label>
+              <div class="dv" id="cashPriceDisplay">$3.8500 / bu</div>
+              <span class="hint">Futures + Basis</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Storage Period</div>
+          <div class="fg col3">
+            <div class="field">
+              <label>Storage Start Month</label>
+              <input type="month" id="startMonth" oninput="calc()">
+              <span class="hint">When grain goes into storage</span>
+            </div>
+            <div class="field">
+              <label>Months to Store</label>
+              <input type="number" id="months" step="1" min="1" max="24" value="6" oninput="calc()">
+            </div>
+            <div class="field">
+              <label>Projected Sale Month</label>
+              <div class="dv" id="saleMonthDisplay">May 2026</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Quantity to Store</div>
+          <div class="fg col2">
+            <div class="field">
+              <label>Bushels to Store</label>
+              <div class="iw has-sfx">
+                <input type="number" id="bushels" step="1000" min="0" value="10000" oninput="calc()">
+                <span class="sfx">bu</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>Total Grain Value Today</label>
+              <div class="dv" id="grainValueDisplay">$38,500</div>
+              <span class="hint">Bushels × current cash price</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /card 1 -->
+
+    <!-- Card 2: Storage Costs -->
+    <div class="card">
+      <div class="card-hd">🏗️ Storage Cost Inputs</div>
+      <div class="card-bd">
+
+        <!-- Interest -->
+        <div class="sec">
+          <div class="sec-title">Interest / Opportunity Cost</div>
+          <div class="fg col2">
+            <div class="field">
+              <label>Annual Interest Rate</label>
+              <div class="iw has-sfx">
+                <input type="number" id="interestRate" step="0.1" value="7.5" oninput="calc()">
+                <span class="sfx">%</span>
+              </div>
+              <span class="hint">Operating loan rate or investment alternative</span>
+            </div>
+            <div class="field">
+              <label>Monthly Interest Cost (calculated)</label>
+              <div class="dv" id="interestCostDisplay">$0.0241 / bu</div>
+              <span class="hint">Cash price × rate ÷ 12</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Storage type toggle -->
+        <div class="sec">
+          <div class="sec-title">Physical Storage Type</div>
+          <div class="toggle">
+            <button id="btn-farm" class="on" onclick="setStorageType('farm')">On-Farm Storage</button>
+            <button id="btn-commercial" onclick="setStorageType('commercial')">Commercial Elevator</button>
+          </div>
+
+          <!-- On-Farm inputs -->
+          <div id="farm-inputs">
+            <div class="fg col2">
+              <div class="field">
+                <label>Monthly Fixed Cost</label>
+                <div class="iw has-pfx has-sfx">
+                  <span class="pfx">$</span>
+                  <input type="number" id="farmFixed" step="0.001" value="0.010" oninput="calc()">
+                  <span class="sfx">/bu</span>
+                </div>
+                <span class="hint">Bin depreciation, bin insurance, property tax</span>
+              </div>
+              <div class="field">
+                <label>Monthly Variable Cost</label>
+                <div class="iw has-pfx has-sfx">
+                  <span class="pfx">$</span>
+                  <input type="number" id="farmVariable" step="0.001" value="0.007" oninput="calc()">
+                  <span class="sfx">/bu</span>
+                </div>
+                <span class="hint">Aeration electricity, monitoring, labor</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Commercial elevator inputs -->
+          <div id="commercial-inputs" style="display:none">
+            <div class="fg col2">
+              <div class="field">
+                <label>Handling / In-Out Fee (one-time)</label>
+                <div class="iw has-pfx has-sfx">
+                  <span class="pfx">$</span>
+                  <input type="number" id="handling" step="0.01" value="0.08" oninput="calc()">
+                  <span class="sfx">/bu</span>
+                </div>
+                <span class="hint">Charged once at delivery — typical $0.06–$0.12</span>
+              </div>
+              <div class="field">
+                <label>Monthly Storage Rate</label>
+                <div class="iw has-pfx has-sfx">
+                  <span class="pfx">$</span>
+                  <input type="number" id="monthlyStorage" step="0.001" value="0.040" oninput="calc()">
+                  <span class="sfx">/bu</span>
+                </div>
+                <span class="hint">Typical $0.03–$0.05 / bu / month</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Additional costs -->
+        <div class="sec">
+          <div class="sec-title">Additional Costs</div>
+          <div class="fg col3">
+            <div class="field">
+              <label>Drying Cost (one-time)</label>
+              <div class="iw has-pfx has-sfx">
+                <span class="pfx">$</span>
+                <input type="number" id="dryingCost" step="0.01" value="0.00" oninput="calc()">
+                <span class="sfx">/bu</span>
+              </div>
+              <span class="hint">Enter 0 if grain is already dry</span>
+            </div>
+            <div class="field">
+              <label>Pest Control / Fumigation</label>
+              <div class="iw has-pfx has-sfx">
+                <span class="pfx">$</span>
+                <input type="number" id="fumigation" step="0.001" value="0.005" oninput="calc()">
+                <span class="sfx">/bu</span>
+              </div>
+              <span class="hint">Per month equivalent; typical $0.01–0.03/bu/year</span>
+            </div>
+            <div class="field">
+              <label>Grain Insurance (annual)</label>
+              <div class="iw has-sfx">
+                <input type="number" id="insuranceRate" step="0.01" value="0.20" oninput="calc()">
+                <span class="sfx">%</span>
+              </div>
+              <span class="hint">% of grain value per year (typical 0.10–0.25%)</span>
+            </div>
+          </div>
+          <div class="fg col2" style="margin-top:10px">
+            <div class="field">
+              <label>Shrinkage (annual %)</label>
+              <div class="iw has-sfx">
+                <input type="number" id="shrinkage" step="0.01" value="0.20" oninput="calc()">
+                <span class="sfx">%</span>
+              </div>
+              <span class="hint">Dry matter loss in storage per year (typical 0.1–0.5%)</span>
+            </div>
+            <div class="field">
+              <label>Total Monthly Storage Carry</label>
+              <div class="dv" id="totalMonthlyDisplay">$0.0484 / bu</div>
+              <span class="hint">Interest + all storage costs combined</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /card 2 -->
+
+    <!-- Card 3: Contract Ladder & Basis -->
+    <div class="card">
+      <div class="card-hd gold">📈 Contract Ladder &amp; Basis</div>
+      <div class="card-bd">
+        <p class="hint" style="margin-bottom:14px;font-size:.78rem">
+          Enter up to 5 deferred contract months and their current futures prices.
+          Click any row (or the radio button) to select it as your target sale contract —
+          storage duration auto-fills and the calculator shows whether that contract's
+          carry covers your costs. Enter your expected basis against that contract below.
+        </p>
+
+        <div class="sec">
+          <div class="sec-title">Futures Contract Ladder — Click a Row to Select Target</div>
+          <div class="ctbl-wrap">
+            <table class="ctbl">
+              <thead>
+                <tr>
+                  <th>Contract Month</th>
+                  <th>Futures Price</th>
+                  <th>Spread vs. Nearby</th>
+                  <th>Mo. Away</th>
+                  <th>Carry / Mo.</th>
+                  <th>Covers Your Cost?</th>
+                  <th>Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="c-row" id="cRow0" onclick="selectRow(0)">
+                  <td><input type="month" id="cMonth0" oninput="calc()" onclick="event.stopPropagation()"></td>
+                  <td><div class="iw has-pfx"><span class="pfx">$</span><input type="number" id="cPrice0" step="0.01" oninput="calc()" onclick="event.stopPropagation()"></div></td>
+                  <td class="cc" id="cSpread0">—</td><td class="cc" id="cMo0">—</td>
+                  <td class="cc" id="cCarryMo0">—</td><td class="cc" id="cCover0">—</td>
+                  <td><input type="radio" class="tgt-radio" name="tgt" id="cSel0" onclick="event.stopPropagation()" onchange="onContractSelect(0)"></td>
+                </tr>
+                <tr class="c-row" id="cRow1" onclick="selectRow(1)">
+                  <td><input type="month" id="cMonth1" oninput="calc()" onclick="event.stopPropagation()"></td>
+                  <td><div class="iw has-pfx"><span class="pfx">$</span><input type="number" id="cPrice1" step="0.01" oninput="calc()" onclick="event.stopPropagation()"></div></td>
+                  <td class="cc" id="cSpread1">—</td><td class="cc" id="cMo1">—</td>
+                  <td class="cc" id="cCarryMo1">—</td><td class="cc" id="cCover1">—</td>
+                  <td><input type="radio" class="tgt-radio" name="tgt" id="cSel1" onclick="event.stopPropagation()" onchange="onContractSelect(1)"></td>
+                </tr>
+                <tr class="c-row" id="cRow2" onclick="selectRow(2)">
+                  <td><input type="month" id="cMonth2" oninput="calc()" onclick="event.stopPropagation()"></td>
+                  <td><div class="iw has-pfx"><span class="pfx">$</span><input type="number" id="cPrice2" step="0.01" oninput="calc()" onclick="event.stopPropagation()"></div></td>
+                  <td class="cc" id="cSpread2">—</td><td class="cc" id="cMo2">—</td>
+                  <td class="cc" id="cCarryMo2">—</td><td class="cc" id="cCover2">—</td>
+                  <td><input type="radio" class="tgt-radio" name="tgt" id="cSel2" onclick="event.stopPropagation()" onchange="onContractSelect(2)"></td>
+                </tr>
+                <tr class="c-row" id="cRow3" onclick="selectRow(3)">
+                  <td><input type="month" id="cMonth3" oninput="calc()" onclick="event.stopPropagation()"></td>
+                  <td><div class="iw has-pfx"><span class="pfx">$</span><input type="number" id="cPrice3" step="0.01" oninput="calc()" onclick="event.stopPropagation()"></div></td>
+                  <td class="cc" id="cSpread3">—</td><td class="cc" id="cMo3">—</td>
+                  <td class="cc" id="cCarryMo3">—</td><td class="cc" id="cCover3">—</td>
+                  <td><input type="radio" class="tgt-radio" name="tgt" id="cSel3" onclick="event.stopPropagation()" onchange="onContractSelect(3)"></td>
+                </tr>
+                <tr class="c-row" id="cRow4" onclick="selectRow(4)">
+                  <td><input type="month" id="cMonth4" oninput="calc()" onclick="event.stopPropagation()"></td>
+                  <td><div class="iw has-pfx"><span class="pfx">$</span><input type="number" id="cPrice4" step="0.01" oninput="calc()" onclick="event.stopPropagation()"></div></td>
+                  <td class="cc" id="cSpread4">—</td><td class="cc" id="cMo4">—</td>
+                  <td class="cc" id="cCarryMo4">—</td><td class="cc" id="cCover4">—</td>
+                  <td><input type="radio" class="tgt-radio" name="tgt" id="cSel4" onclick="event.stopPropagation()" onchange="onContractSelect(4)"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint" style="margin-top:7px">Spread and carry calculate from the nearby price in Card 1. Selecting a row auto-fills the storage duration above.</p>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="sec">
+          <div class="sec-title">Basis at Sale</div>
+          <div class="fg col3">
+            <div class="field">
+              <label>Expected Basis</label>
+              <div class="basis-lbl-ref">vs. <strong id="basisContractRef">— select a contract above —</strong></div>
+              <div class="iw has-pfx">
+                <span class="pfx">$</span>
+                <input type="number" id="futureBasis" step="0.01" value="-0.15" oninput="calc()">
+              </div>
+              <span class="hint">Harvest basis typically weakest; improves post-harvest</span>
+            </div>
+            <div class="field">
+              <label>Basis Improvement</label>
+              <div class="dv" id="basisChangeDisplay">+$0.2000 / bu</div>
+            </div>
+            <div class="field">
+              <label>Projected Cash Price at Sale</label>
+              <div class="dv" id="futureCashDisplay">$4.1700 / bu</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /card 3 -->
+
+    <!-- Card 4: Monthly Breakdown Table -->
+    <div class="card">
+      <div class="card-hd">📋 Month-by-Month Breakdown</div>
+      <div class="card-bd">
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align:left">Month</th>
+                <th>Interest</th>
+                <th>Storage</th>
+                <th>Ins. &amp; Other</th>
+                <th>Monthly Total</th>
+                <th>Cumulative Cost</th>
+                <th>Break-Even Cash Price</th>
+              </tr>
+            </thead>
+            <tbody id="breakdownBody"></tbody>
+          </table>
+        </div>
+        <p class="tbl-note">
+          One-time costs (drying, handling/in-out) are applied in Month 1.
+          Interest is calculated on the original grain value (simple interest). Break-even cash price = today's cash price + cumulative storage cost.
+        </p>
+      </div>
+    </div><!-- /card 4 -->
+
+  </div><!-- /left column -->
+
+  <!-- ═══════════════ RIGHT COLUMN — RESULTS ═══════════════ -->
+  <div class="results-panel">
+
+    <div>
+      <div class="r-hd">💰 Results — <span id="cropLabel">Corn</span></div>
+      <div class="r-body" style="border-radius:0 0 10px 10px">
+
+        <!-- Sell Today -->
+        <div class="r-section">
+          <div class="r-sec-title">If You Sell Today</div>
+          <div class="r-row">
+            <span class="lbl">Cash price received</span>
+            <span class="val pos" id="r_cashToday" style="font-size:1rem">$3.8500</span>
+          </div>
+          <div class="r-row">
+            <span class="lbl">= Futures <span id="r_futRef">$4.20</span> + Basis <span id="r_basisRef">−$0.35</span></span>
+            <span class="val" style="font-size:.72rem;color:#999">per bushel</span>
+          </div>
+        </div>
+
+        <!-- Monthly Cost Breakdown -->
+        <div class="r-section">
+          <div class="r-sec-title">Monthly Cost of Carry</div>
+          <div class="r-row"><span class="lbl">Interest cost</span><span class="val" id="r_interest">$0.0241</span></div>
+          <div class="r-row"><span class="lbl" id="r_storageLabel">On-farm storage</span><span class="val" id="r_storage">$0.0170</span></div>
+          <div class="r-row"><span class="lbl">Grain insurance</span><span class="val" id="r_insurance">$0.0006</span></div>
+          <div class="r-row"><span class="lbl">Shrinkage</span><span class="val" id="r_shrinkage">$0.0008</span></div>
+          <div class="r-row"><span class="lbl">Pest control</span><span class="val" id="r_pest">$0.0050</span></div>
+          <div class="r-total">
+            <span class="lbl">Total monthly carry</span>
+            <span class="val" id="r_monthlyTotal">$0.0476</span>
+          </div>
+        </div>
+
+        <!-- Store for N months -->
+        <div class="r-section">
+          <div class="r-sec-title">Store for <span id="r_months">6</span> Months — Total Costs</div>
+          <div class="r-row"><span class="lbl">One-time costs (Month 1)</span><span class="val" id="r_oneTime">$0.0000</span></div>
+          <div class="r-row"><span class="lbl">Recurring carry (<span id="r_months2">6</span> mo)</span><span class="val" id="r_totalRecurring">$0.2856</span></div>
+          <div class="r-total">
+            <span class="lbl">Total cost of storage</span>
+            <span class="val" id="r_totalCost">$0.2856</span>
+          </div>
+        </div>
+
+        <!-- Break-Even -->
+        <div class="breakeven-box">
+          <div class="be-title">Break-Even Requirement — <span id="r_months3">6</span> Months</div>
+          <div class="be-big">
+            <div class="num" id="r_breakEven">$4.1356</div>
+            <div class="sub">Minimum cash price at sale to equal selling today</div>
+          </div>
+          <div class="r-divider"></div>
+          <div class="r-row">
+            <span class="lbl">Futures must reach at least</span>
+            <span class="val pos" id="r_beFutures">$4.2856</span>
+          </div>
+          <div class="r-row">
+            <span class="lbl">&#8194;(assumes expected basis of</span>
+            <span class="val" id="r_beBasisParen" style="color:#999;font-size:.78rem">−$0.15)</span>
+          </div>
+          <div class="r-divider"></div>
+          <div class="r-row">
+            <span class="lbl">Or: basis improvement needed</span>
+            <span class="val" id="r_beMinBasisChange">+$0.0856</span>
+          </div>
+          <div class="r-row">
+            <span class="lbl">&#8194;(if futures stay flat at today's level)</span>
+            <span class="val" style="color:#999;font-size:.72rem">vs. today</span>
+          </div>
+          <div class="r-divider"></div>
+          <div class="r-row">
+            <span class="lbl">Market futures carry available</span>
+            <span class="val" id="r_marketCarry" style="color:var(--green-mid)">$0.1200</span>
+          </div>
+          <div class="r-row">
+            <span class="lbl">Storage cost exceeds market carry by</span>
+            <span class="val" id="r_carryVsCost">+$0.1656</span>
+          </div>
+        </div>
+
+        <!-- Projected Net -->
+        <div class="net-box">
+          <div class="net-title">Projected Outcome — Market Carry + Basis</div>
+          <div class="r-row"><span class="lbl">Projected cash at sale</span><span class="val" id="r_projCash">$4.1700</span></div>
+          <div class="r-row"><span class="lbl">&#8194;Futures carry (market)</span><span class="val pos" id="r_projFutGain">+$0.1200</span></div>
+          <div class="r-row"><span class="lbl">&#8194;Basis improvement (<span id="r_projBasisRef">−$0.35→−$0.15</span>)</span><span class="val pos" id="r_projBasisGain">+$0.2000</span></div>
+          <div class="r-row"><span class="lbl">Less: total storage cost</span><span class="val neg" id="r_projCostDeduct">−$0.2856</span></div>
+          <div class="net-total" id="netTotalRow">
+            <span class="lbl">Net gain vs. selling now</span>
+            <span class="val pos" id="r_netGain">+$0.0344</span>
+          </div>
+
+          <!-- Bushel totals -->
+          <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+            <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--gold);margin-bottom:8px">FOR <span id="r_bushelsLabel">10,000</span> BU STORED</div>
+            <div class="r-row">
+              <span class="lbl">Gross pickup (carry + basis)</span>
+              <span class="val pos" id="r_grossPerBu">+28.0¢/bu</span>
+            </div>
+            <div class="r-row">
+              <span class="lbl">Less: storage cost</span>
+              <span class="val neg" id="r_costPerBu">−4.7¢/bu</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 0 0;border-top:2px solid var(--green-dark);margin-top:5px">
+              <span style="font-size:.82rem;font-weight:700">Net pickup per bushel</span>
+              <span style="font-size:.95rem;font-weight:900" id="r_netPerBu">+23.3¢/bu</span>
+            </div>
+            <div class="r-divider" style="margin:8px 0"></div>
+            <div class="r-row">
+              <span class="lbl">Gross dollars (price appreciation)</span>
+              <span class="val pos" id="r_grossTotal">+$2,800</span>
+            </div>
+            <div class="r-row">
+              <span class="lbl">Less: total storage costs</span>
+              <span class="val neg" id="r_storageTotal">−$473</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 0 0;border-top:2px solid var(--green-dark);margin-top:5px">
+              <span style="font-size:.82rem;font-weight:700">Net dollars earned</span>
+              <span style="font-size:1.1rem;font-weight:900" id="r_netTotal">+$2,327</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verdict -->
+        <div class="verdict pos" id="verdictBox">
+          <div class="icon" id="verdictIcon">✅</div>
+          <div class="txt" id="verdictText">Market carry + basis improvement covers storage costs by $0.0344/bu.</div>
+        </div>
+
+      </div><!-- /r-body -->
+    </div>
+
+    <!-- Benchmarks -->
+    <div class="bench-card">
+      <div class="bench-title">Typical Benchmarks</div>
+      <div class="bench-row"><span class="bl" id="bench1L">Corn futures carry (Dec→Mar)</span><span class="bv">~$0.10–$0.15</span></div>
+      <div class="bench-row"><span class="bl" id="bench2L">Corn basis improve (harvest→spring)</span><span class="bv">~$0.15–$0.35</span></div>
+      <div class="bench-row"><span class="bl">On-farm carry (all-in typical)</span><span class="bv">$0.03–$0.05/mo</span></div>
+      <div class="bench-row"><span class="bl">Commercial elevator (all-in typical)</span><span class="bv">$0.06–$0.10/mo</span></div>
+      <div class="bench-row"><span class="bl">Operating loan rate (FSA 2025)</span><span class="bv">4.25–8.00%</span></div>
+    </div>
+
+  </div><!-- /results-panel -->
+</div><!-- /main -->
+
+<script>
+// ── State ──
+let currentCrop = 'corn';
+let storageType  = 'farm';
+
+// ── Crop defaults ──
+const CROPS = {
+  corn: {
+    futures:        4.20,
+    basis:         -0.35,
+    futureBasis:   -0.15,
+    contractMonths: [12, 3, 5, 7],            // Dec, Mar, May, Jul  (4 contracts)
+    contractCarry:  [0.08, 0.16, 0.22, 0.26],
+    bench1L: 'Corn futures carry (Dec→Mar)',
+    bench2L: 'Corn basis improve (harvest→spring)',
+  },
+  soybeans: {
+    futures:        9.80,
+    basis:         -0.55,
+    futureBasis:   -0.25,
+    contractMonths: [11, 1, 3, 5, 7],         // Nov, Jan, Mar, May, Jul  (5 contracts)
+    contractCarry:  [0.10, 0.16, 0.20, 0.24, 0.28],
+    bench1L: 'Soybean futures carry (Nov→Mar)',
+    bench2L: 'Soybean basis improve (harvest→spring)',
+  },
+  wheat: {
+    futures:        5.50,
+    basis:         -0.45,
+    futureBasis:   -0.20,
+    contractMonths: [7, 9, 12, 3, 5],         // Jul, Sep, Dec, Mar, May  (5 contracts)
+    contractCarry:  [0.06, 0.12, 0.16, 0.20, 0.22],
+    bench1L: 'Wheat futures carry (Jul→Dec)',
+    bench2L: 'Wheat basis improve (harvest→winter)',
+  }
+};
+
+const LABELS = { corn:'Corn', soybeans:'Soybeans', wheat:'Wheat' };
+
+// ── Helper: format ──
+function f(v, d=4) { return '$' + Math.abs(v).toFixed(d); }
+function fs(v, d=4) {
+  const s = v >= 0 ? '+' : '−';
+  return s + '$' + Math.abs(v).toFixed(d);
+}
+function fSign(v, d=4) { return (v >= 0 ? '+' : '−') + '$' + Math.abs(v).toFixed(d); }
+function fc(v) { // signed cents-per-bushel
+  return (v >= 0 ? '+' : '−') + (Math.abs(v) * 100).toFixed(1) + '¢/bu';
+}
+function fd(v) { // signed dollar total, no decimals
+  return (v >= 0 ? '+' : '−') + '$' + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits:0});
+}
+
+function getStartDate() {
+  const val = el('startMonth').value;
+  if (val) {
+    const [yr, mo] = val.split('-').map(Number);
+    return new Date(yr, mo - 1, 1);
+  }
+  return new Date();
+}
+
+function getMonthLabel(offsetMonths) {
+  const d = getStartDate();
+  d.setMonth(d.getMonth() + offsetMonths);
+  return d.toLocaleDateString('en-US', { month:'short', year:'numeric' });
+}
+
+// Returns sorted array of {mo, yr} objects for the standardized contract months
+// of the given crop, each resolved to the next upcoming occurrence after startDate.
+function getStdContractMonths(crop, startDate) {
+  const stdMonths = CROPS[crop].contractMonths;
+  const startMo   = startDate.getMonth() + 1;   // 1-based
+  const startYr   = startDate.getFullYear();
+  return stdMonths
+    .map(mo => ({ mo, yr: mo > startMo ? startYr : startYr + 1 }))
+    .sort((a, b) => (a.yr * 12 + a.mo) - (b.yr * 12 + b.mo));
+}
+
+function n(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function el(id) { return document.getElementById(id); }
+
+// ── setCrop ──
+function setCrop(crop) {
+  currentCrop = crop;
+  document.querySelectorAll('.crop-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['corn','soybeans','wheat'][i] === crop);
+  });
+  const d = CROPS[crop];
+  el('futuresPrice').value    = d.futures.toFixed(2);
+  el('currentBasis').value    = d.basis.toFixed(2);
+  el('futureBasis').value     = d.futureBasis.toFixed(2);
+  el('cropLabel').textContent = LABELS[crop];
+  el('bench1L').textContent   = d.bench1L;
+  el('bench2L').textContent   = d.bench2L;
+
+  // Populate contract table using standardized contract months for this crop
+  const startDate    = getStartDate();
+  const stdContracts = getStdContractMonths(crop, startDate);
+  const numContracts = stdContracts.length;
+  for (let i = 0; i < 5; i++) {
+    if (i < numContracts) {
+      const { mo, yr } = stdContracts[i];
+      el('cMonth' + i).value   = yr + '-' + String(mo).padStart(2, '0');
+      el('cPrice' + i).value   = (d.futures + d.contractCarry[i]).toFixed(2);
+      el('cSel'   + i).checked = (i === 0);
+    } else {
+      // Clear unused rows (e.g., row 4 for corn, which only has 4 contracts)
+      el('cMonth' + i).value   = '';
+      el('cPrice' + i).value   = '';
+      el('cSel'   + i).checked = false;
+    }
+  }
+  updateBasisLabel(0);
+  calc();
+}
+
+// ── setStorageType ──
+function setStorageType(type) {
+  storageType = type;
+  el('btn-farm').classList.toggle('on', type === 'farm');
+  el('btn-commercial').classList.toggle('on', type === 'commercial');
+  el('farm-inputs').style.display       = type === 'farm'       ? 'block' : 'none';
+  el('commercial-inputs').style.display = type === 'commercial' ? 'block' : 'none';
+  el('r_storageLabel').textContent = type === 'farm' ? 'On-farm storage' : 'Commercial elevator';
+  calc();
+}
+
+// ── Contract helpers ──
+function getSelectedContract() {
+  for (let i = 0; i < 5; i++) {
+    if (el('cSel' + i)?.checked) {
+      return { idx: i, monthVal: el('cMonth' + i).value,
+               price: parseFloat(el('cPrice' + i).value) || null };
+    }
+  }
+  return null;
+}
+
+function selectRow(i) {
+  el('cSel' + i).checked = true;
+  onContractSelect(i);
+}
+
+function onContractSelect(i) {
+  updateBasisLabel(i);
+  calc();
+}
+
+function updateBasisLabel(i) {
+  const val = el('cMonth' + i)?.value;
+  const ref = el('basisContractRef');
+  if (val) {
+    const [yr, mo] = val.split('-').map(Number);
+    const label = new Date(yr, mo - 1, 1)
+      .toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    ref.textContent = label + ' futures';
+  } else {
+    ref.textContent = '— select a contract above —';
+  }
+}
+
+function updateContractTable(monthlyTotal, futuresPrice) {
+  const sel = getSelectedContract();
+  const startDate = getStartDate();
+  for (let i = 0; i < 5; i++) {
+    const price    = parseFloat(el('cPrice' + i).value) || null;
+    const monthVal = el('cMonth' + i).value;
+    el('cRow' + i).classList.toggle('sel', sel?.idx === i);
+    const blank = '<span style="color:#bbb">—</span>';
+    if (!price || !monthVal) {
+      ['cSpread','cMo','cCarryMo','cCover'].forEach(p => el(p + i).innerHTML = blank);
+      continue;
+    }
+    const spread = price - futuresPrice;
+    const [yr, mo] = monthVal.split('-').map(Number);
+    const cd = new Date(yr, mo - 1, 1);
+    const moAway = (cd.getFullYear() - startDate.getFullYear()) * 12
+                 + (cd.getMonth() - startDate.getMonth());
+    if (moAway <= 0) {
+      el('cSpread' + i).textContent = fSign(spread, 4);
+      el('cMo'     + i).innerHTML   = '<span style="color:#999">same/past</span>';
+      el('cCarryMo'+ i).innerHTML   = blank;
+      el('cCover'  + i).innerHTML   = blank;
+      continue;
+    }
+    const carryPerMo = spread / moAway;
+    const net        = carryPerMo - monthlyTotal;
+    el('cSpread' + i).textContent = fSign(spread, 4);
+    el('cMo'     + i).textContent = moAway + ' mo';
+    el('cCarryMo'+ i).textContent = fSign(carryPerMo, 4);
+    el('cCover'  + i).innerHTML   = net >= 0
+      ? `<span style="color:var(--green-dark);font-weight:700">✅ ${fSign(net,4)}/mo</span>`
+      : `<span style="color:var(--red);font-weight:700">❌ ${fSign(net,4)}/mo</span>`;
+  }
+}
+
+// ── Main calc ──
+function calc() {
+  // Inputs
+  const futuresPrice  = n('futuresPrice');
+  const currentBasis  = n('currentBasis');
+  const interestRate  = n('interestRate');
+  const dryingCost    = n('dryingCost');
+  const fumigation    = n('fumigation');
+  const insuranceRate = n('insuranceRate');
+  const shrinkage     = n('shrinkage');
+  const futureBasis = n('futureBasis');
+  const bushels     = Math.max(0, n('bushels'));
+
+  // Resolve selected contract → futureFutures, marketCarry, months
+  const selContract   = getSelectedContract();
+  const futureFutures = selContract?.price ? selContract.price : futuresPrice;
+  const marketCarry   = futureFutures - futuresPrice;
+  if (selContract?.monthVal) {
+    const [cYr, cMo] = selContract.monthVal.split('-').map(Number);
+    const sd = getStartDate();
+    const diff = (new Date(cYr, cMo - 1, 1).getFullYear() - sd.getFullYear()) * 12
+               + (new Date(cYr, cMo - 1, 1).getMonth() - sd.getMonth());
+    if (diff > 0) el('months').value = diff;
+  }
+  const months = Math.max(1, Math.round(n('months')));
+
+  // Derived current
+  const cashPrice = futuresPrice + currentBasis;
+
+  // Storage cost
+  let monthlyStorage = 0;
+  let oneTimeStorage = 0;
+  if (storageType === 'farm') {
+    monthlyStorage = n('farmFixed') + n('farmVariable');
+  } else {
+    oneTimeStorage = n('handling');
+    monthlyStorage = n('monthlyStorage');
+  }
+
+  // Monthly costs
+  const monthlyInterest  = cashPrice * (interestRate / 100) / 12;
+  const monthlyInsurance = cashPrice * (insuranceRate / 100) / 12;
+  const monthlyShrinkage = cashPrice * (shrinkage / 100) / 12;
+  const monthlyPest      = fumigation; // user enters per-month equivalent
+  const monthlyTotal     = monthlyInterest + monthlyStorage + monthlyInsurance + monthlyShrinkage + monthlyPest;
+
+  // One-time costs
+  const oneTime = dryingCost + oneTimeStorage;
+
+  // Totals
+  const totalRecurring = monthlyTotal * months;
+  const totalCost      = oneTime + totalRecurring;
+
+  // Break-evens
+  const breakEvenCash    = cashPrice + totalCost;
+  const breakEvenFutures = breakEvenCash - futureBasis;          // assumes expected basis
+  const beMinBasisChange = totalCost - (futureFutures - futuresPrice); // if futures stay flat
+  const carryVsCost      = totalCost - marketCarry;              // positive = cost > market carry
+
+  // Projections
+  const futureCash    = futureFutures + futureBasis;
+  const futuresChange = futureFutures - futuresPrice;
+  const basisChange   = futureBasis - currentBasis;
+  const grossPerBu    = futureCash - cashPrice;           // price appreciation before storage costs
+  const netGain       = grossPerBu - totalCost;           // net pickup per bushel
+  const grainValue    = cashPrice * bushels;
+  const grossDollars  = grossPerBu * bushels;
+  const storageDollars= totalCost  * bushels;
+  const netDollars    = netGain    * bushels;
+
+  // ── Update DOM ──
+
+  // Current market
+  const cashEl = el('cashPriceDisplay');
+  cashEl.textContent  = f(cashPrice) + ' / bu';
+  cashEl.className    = 'dv' + (cashPrice < 0 ? ' neg' : '');
+  el('saleMonthDisplay').textContent = getMonthLabel(months);
+
+  el('interestCostDisplay').textContent = f(monthlyInterest) + ' / bu / mo';
+  el('totalMonthlyDisplay').textContent = f(monthlyTotal) + ' / bu / mo';
+  el('grainValueDisplay').textContent   = '$' + grainValue.toLocaleString('en-US',{maximumFractionDigits:0});
+
+  // Update contract table (spread, carry, coverage for all 5 rows)
+  updateContractTable(monthlyTotal, futuresPrice);
+
+  const bcEl = el('basisChangeDisplay');
+  bcEl.textContent = fSign(basisChange) + ' / bu';
+  bcEl.className   = 'dv' + (basisChange < 0 ? ' neg' : '');
+
+  el('futureCashDisplay').textContent = f(futureCash) + ' / bu';
+
+  // Results panel
+  el('r_cashToday').textContent   = f(cashPrice);
+  el('r_futRef').textContent      = f(futuresPrice,2);
+  el('r_basisRef').textContent    = (currentBasis < 0 ? '−' : '+') + f(Math.abs(currentBasis),2);
+  el('r_interest').textContent    = f(monthlyInterest);
+  el('r_storage').textContent     = f(monthlyStorage);
+  el('r_insurance').textContent   = f(monthlyInsurance);
+  el('r_shrinkage').textContent   = f(monthlyShrinkage);
+  el('r_pest').textContent        = f(monthlyPest);
+  el('r_monthlyTotal').textContent= f(monthlyTotal);
+
+  ['r_months','r_months2','r_months3'].forEach(id => el(id).textContent = months);
+  el('r_oneTime').textContent         = f(oneTime);
+  el('r_totalRecurring').textContent  = f(totalRecurring);
+  el('r_totalCost').textContent       = f(totalCost);
+
+  el('r_breakEven').textContent       = f(breakEvenCash);
+  el('r_beFutures').textContent       = f(breakEvenFutures);
+  el('r_beBasisParen').textContent    = '(' + (futureBasis < 0 ? '−' : '+') + f(Math.abs(futureBasis),2) + ')';
+  el('r_beMinBasisChange').textContent= fSign(beMinBasisChange);
+  el('r_marketCarry').textContent     = f(marketCarry);
+
+  const cvEl = el('r_carryVsCost');
+  cvEl.textContent = fSign(carryVsCost);
+  cvEl.className   = 'val ' + (carryVsCost > 0 ? 'neg' : 'pos');
+
+  el('r_projCash').textContent      = f(futureCash);
+  el('r_projBasisRef').textContent  = (currentBasis < 0 ? '−' : '+') + f(Math.abs(currentBasis),2)
+                                    + '→' + (futureBasis < 0 ? '−' : '+') + f(Math.abs(futureBasis),2);
+
+  const fgEl = el('r_projFutGain');
+  fgEl.textContent = fSign(futuresChange);
+  fgEl.className   = 'val ' + (futuresChange >= 0 ? 'pos' : 'neg');
+
+  const bgEl = el('r_projBasisGain');
+  bgEl.textContent = fSign(basisChange);
+  bgEl.className   = 'val ' + (basisChange >= 0 ? 'pos' : 'neg');
+
+  el('r_projCostDeduct').textContent = '−' + f(totalCost);
+
+  const ngEl = el('r_netGain');
+  ngEl.textContent = fSign(netGain);
+  ngEl.className   = 'val ' + (netGain >= 0 ? 'pos' : 'neg');
+
+  const ntRow = el('netTotalRow');
+  ntRow.style.borderTopColor = netGain >= 0 ? 'var(--green-dark)' : 'var(--red)';
+
+  // Bushel totals
+  const bLabel = bushels.toLocaleString('en-US',{maximumFractionDigits:0});
+  el('r_bushelsLabel').textContent = bLabel;
+  const gpEl = el('r_grossPerBu');
+  gpEl.textContent = fc(grossPerBu);
+  gpEl.className   = 'val ' + (grossPerBu >= 0 ? 'pos' : 'neg');
+  el('r_costPerBu').textContent = '−' + (totalCost * 100).toFixed(1) + '¢/bu';
+  const npEl = el('r_netPerBu');
+  npEl.textContent  = fc(netGain);
+  npEl.style.color  = netGain >= 0 ? 'var(--green-dark)' : 'var(--red)';
+  const gtEl = el('r_grossTotal');
+  gtEl.textContent = fd(grossDollars);
+  gtEl.className   = 'val ' + (grossDollars >= 0 ? 'pos' : 'neg');
+  el('r_storageTotal').textContent = '−$' + storageDollars.toLocaleString('en-US',{maximumFractionDigits:0});
+  const ntEl = el('r_netTotal');
+  ntEl.textContent = fd(netDollars);
+  ntEl.style.color = netDollars >= 0 ? 'var(--green-dark)' : 'var(--red)';
+
+  // Verdict
+  const vBox = el('verdictBox');
+  const vIcon = el('verdictIcon');
+  const vText = el('verdictText');
+  if (netGain > 0.005) {
+    vBox.className  = 'verdict pos';
+    vIcon.textContent = '✅';
+    vText.className = 'txt';
+    vText.style.color = 'var(--green-dark)';
+    vText.textContent = `Market carry + basis improvement covers storage costs, netting ${fSign(netGain)}/bu over ${months} month${months!==1?'s':''}.`;
+  } else if (netGain < -0.005) {
+    vBox.className  = 'verdict neg';
+    vIcon.textContent = '⚠️';
+    vText.className = 'txt';
+    vText.style.color = 'var(--red)';
+    vText.textContent = `Market carry + basis improvement falls short of storage costs by ${f(Math.abs(netGain))}/bu. The market is not paying enough to store.`;
+  } else {
+    vBox.className  = 'verdict neu';
+    vIcon.textContent = '↔️';
+    vText.className = 'txt';
+    vText.style.color = 'var(--muted)';
+    vText.textContent = `Break-even — market carry + basis improvement barely covers storage costs. Margin may not justify quality and market risk.`;
+  }
+
+  // Monthly breakdown table
+  buildTable(cashPrice, monthlyInterest, monthlyStorage, monthlyInsurance + monthlyShrinkage + monthlyPest, oneTime, months);
+}
+
+// ── Monthly table ──
+function buildTable(cashPrice, monthlyInterest, monthlyStorage, monthlyOther, oneTime, months) {
+  const tbody = el('breakdownBody');
+  tbody.innerHTML = '';
+  let cumulative = 0;
+
+  for (let m = 1; m <= months; m++) {
+    const oneTimeThisMonth = m === 1 ? oneTime : 0;
+    const storageLine      = monthlyStorage + oneTimeThisMonth;
+    const monthTotal       = monthlyInterest + storageLine + monthlyOther;
+    cumulative += monthTotal;
+    const breakEven = cashPrice + cumulative;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${getMonthLabel(m-1)}${m===1&&oneTime>0?' <em style="color:#999;font-size:.68rem">(+one-time)</em>':''}</td>
+      <td>${f(monthlyInterest)}</td>
+      <td>${f(storageLine)}</td>
+      <td>${f(monthlyOther)}</td>
+      <td>${f(monthTotal)}</td>
+      <td>${f(cumulative)}</td>
+      <td><strong>${f(breakEven)}</strong></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // Total row
+  const totInterest = monthlyInterest * months;
+  const totStorage  = monthlyStorage * months + oneTime;
+  const totOther    = monthlyOther * months;
+  const grandTotal  = totInterest + totStorage + totOther;
+  const finalBE     = cashPrice + grandTotal;
+
+  const tr = document.createElement('tr');
+  tr.className = 'total-row';
+  tr.innerHTML = `
+    <td>TOTAL (${months} mo)</td>
+    <td>${f(totInterest)}</td>
+    <td>${f(totStorage)}</td>
+    <td>${f(totOther)}</td>
+    <td>${f(grandTotal)}</td>
+    <td>${f(grandTotal)}</td>
+    <td><strong>${f(finalBE)}</strong></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+// Set default start month and kick off initial render via setCrop
+(function() {
+  const now = new Date();
+  el('startMonth').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  setCrop('corn');
+})();
+</script>
+</body>
+</html>
