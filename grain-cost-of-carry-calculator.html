@@ -756,9 +756,8 @@ function getStdContractMonths(crop, startDate) {
   const stdMonths = CROPS[crop].contractMonths;
   const startMo   = startDate.getMonth() + 1;   // 1-based
   const startYr   = startDate.getFullYear();
-  return stdMonths
-    .map(mo => ({ mo, yr: mo > startMo ? startYr : startYr + 1 }))
-    .sort((a, b) => (a.yr * 12 + a.mo) - (b.yr * 12 + b.mo));
+  // Preserve the defined harvest-season order; only resolve the correct year for each month
+  return stdMonths.map(mo => ({ mo, yr: mo > startMo ? startYr : startYr + 1 }));
 }
 
 function n(id) { return parseFloat(document.getElementById(id).value) || 0; }
