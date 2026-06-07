@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Options Analyzer">
+<meta name="theme-color" content="#1e5a3c">
+<link rel="manifest" href="manifest.json">
+<title>Commodity Options Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
+  --slate:#1e293b;--slate-m:#64748b;--border:#e2e8f0;
+  --white:#fff;--rad:12px;
+  --red:#dc2626;--red-l:#fef2f2;--red-m:#fca5a5;
+  --amber:#d97706;--amber-l:#fffbeb;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0fdf4;display:flex;flex-direction:column;color:var(--slate);overflow:hidden}
+#hdr{background:var(--green);color:white;flex-shrink:0;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#hdr-top{display:flex;align-items:center;gap:9px}
+.hdr-icon{background:rgba(255,255,255,.15);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#hdr-title{font-size:.95rem;font-weight:700}
+#hdr-sub{font-size:.68rem;color:var(--green-m);margin-top:1px}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;padding-bottom:calc(70px + var(--safe-b) + 8px)}
+#scroll::-webkit-scrollbar{display:none}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:10px}
+.chip-group{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:#f1f5f9;border:1.5px solid var(--border);border-radius:999px;padding:7px 14px;font-size:.8rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:all .15s;white-space:nowrap;line-height:1}
+.chip.active{background:var(--green);border-color:var(--green);color:white}
+.chip:active{opacity:.7}
+.strat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.strat-chip{background:#f1f5f9;border:2px solid var(--border);border-radius:var(--rad);padding:10px 12px;cursor:pointer;transition:all .15s;text-align:left;width:100%}
+.strat-chip.active{background:var(--green);border-color:var(--green)}
+.strat-chip .s-name{font-size:.82rem;font-weight:700;color:var(--slate);display:block;line-height:1.2}
+.strat-chip.active .s-name{color:white}
+.strat-chip .s-role{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-top:2px}
+.strat-chip:not(.active) .s-role{color:#16a34a}
+.strat-chip.active .s-role{color:rgba(255,255,255,.7)}
+.strat-chip .s-desc{font-size:.68rem;color:var(--slate-m);margin-top:3px;display:block;line-height:1.3}
+.strat-chip.active .s-desc{color:rgba(255,255,255,.65)}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px}
+.hint{font-size:.68rem;color:#94a3b8;margin-top:3px}
+.input-wrap{position:relative}
+.pfx,.sfx{position:absolute;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.82rem;pointer-events:none}
+.pfx{left:10px}.sfx{right:10px}
+input[type=number]{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.95rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+input[type=number]:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
+input.pfx-in{padding-left:26px}
+input.sfx-in{padding-right:42px}
+input.pfx-sfx{padding-left:26px;padding-right:42px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.banner{border-radius:var(--rad);padding:12px 14px;margin-bottom:10px;border:1.5px solid}
+.banner-head{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.banner-desc{font-size:.78rem;line-height:1.45}
+.banner-key{margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px}
+.banner-key-item{font-size:.78rem;font-weight:600}
+.banner-key-label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;opacity:.7;display:block;margin-bottom:1px}
+/* slider */
+.slider-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.slider-label{font-size:.75rem;font-weight:600;color:var(--slate-m)}
+.slider-price{font-size:1.15rem;font-weight:800;color:var(--green);letter-spacing:-.3px}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:#e2e8f0;outline:none;cursor:pointer;margin:4px 0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--green);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--green);cursor:pointer;border:none;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.slider-minmax{display:flex;justify-content:space-between;margin-top:3px;font-size:.64rem;color:var(--slate-m);font-weight:500}
+/* metrics */
+.metrics4{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.mbox{background:white;border:1px solid var(--border);border-radius:var(--rad);padding:11px 12px}
+.mbox.pos{background:#f0fdf4;border-color:#86efac}
+.mbox.neg{background:var(--red-l);border-color:var(--red-m)}
+.mbox.amber{background:var(--amber-l);border-color:#fcd34d}
+.mbox.blue{background:var(--blue-l);border-color:#93c5fd}
+.mbox.purple{background:#faf5ff;border-color:#c4b5fd}
+.m-lbl{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate-m);line-height:1}
+.m-val{font-size:1.15rem;font-weight:800;letter-spacing:-.4px;margin-top:3px;line-height:1}
+.m-sub{font-size:.65rem;color:var(--slate-m);margin-top:2px}
+/* bd rows */
+.bd-row{display:flex;justify-content:space-between;align-items:baseline;font-size:.78rem;padding:5px 0;border-bottom:1px solid #f1f5f9}
+.bd-row:last-child{border-bottom:none}
+.bd-lbl{color:#94a3b8;font-size:.71rem;flex:1;padding-right:8px}
+.bd-val{font-weight:600;color:var(--slate);white-space:nowrap;font-size:.8rem}
+.bd-val.pos{color:#16a34a}
+.bd-val.neg{color:var(--red)}
+.bd-val.warn{color:var(--amber)}
+.bd-val.ok{color:#16a34a}
+.bd-val.danger{color:var(--red);font-weight:700}
+.bd-total{border-top:2px solid var(--border);padding-top:6px;margin-top:3px}
+/* alert */
+.alert{border-radius:var(--rad);padding:11px 13px;margin-bottom:10px;display:flex;gap:9px;align-items:flex-start}
+.alert.red{background:var(--red-l);border:1.5px solid var(--red-m)}
+.alert.amber{background:var(--amber-l);border:1.5px solid #fcd34d}
+.alert.green{background:#f0fdf4;border:1.5px solid #86efac}
+.alert-icon{font-size:1.1rem;line-height:1;flex-shrink:0;margin-top:1px}
+.alert-body{font-size:.78rem;color:var(--slate);line-height:1.45}
+.alert-body strong{font-weight:700}
+/* na box */
+.na-box{background:#f8fafc;border:1px dashed var(--border);border-radius:var(--rad);padding:22px 16px;text-align:center;margin-bottom:10px}
+.na-box p{font-size:.82rem;color:var(--slate-m);line-height:1.5}
+.na-box strong{color:var(--slate)}
+/* legend */
+.chart-legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:.68rem;font-weight:600;color:var(--slate-m)}
+.leg-line{width:20px;height:3px;flex-shrink:0;border-radius:2px}
+.leg-dash{width:20px;height:0;border-bottom:2px dashed;flex-shrink:0}
+/* nav */
+#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-b);box-shadow:0 -2px 12px rgba(0,0,0,.06);z-index:100}
+.nbtn{flex:1;background:none;border:none;cursor:pointer;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate-m);transition:color .12s;min-height:56px}
+.nbtn:active{opacity:.7}
+.nbtn.active{color:var(--green)}
+.nbtn svg{width:20px;height:20px}
+.nbtn span{font-size:.68rem;font-weight:600}
+.sec{display:none}
+.sec.active{display:block}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-top">
+    <div class="hdr-icon">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <div>
+      <div id="hdr-title">Options Analyzer</div>
+      <div id="hdr-sub">Commodity Price Floors &amp; Ceilings</div>
+    </div>
+  </div>
+</div>
+
+<div id="scroll">
+
+<!-- ==================== SETUP ==================== -->
+<div id="sec-setup" class="sec active">
+
+  <div class="card">
+    <div class="card-title">Commodity</div>
+    <div class="chip-group" id="commodity-chips">
+      <button class="chip active" data-com="corn">Corn</button>
+      <button class="chip" data-com="soybeans">Soybeans</button>
+      <button class="chip" data-com="wheat">Wheat</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Strategy</div>
+    <div class="strat-grid" id="strat-chips">
+      <button class="strat-chip active" data-strat="long-put">
+        <span class="s-name">Buy a Put</span>
+        <span class="s-role">Price Floor</span>
+        <span class="s-desc">Pay premium · Protect downside as a seller</span>
+      </button>
+      <button class="strat-chip" data-strat="short-put">
+        <span class="s-name">Sell a Put</span>
+        <span class="s-role">Premium Income</span>
+        <span class="s-desc">Collect premium · Obligated to buy at strike</span>
+      </button>
+      <button class="strat-chip" data-strat="long-call">
+        <span class="s-name">Buy a Call</span>
+        <span class="s-role">Price Ceiling</span>
+        <span class="s-desc">Pay premium · Cap purchase cost as a buyer</span>
+      </button>
+      <button class="strat-chip" data-strat="short-call">
+        <span class="s-name">Sell a Call</span>
+        <span class="s-role">Capped Upside</span>
+        <span class="s-desc">Collect premium · Cap gains as a seller</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="strat-banner"></div>
+
+  <div class="card">
+    <div class="card-title">Prices &amp; Position Size</div>
+    <div class="row2" style="margin-bottom:10px">
+      <div class="field" style="margin-bottom:0">
+        <label>Reference / Futures Price</label>
+        <div class="input-wrap">
+          <span class="pfx">$</span>
+          <input type="number" id="i-ref" class="pfx-sfx" inputmode="decimal" step="0.01" min="0.01" value="4.50">
+          <span class="sfx">/bu</span>
+        </div>
+        <div class="hint">Current market price</div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Strike Price</label>
+        <div class="input-wrap">
+          <span class="pfx">$</span>
+          <input type="number" id="i-strike" class="pfx-sfx" inputmode="decimal" step="0.05" min="0.01" value="4.50">
+          <span class="sfx">/bu</span>
+        </div>
+        <div class="hint">Option exercise price</div>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Option Premium</label>
+        <div class="input-wrap">
+          <span class="pfx">$</span>
+          <input type="number" id="i-premium" class="pfx-sfx" inputmode="decimal" step="0.01" min="0" value="0.20">
+          <span class="sfx">/bu</span>
+        </div>
+        <div class="hint" id="premium-cents-hint">= 20¢/bu · $1,000/contract</div>
+      </div>
+      <div class="field">
+        <label>Number of Contracts</label>
+        <div class="input-wrap">
+          <input type="number" id="i-contracts" class="sfx-in" inputmode="numeric" step="1" min="1" value="1">
+          <span class="sfx">× 5k bu</span>
+        </div>
+        <div class="hint" id="total-bu-hint">= 5,000 bushels</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ==================== SCENARIO / CHART ==================== -->
+<div id="sec-chart" class="sec">
+
+  <div class="card">
+    <div class="card-title">Price Scenario</div>
+    <div class="slider-header">
+      <span class="slider-label">Simulated Market Price</span>
+      <span class="slider-price" id="slider-display">$4.50/bu</span>
+    </div>
+    <input type="range" id="price-slider" min="1" max="10" step="0.01" value="4.50">
+    <div class="slider-minmax">
+      <span id="sl-min">$1.00</span>
+      <span id="sl-max">$10.00</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Payoff Diagram</div>
+    <canvas id="payoff-chart" style="max-height:265px"></canvas>
+    <div class="chart-legend" id="chart-legend"></div>
+  </div>
+
+  <div class="metrics4" id="scenario-metrics"></div>
+
+  <div class="card">
+    <div class="card-title">Position Summary at Scenario Price</div>
+    <div id="pos-rows"></div>
+  </div>
+
+</div>
+
+<!-- ==================== MARGIN ==================== -->
+<div id="sec-margin" class="sec">
+
+  <div id="margin-na" class="na-box" style="display:none">
+    <p>Margin requirements only apply to <strong>short option positions</strong> (Sell a Put or Sell a Call).<br><br>Select one of those strategies on the Setup tab to analyze margin calls.</p>
+  </div>
+
+  <div id="margin-content" style="display:none">
+
+    <div class="card">
+      <div class="card-title">Account &amp; Margin Settings</div>
+      <div class="field">
+        <label>Trading Account Balance</label>
+        <div class="input-wrap">
+          <span class="pfx">$</span>
+          <input type="number" id="i-acct" class="pfx-in" inputmode="decimal" step="100" min="0" value="10000">
+        </div>
+        <div class="hint">Total funds available in your account</div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Initial Margin</label>
+          <div class="input-wrap">
+            <span class="pfx">$</span>
+            <input type="number" id="i-init-margin" class="pfx-sfx" inputmode="decimal" step="50" min="0" value="500">
+            <span class="sfx">/contract</span>
+          </div>
+          <div class="hint">Required to open position</div>
+        </div>
+        <div class="field">
+          <label>Maintenance Margin</label>
+          <div class="input-wrap">
+            <span class="pfx">$</span>
+            <input type="number" id="i-maint-margin" class="pfx-sfx" inputmode="decimal" step="50" min="0" value="400">
+            <span class="sfx">/contract</span>
+          </div>
+          <div class="hint">Margin call triggered below this</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="margin-alert-box"></div>
+
+    <div class="card">
+      <div class="card-title">Account Equity at Scenario Price <span id="margin-scenario-label" style="color:var(--green);font-weight:700"></span></div>
+      <div id="equity-rows"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Margin Call Trigger Analysis</div>
+      <div id="trigger-rows"></div>
+    </div>
+
+    <div class="card" id="margin-call-detail-card">
+      <div class="card-title">Margin Call Detail</div>
+      <div id="margin-call-rows"></div>
+    </div>
+
+  </div>
+
+</div>
+
+</div><!-- /scroll -->
+
+<nav id="bnav">
+  <button class="nbtn active" data-sec="setup" onclick="switchTab('setup')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/>
+    </svg>
+    <span>Setup</span>
+  </button>
+  <button class="nbtn" data-sec="chart" onclick="switchTab('chart')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    <span>Scenario</span>
+  </button>
+  <button class="nbtn" data-sec="margin" onclick="switchTab('margin')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M12 12v4M10 14h4"/>
+    </svg>
+    <span>Margin</span>
+  </button>
+</nav>
+
+<script>
+// ─── CONSTANTS ──────────────────────────────────────────────────────────────
+const CS = 5000; // bushels per contract (corn/beans/wheat all 5000 bu)
+
+const COMMODITY_DEFAULTS = {
+  corn:     { ref: 4.50,  strike: 4.50,  premium: 0.20, initMargin: 500,  maintMargin: 400  },
+  soybeans: { ref: 12.00, strike: 12.00, premium: 0.40, initMargin: 1200, maintMargin: 900  },
+  wheat:    { ref: 5.50,  strike: 5.50,  premium: 0.22, initMargin: 600,  maintMargin: 450  },
+};
+
+const STRAT = {
+  'long-put': {
+    name: 'Buy a Put',
+    role: 'Producer Price Floor',
+    desc: 'You pay a premium now to guarantee a minimum effective selling price. If the market falls below the strike, your put gains in value, offsetting losses on your cash grain sales. Your upside is unlimited minus the premium cost.',
+    floorCeil: s => s.strike - s.premium,
+    floorCeilLabel: 'Effective Floor',
+    direction: 'floor',
+    pnl: (price, s) => Math.max(s.strike - price, 0) - s.premium,
+    needsMargin: false,
+    effectiveLabel: 'Effective Selling Price',
+    effective: (price, pnl) => price + pnl,
+  },
+  'short-put': {
+    name: 'Sell a Put',
+    role: 'Premium Income / Purchase Obligation',
+    desc: 'You collect a premium upfront. If the market falls below the strike, you are obligated to buy the commodity at the strike price, regardless of how far prices have dropped. Losses can be large. Margin is required.',
+    floorCeil: s => s.strike - s.premium,
+    floorCeilLabel: 'Breakeven / Max Loss Threshold',
+    direction: 'floor',
+    pnl: (price, s) => s.premium - Math.max(s.strike - price, 0),
+    needsMargin: true,
+    effectiveLabel: 'Effective Purchase Price',
+    effective: (price, pnl) => price - pnl,
+  },
+  'long-call': {
+    name: 'Buy a Call',
+    role: 'Buyer Price Ceiling',
+    desc: 'You pay a premium now to cap your maximum purchase price. If the market rises above the strike, your call gains in value, offsetting higher costs when you buy the physical commodity. Your savings are unlimited above the ceiling.',
+    floorCeil: s => s.strike + s.premium,
+    floorCeilLabel: 'Effective Ceiling',
+    direction: 'ceiling',
+    pnl: (price, s) => Math.max(price - s.strike, 0) - s.premium,
+    needsMargin: false,
+    effectiveLabel: 'Effective Purchase Price',
+    effective: (price, pnl) => price - pnl,
+  },
+  'short-call': {
+    name: 'Sell a Call',
+    role: 'Producer Selling Ceiling',
+    desc: 'You collect a premium by agreeing to sell at the strike if the market rises above it. Your upside is capped at the strike plus premium, but you keep the premium even if prices stay flat or decline. Margin is required.',
+    floorCeil: s => s.strike + s.premium,
+    floorCeilLabel: 'Effective Ceiling',
+    direction: 'ceiling',
+    pnl: (price, s) => s.premium - Math.max(price - s.strike, 0),
+    needsMargin: true,
+    effectiveLabel: 'Effective Selling Price',
+    effective: (price, pnl) => price + pnl,
+  },
+};
+
+const BANNER_THEME = {
+  'long-put':  { bg: '#f0fdf4', border: '#86efac', head: '#166534', body: '#14532d' },
+  'short-put': { bg: '#fffbeb', border: '#fcd34d', head: '#92400e', body: '#78350f' },
+  'long-call': { bg: '#eff6ff', border: '#93c5fd', head: '#1d4ed8', body: '#1e3a8a' },
+  'short-call':{ bg: '#fffbeb', border: '#fcd34d', head: '#92400e', body: '#78350f' },
+};
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const S = {
+  commodity: 'corn',
+  strategy: 'long-put',
+  ref: 4.50,
+  strike: 4.50,
+  premium: 0.20,
+  contracts: 1,
+  scenarioPrice: 4.50,
+  acct: 10000,
+  initMargin: 500,
+  maintMargin: 400,
+};
+
+// ─── CHART ───────────────────────────────────────────────────────────────────
+let chart = null;
+
+// Custom plugin: draw vertical lines directly on the canvas
+const vLinesPlugin = {
+  id: 'vLines',
+  afterDraw(ch) {
+    const lines = ch._vlines;
+    if (!lines || !lines.length) return;
+    const { ctx, chartArea: a, scales } = ch;
+    lines.forEach(l => {
+      if (l.x == null || isNaN(l.x)) return;
+      const px = scales.x.getPixelForValue(l.x);
+      if (px < a.left - 1 || px > a.right + 1) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(px, a.top);
+      ctx.lineTo(px, a.bottom);
+      ctx.strokeStyle = l.color;
+      ctx.lineWidth = l.lw || 2;
+      ctx.setLineDash(l.dash || []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (l.tag) {
+        ctx.font = `600 10px -apple-system,sans-serif`;
+        ctx.fillStyle = l.color;
+        const right = px > a.right - 70;
+        ctx.textAlign = right ? 'right' : 'left';
+        const tx = right ? px - 5 : px + 5;
+        ctx.fillText(l.tag, tx, a.top + 11);
+        if (l.sub) ctx.fillText(l.sub, tx, a.top + 23);
+      }
+      ctx.restore();
+    });
+  }
+};
+Chart.register(vLinesPlugin);
+
+function buildVLines() {
+  const strat = STRAT[S.strategy];
+  const fc = strat.floorCeil(S);
+  const lines = [];
+
+  // Strike
+  lines.push({ x: S.strike, color: '#94a3b8', lw: 1.5, dash: [5, 4], tag: 'Strike', sub: '$' + S.strike.toFixed(2) });
+
+  // Floor or Ceiling
+  const fcColor = strat.direction === 'floor' ? '#16a34a' : '#2563eb';
+  lines.push({ x: fc, color: fcColor, lw: 2, dash: [7, 4],
+    tag: strat.direction === 'floor' ? 'Floor' : 'Ceiling',
+    sub: '$' + fc.toFixed(4) });
+
+  // Scenario price
+  lines.push({ x: S.scenarioPrice, color: '#7c3aed', lw: 2, dash: [] });
+
+  // Margin trigger (short positions only)
+  if (strat.needsMargin) {
+    const trig = marginTrigger();
+    if (trig != null && !isNaN(trig) && isFinite(trig) && trig > 0) {
+      lines.push({ x: trig, color: '#dc2626', lw: 1.5, dash: [4, 3], tag: 'Margin Call', sub: '$' + trig.toFixed(2) });
+    }
+  }
+
+  return lines;
+}
+
+function buildChart() {
+  const strat = STRAT[S.strategy];
+  const lo = Math.max(0.01, S.strike * 0.45);
+  const hi = S.strike * 1.55;
+  const N = 250;
+
+  const prices = [], posArea = [], negArea = [], line = [];
+  for (let i = 0; i <= N; i++) {
+    const p = lo + (hi - lo) * i / N;
+    const y = strat.pnl(p, S);
+    prices.push(p);
+    line.push({ x: p, y });
+    posArea.push({ x: p, y: y > 0 ? y : 0 });
+    negArea.push({ x: p, y: y < 0 ? y : 0 });
+  }
+
+  const canvas = document.getElementById('payoff-chart');
+  if (chart) { chart.destroy(); chart = null; }
+
+  chart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          data: posArea,
+          fill: 'origin',
+          backgroundColor: 'rgba(22,163,74,0.13)',
+          borderColor: 'transparent',
+          pointRadius: 0,
+          tension: 0,
+          order: 3,
+        },
+        {
+          data: negArea,
+          fill: 'origin',
+          backgroundColor: 'rgba(220,38,38,0.13)',
+          borderColor: 'transparent',
+          pointRadius: 0,
+          tension: 0,
+          order: 3,
+        },
+        {
+          label: 'P&L/bu',
+          data: line,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          segment: {
+            borderColor: ctx => ctx.p1.parsed.y >= 0 ? '#16a34a' : '#dc2626',
+          },
+          order: 1,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.75,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => `Market Price: $${items[0].parsed.x.toFixed(2)}/bu`,
+            label: item => {
+              if (item.datasetIndex !== 2) return null;
+              const v = item.parsed.y;
+              const tot = v * CS * S.contracts;
+              const sign = v >= 0 ? '+' : '';
+              return [`Option P&L: ${sign}$${Math.abs(v).toFixed(4)}/bu  (${sign}$${Math.abs(tot).toFixed(2)} total)`];
+            },
+          },
+          filter: item => item.datasetIndex === 2,
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: lo,
+          max: hi,
+          ticks: {
+            maxTicksLimit: 8,
+            callback: v => '$' + v.toFixed(2),
+            font: { size: 10 },
+          },
+          grid: { color: '#f1f5f9' },
+        },
+        y: {
+          ticks: {
+            callback: v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2),
+            font: { size: 10 },
+          },
+          grid: {
+            color: ctx => ctx.tick.value === 0 ? '#94a3b8' : '#f1f5f9',
+            lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1,
+          },
+        }
+      }
+    }
+  });
+
+  chart._vlines = buildVLines();
+  chart.update('none');
+  renderLegend();
+}
+
+function updateChartVLines() {
+  if (!chart) return;
+  chart._vlines = buildVLines();
+  chart.update('none');
+}
+
+// ─── CALCULATIONS ────────────────────────────────────────────────────────────
+function pnlPerBu(price) {
+  return STRAT[S.strategy].pnl(price, S);
+}
+
+function marginTrigger() {
+  const nc = S.contracts;
+  const totalPrem = S.premium * CS * nc;
+  const totalMaint = S.maintMargin * nc;
+  if (S.strategy === 'short-put') {
+    return S.strike - (S.acct + totalPrem - totalMaint) / (CS * nc);
+  }
+  if (S.strategy === 'short-call') {
+    return S.strike + (S.acct + totalPrem - totalMaint) / (CS * nc);
+  }
+  return null;
+}
+
+function accountEquity(price) {
+  return S.acct + pnlPerBu(price) * CS * S.contracts;
+}
+
+// ─── FORMATTERS ──────────────────────────────────────────────────────────────
+const f$ = (v, dp=2) => '$' + Math.abs(v).toFixed(dp);
+const fSign = (v, dp=4) => (v >= 0 ? '+' : '−') + '$' + Math.abs(v).toFixed(dp);
+const fSignD = (v, dp=2) => (v >= 0 ? '+' : '−') + '$' + Math.abs(v).toFixed(dp);
+
+// ─── RENDER: STRATEGY BANNER ─────────────────────────────────────────────────
+function renderBanner() {
+  const strat = STRAT[S.strategy];
+  const theme = BANNER_THEME[S.strategy];
+  const fc = strat.floorCeil(S);
+  const totalPrem = S.premium * CS * S.contracts;
+  const nc = S.contracts;
+
+  let k1label, k1val, k2label, k2val, k3label, k3val;
+  if (S.strategy === 'long-put' || S.strategy === 'long-call') {
+    k1label = strat.floorCeilLabel;
+    k1val   = '$' + fc.toFixed(4) + '/bu';
+    k2label = 'Premium Cost';
+    k2val   = '$' + S.premium.toFixed(4) + '/bu  (' + f$(totalPrem) + ' total)';
+    k3label = 'Breakeven Price';
+    k3val   = '$' + fc.toFixed(4) + '/bu';
+  } else {
+    k1label = 'Max Profit (premium)';
+    k1val   = '$' + S.premium.toFixed(4) + '/bu  (' + f$(totalPrem) + ' total)';
+    k2label = strat.floorCeilLabel;
+    k2val   = '$' + fc.toFixed(4) + '/bu';
+    k3label = 'Margin Required';
+    k3val   = 'Yes — see Margin tab';
+  }
+
+  document.getElementById('strat-banner').innerHTML = `
+    <div class="banner" style="background:${theme.bg};border-color:${theme.border}">
+      <div class="banner-head" style="color:${theme.head}">${strat.role}</div>
+      <div class="banner-desc" style="color:${theme.body}">${strat.desc}</div>
+      <div class="banner-key" style="border-color:rgba(0,0,0,.07)">
+        <div>
+          <span class="banner-key-label" style="color:${theme.head}">${k1label}</span>
+          <span class="banner-key-item" style="color:${theme.head}">${k1val}</span>
+        </div>
+        <div>
+          <span class="banner-key-label" style="color:${theme.head}">${k2label}</span>
+          <span class="banner-key-item" style="color:${theme.head}">${k2val}</span>
+        </div>
+        <div>
+          <span class="banner-key-label" style="color:${theme.head}">${k3label}</span>
+          <span class="banner-key-item" style="color:${theme.head}">${k3val}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── RENDER: PREMIUM HINTS ───────────────────────────────────────────────────
+function renderHints() {
+  const prem = S.premium;
+  const nc = S.contracts;
+  document.getElementById('premium-cents-hint').textContent =
+    `= ${(prem * 100).toFixed(1)}¢/bu · ${f$(prem * CS)}/contract`;
+  document.getElementById('total-bu-hint').textContent =
+    `= ${(CS * nc).toLocaleString()} bushels`;
+}
+
+// ─── RENDER: CHART LEGEND ────────────────────────────────────────────────────
+function renderLegend() {
+  const strat = STRAT[S.strategy];
+  const trig = strat.needsMargin ? marginTrigger() : null;
+  const showTrig = trig != null && !isNaN(trig) && isFinite(trig) && trig > 0;
+  const fcLabel = strat.direction === 'floor' ? 'Floor ($' + strat.floorCeil(S).toFixed(4) + ')' : 'Ceiling ($' + strat.floorCeil(S).toFixed(4) + ')';
+  const fcColor = strat.direction === 'floor' ? '#16a34a' : '#2563eb';
+  document.getElementById('chart-legend').innerHTML = `
+    <div class="leg-item"><div class="leg-line" style="background:#16a34a"></div>Profit zone</div>
+    <div class="leg-item"><div class="leg-line" style="background:#dc2626"></div>Loss zone</div>
+    <div class="leg-item"><div class="leg-dash" style="border-color:#94a3b8"></div>Strike ($${S.strike.toFixed(2)})</div>
+    <div class="leg-item"><div class="leg-dash" style="border-color:${fcColor}"></div>${fcLabel}</div>
+    <div class="leg-item"><div class="leg-line" style="background:#7c3aed"></div>Scenario price</div>
+    ${showTrig ? `<div class="leg-item"><div class="leg-dash" style="border-color:#dc2626"></div>Margin call ($${trig.toFixed(2)})</div>` : ''}
+  `;
+}
+
+// ─── RENDER: SCENARIO METRICS ────────────────────────────────────────────────
+function renderScenario() {
+  const p = S.scenarioPrice;
+  const strat = STRAT[S.strategy];
+  const pbu = pnlPerBu(p);
+  const ptot = pbu * CS * S.contracts;
+  const fc = strat.floorCeil(S);
+  const eff = strat.effective(p, pbu);
+  const pnlCls = pbu >= 0 ? 'pos' : 'neg';
+  const totalCls = ptot >= 0 ? 'pos' : 'neg';
+  const mboxPnl = pbu >= 0 ? 'pos' : 'neg';
+  const mboxTot = ptot >= 0 ? 'pos' : 'neg';
+  const fcCls = strat.direction === 'floor' ? 'pos' : 'blue';
+  const dirIcon = strat.direction === 'floor' ? '▲ Floor' : '▼ Ceiling';
+
+  document.getElementById('scenario-metrics').innerHTML = `
+    <div class="mbox ${mboxPnl}">
+      <div class="m-lbl">Option P&amp;L</div>
+      <div class="m-val" style="color:${pbu>=0?'#16a34a':'#dc2626'}">${fSign(pbu, 4)}</div>
+      <div class="m-sub">per bushel</div>
+    </div>
+    <div class="mbox ${mboxTot}">
+      <div class="m-lbl">Total P&amp;L (${S.contracts} contract${S.contracts>1?'s':''})</div>
+      <div class="m-val" style="color:${ptot>=0?'#16a34a':'#dc2626'}">${fSignD(ptot)}</div>
+      <div class="m-sub">${(CS * S.contracts).toLocaleString()} bu position</div>
+    </div>
+    <div class="mbox ${fcCls}">
+      <div class="m-lbl">${dirIcon}</div>
+      <div class="m-val">${f$(fc, 4)}</div>
+      <div class="m-sub">${strat.floorCeilLabel}</div>
+    </div>
+    <div class="mbox">
+      <div class="m-lbl">${strat.effectiveLabel}</div>
+      <div class="m-val">${f$(eff, 4)}</div>
+      <div class="m-sub">at $${p.toFixed(2)} market</div>
+    </div>
+  `;
+
+  // Position summary rows
+  const centsPbu = (pbu * 100).toFixed(2);
+  document.getElementById('pos-rows').innerHTML = `
+    <div class="bd-row">
+      <span class="bd-lbl">Commodity</span>
+      <span class="bd-val">${S.commodity.charAt(0).toUpperCase()+S.commodity.slice(1)} — ${S.contracts} contract${S.contracts>1?'s':''} (${(CS*S.contracts).toLocaleString()} bu)</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Strategy</span>
+      <span class="bd-val">${strat.name}</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Scenario Market Price</span>
+      <span class="bd-val">$${p.toFixed(2)}/bu</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Strike Price</span>
+      <span class="bd-val">$${S.strike.toFixed(2)}/bu</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Option Premium</span>
+      <span class="bd-val">${S.strategy.startsWith('long') ? '−' : '+'}$${S.premium.toFixed(4)}/bu (${centsPbu}¢)</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Option P&amp;L/bu</span>
+      <span class="bd-val ${pnlCls}">${fSign(pbu, 4)}  (${(pbu*100).toFixed(2)}¢)</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Total Contract P&amp;L</span>
+      <span class="bd-val ${totalCls}">${fSignD(ptot)}</span>
+    </div>
+    <div class="bd-row bd-total">
+      <span class="bd-lbl">${strat.effectiveLabel}</span>
+      <span class="bd-val" style="font-size:.88rem;color:var(--green)">$${eff.toFixed(4)}/bu</span>
+    </div>
+  `;
+}
+
+// ─── RENDER: MARGIN ──────────────────────────────────────────────────────────
+function renderMargin() {
+  const strat = STRAT[S.strategy];
+  const na = document.getElementById('margin-na');
+  const content = document.getElementById('margin-content');
+
+  if (!strat.needsMargin) {
+    na.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
+  na.style.display = 'none';
+  content.style.display = 'block';
+
+  const nc = S.contracts;
+  const totInit  = S.initMargin  * nc;
+  const totMaint = S.maintMargin * nc;
+  const totPrem  = S.premium * CS * nc;
+  const p = S.scenarioPrice;
+  const equity = accountEquity(p);
+  const pnlTot = pnlPerBu(p) * CS * nc;
+
+  document.getElementById('margin-scenario-label').textContent = `— $${p.toFixed(2)}/bu`;
+
+  // Status
+  let statusClass, statusText;
+  if (equity >= totInit) {
+    statusClass = 'ok'; statusText = 'Above initial margin ✓';
+  } else if (equity >= totMaint) {
+    statusClass = 'warn'; statusText = 'Warning: between maintenance and initial';
+  } else {
+    statusClass = 'danger'; statusText = 'MARGIN CALL ACTIVE';
+  }
+
+  // Alert box
+  const alertEl = document.getElementById('margin-alert-box');
+  if (equity < totMaint) {
+    alertEl.innerHTML = `<div class="alert red"><span class="alert-icon">⚠️</span><div class="alert-body"><strong>Margin Call Active at $${p.toFixed(2)}/bu</strong> — Account equity ($${equity.toFixed(2)}) is below maintenance margin ($${totMaint.toFixed(2)}). Additional funds must be deposited to restore to initial margin ($${totInit.toFixed(2)}).</div></div>`;
+  } else if (equity < totInit) {
+    alertEl.innerHTML = `<div class="alert amber"><span class="alert-icon">⚡</span><div class="alert-body"><strong>Caution</strong> — Equity is between maintenance ($${totMaint.toFixed(2)}) and initial ($${totInit.toFixed(2)}) margin levels. A further adverse price move will trigger a margin call.</div></div>`;
+  } else {
+    alertEl.innerHTML = '';
+  }
+
+  // Equity rows
+  document.getElementById('equity-rows').innerHTML = `
+    <div class="bd-row">
+      <span class="bd-lbl">Account Balance</span>
+      <span class="bd-val">${f$(S.acct)}</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Premium ${S.strategy.startsWith('long') ? 'Paid' : 'Received'}</span>
+      <span class="bd-val ${S.strategy.startsWith('long') ? 'neg' : 'pos'}">${fSignD(S.strategy.startsWith('long') ? -totPrem : totPrem)}</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Unrealized Option P&amp;L</span>
+      <span class="bd-val ${pnlTot>=0?'pos':'neg'}">${fSignD(pnlTot)}</span>
+    </div>
+    <div class="bd-row bd-total">
+      <span class="bd-lbl">Account Equity</span>
+      <span class="bd-val ${statusClass}" style="font-size:.85rem">${f$(equity)} — ${statusText}</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Initial Margin Required (${nc} × $${S.initMargin})</span>
+      <span class="bd-val">${f$(totInit)}</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Maintenance Margin (${nc} × $${S.maintMargin})</span>
+      <span class="bd-val">${f$(totMaint)}</span>
+    </div>
+    <div class="bd-row">
+      <span class="bd-lbl">Cushion Above Maintenance</span>
+      <span class="bd-val ${equity - totMaint >= 0 ? 'ok' : 'danger'}">${fSignD(equity - totMaint)}</span>
+    </div>
+  `;
+
+  // Trigger analysis
+  const trig = marginTrigger();
+  const trigValid = trig != null && !isNaN(trig) && isFinite(trig) && trig > 0;
+
+  if (trigValid) {
+    const trigEquity = accountEquity(trig);
+    const trigPnlBu  = pnlPerBu(trig);
+    const trigPnlTot = trigPnlBu * CS * nc;
+    const callAmt    = totInit - trigEquity;      // how much to deposit
+    const callPerBu  = callAmt / (CS * nc);
+    const priceMove  = trig - S.ref;
+    const priceMoveDir = S.strategy === 'short-put' ? 'falls ↓' : 'rises ↑';
+
+    document.getElementById('trigger-rows').innerHTML = `
+      <div class="bd-row">
+        <span class="bd-lbl">Reference / Current Price</span>
+        <span class="bd-val">$${S.ref.toFixed(2)}/bu</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">Margin Call Trigger Price</span>
+        <span class="bd-val danger">$${trig.toFixed(4)}/bu</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">Direction of Risk</span>
+        <span class="bd-val">Price ${priceMoveDir} from reference</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">Price Move to Trigger</span>
+        <span class="bd-val neg">${fSignD(priceMove, 4)}/bu  (${(Math.abs(priceMove/S.ref)*100).toFixed(1)}%)</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">Option P&amp;L at Trigger (per bu)</span>
+        <span class="bd-val neg">${fSign(trigPnlBu, 4)}  (${(trigPnlBu*100).toFixed(2)}¢)</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">Option P&amp;L at Trigger (total)</span>
+        <span class="bd-val neg">${fSignD(trigPnlTot)}</span>
+      </div>
+    `;
+
+    // Margin call detail
+    document.getElementById('margin-call-rows').innerHTML = `
+      <div class="bd-row">
+        <span class="bd-lbl">Account Equity at Trigger</span>
+        <span class="bd-val">${f$(trigEquity)}</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">Maintenance Margin (min required)</span>
+        <span class="bd-val">${f$(totMaint)}</span>
+      </div>
+      <div class="bd-row bd-total">
+        <span class="bd-lbl" style="font-weight:700;color:var(--red)">Margin Call Amount (deposit required)</span>
+        <span class="bd-val danger" style="font-size:.9rem">${f$(Math.max(0, callAmt))}</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">Margin Call per Bushel</span>
+        <span class="bd-val danger">${f$(Math.max(0, callPerBu), 4)}/bu  (${(Math.max(0, callPerBu)*100).toFixed(2)}¢/bu)</span>
+      </div>
+      <div class="bd-row">
+        <span class="bd-lbl">After deposit, account restored to</span>
+        <span class="bd-val ok">${f$(totInit)} (initial margin)</span>
+      </div>
+    `;
+  } else {
+    // No trigger in range
+    const noTrigMsg = trig != null && trig <= 0
+      ? 'Account equity is insufficient to cover even the maintenance margin — position cannot be safely held.'
+      : 'With the current account balance and margin settings, no margin call is triggered within the analyzed price range.';
+    document.getElementById('trigger-rows').innerHTML = `
+      <div style="padding:14px 0;text-align:center;color:var(--slate-m);font-size:.8rem">${noTrigMsg}</div>
+    `;
+    document.getElementById('margin-call-rows').innerHTML = `
+      <div style="padding:14px 0;text-align:center;color:var(--slate-m);font-size:.8rem">No margin call data to display.</div>
+    `;
+  }
+}
+
+// ─── SLIDER RANGE ────────────────────────────────────────────────────────────
+function updateSliderRange() {
+  const lo = Math.max(0.01, S.strike * 0.45);
+  const hi = S.strike * 1.55;
+  const slider = document.getElementById('price-slider');
+  slider.min = lo.toFixed(2);
+  slider.max = hi.toFixed(2);
+  slider.step = '0.01';
+  S.scenarioPrice = Math.max(lo, Math.min(hi, S.scenarioPrice));
+  slider.value = S.scenarioPrice.toFixed(2);
+  document.getElementById('sl-min').textContent = '$' + lo.toFixed(2);
+  document.getElementById('sl-max').textContent = '$' + hi.toFixed(2);
+  document.getElementById('slider-display').textContent = '$' + S.scenarioPrice.toFixed(2) + '/bu';
+}
+
+// ─── READ INPUTS ─────────────────────────────────────────────────────────────
+function readInputs() {
+  const g = id => parseFloat(document.getElementById(id).value);
+  S.ref        = g('i-ref')        || S.ref;
+  S.strike     = g('i-strike')     || S.strike;
+  S.premium    = Math.max(0, g('i-premium') || 0);
+  S.contracts  = Math.max(1, parseInt(document.getElementById('i-contracts').value) || 1);
+  S.acct       = Math.max(0, g('i-acct')       || 0);
+  S.initMargin = Math.max(0, g('i-init-margin') || 0);
+  S.maintMargin= Math.max(0, g('i-maint-margin')|| 0);
+}
+
+// ─── FULL RENDER ─────────────────────────────────────────────────────────────
+function fullRender() {
+  readInputs();
+  renderHints();
+  renderBanner();
+  updateSliderRange();
+  // Only rebuild chart when chart tab is visible (Chart.js needs visible canvas)
+  const chartActive = document.getElementById('sec-chart').classList.contains('active');
+  if (chartActive) {
+    buildChart();
+    renderScenario();
+  }
+  const marginActive = document.getElementById('sec-margin').classList.contains('active');
+  if (marginActive) {
+    renderMargin();
+  }
+}
+
+// Lightweight update for slider moves (no chart rebuild)
+function sliderUpdate() {
+  document.getElementById('slider-display').textContent = '$' + S.scenarioPrice.toFixed(2) + '/bu';
+  updateChartVLines();
+  renderScenario();
+  renderMargin();
+}
+
+// ─── TAB SWITCHING ───────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.sec').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + tab).classList.add('active');
+  document.querySelector(`.nbtn[data-sec="${tab}"]`).classList.add('active');
+  if (tab === 'chart') {
+    readInputs();
+    updateSliderRange();
+    buildChart();
+    renderScenario();
+  }
+  if (tab === 'margin') {
+    readInputs();
+    renderMargin();
+  }
+}
+
+// ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
+document.getElementById('commodity-chips').addEventListener('click', e => {
+  const btn = e.target.closest('[data-com]');
+  if (!btn) return;
+  document.querySelectorAll('[data-com]').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  S.commodity = btn.dataset.com;
+  const d = COMMODITY_DEFAULTS[S.commodity];
+  document.getElementById('i-ref').value      = d.ref;
+  document.getElementById('i-strike').value   = d.strike;
+  document.getElementById('i-premium').value  = d.premium;
+  document.getElementById('i-init-margin').value  = d.initMargin;
+  document.getElementById('i-maint-margin').value = d.maintMargin;
+  S.scenarioPrice = d.ref;
+  fullRender();
+});
+
+document.getElementById('strat-chips').addEventListener('click', e => {
+  const btn = e.target.closest('[data-strat]');
+  if (!btn) return;
+  document.querySelectorAll('[data-strat]').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  S.strategy = btn.dataset.strat;
+  fullRender();
+});
+
+['i-ref','i-strike','i-premium','i-contracts'].forEach(id => {
+  document.getElementById(id).addEventListener('input', fullRender);
+});
+
+['i-acct','i-init-margin','i-maint-margin'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    readInputs();
+    renderMargin();
+    updateChartVLines();
+    renderLegend();
+  });
+});
+
+document.getElementById('price-slider').addEventListener('input', e => {
+  S.scenarioPrice = parseFloat(e.target.value);
+  sliderUpdate();
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+fullRender();
+</script>
+</body>
+</html>
