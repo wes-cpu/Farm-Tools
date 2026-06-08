@@ -288,24 +288,13 @@ input[type=range]::-moz-range-thumb{
       <button class="chip" data-com="soybeans">Soybeans</button>
       <button class="chip" data-com="wheat">Wheat</button>
     </div>
-    <div class="row2">
-      <div class="field" style="margin-bottom:0">
-        <label for="i-ref">Futures / Reference Price</label>
-        <div class="input-wrap">
-          <span class="pfx">$</span>
-          <input type="number" id="i-ref" class="px" inputmode="decimal"
-            autocomplete="off" autocorrect="off" step="0.01" min="0.01" value="4.50">
-          <span class="sfx">/bu</span>
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:0">
-        <label for="i-contracts">Contracts</label>
-        <div class="input-wrap">
-          <input type="number" id="i-contracts" class="sfx-in" inputmode="numeric"
-            autocomplete="off" step="1" min="1" value="1">
-          <span class="sfx">× 5k bu</span>
-        </div>
-        <div class="hint" id="bu-hint">= 5,000 bu</div>
+    <div class="field" style="margin-bottom:0">
+      <label for="i-ref">Futures / Reference Price</label>
+      <div class="input-wrap">
+        <span class="pfx">$</span>
+        <input type="number" id="i-ref" class="px" inputmode="decimal"
+          autocomplete="off" autocorrect="off" step="0.01" min="0.01" value="4.50">
+        <span class="sfx">/bu</span>
       </div>
     </div>
   </div>
@@ -344,7 +333,7 @@ input[type=range]::-moz-range-thumb{
   </div>
 
   <div class="card">
-    <div class="card-title">Combined Payoff Diagram — Option P&amp;L ($/bu)</div>
+    <div class="card-title">Combined Payoff Diagram — Total Position P&amp;L ($)</div>
     <canvas id="payoff-chart" role="img" aria-label="Option payoff chart"></canvas>
     <div class="leg" id="chart-legend"></div>
   </div>
@@ -470,10 +459,10 @@ const TEMPLATES = [
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 const S = {
-  commodity:'corn', ref:4.50, contracts:1, scenarioPrice:4.50,
+  commodity:'corn', ref:4.50, scenarioPrice:4.50,
   legs:[
-    {dir:'long',  type:'put',  strike:4.50, premium:0.20},
-    {dir:'short', type:'call', strike:5.00, premium:0.15},
+    {dir:'long',  type:'put',  strike:4.50, premium:0.20, contracts:1},
+    {dir:'short', type:'call', strike:5.00, premium:0.15, contracts:1},
   ],
   acct:10000, init:500, maint:400,
 };
@@ -484,8 +473,16 @@ function legPnl(leg, m) {
   return leg.dir==='long' ? iv - leg.premium : leg.premium - iv;
 }
 
-function combinedPnl(m) {
-  return S.legs.reduce((s,l) => s + legPnl(l,m), 0);
+function legPnlTotal(leg, m) {
+  return legPnl(leg, m) * CS * leg.contracts;
+}
+
+function combinedPnlTotal(m) {
+  return S.legs.reduce((s,l) => s + legPnlTotal(l,m), 0);
+}
+
+function totalBushels() {
+  return S.legs.reduce((s,l) => s + CS * l.contracts, 0);
 }
 
 function chartRange() {
@@ -504,7 +501,7 @@ function findBreakevens() {
   const prices=samplePrices(2000);
   const bes=[];
   for(let i=1;i<prices.length;i++){
-    const p0=combinedPnl(prices[i-1]), p1=combinedPnl(prices[i]);
+    const p0=combinedPnlTotal(prices[i-1]), p1=combinedPnlTotal(prices[i]);
     if((p0<0&&p1>=0)||(p0>=0&&p1<0)){
       const be=prices[i-1]+(prices[i]-prices[i-1])*(-p0)/(p1-p0);
       bes.push(be);
@@ -515,22 +512,22 @@ function findBreakevens() {
 
 function pnlStats() {
   const prices=samplePrices(2000);
-  const pnls=prices.map(p=>combinedPnl(p));
+  const pnls=prices.map(p=>combinedPnlTotal(p));
   return {
     max:Math.max(...pnls),
     min:Math.min(...pnls),
-    atRef:combinedPnl(S.ref),
+    atRef:combinedPnlTotal(S.ref),
   };
 }
 
 // ─── MARGIN CALCULATIONS ──────────────────────────────────────────────────────
 function shortLegs() { return S.legs.filter(l=>l.dir==='short'); }
 
-function totalInitMargin() { return S.init * S.contracts * shortLegs().length; }
-function totalMaintMargin(){ return S.maint * S.contracts * shortLegs().length; }
+function totalInitMargin() { return shortLegs().reduce((s,l)=>s+S.init*l.contracts,0); }
+function totalMaintMargin(){ return shortLegs().reduce((s,l)=>s+S.maint*l.contracts,0); }
 
 function accountEquity(m) {
-  return S.acct + combinedPnl(m)*CS*S.contracts;
+  return S.acct + combinedPnlTotal(m);
 }
 
 function triggerPrices() {
@@ -645,11 +642,11 @@ function buildAnno(){
 
   // Horizontal lines for max profit and max loss (if bounded)
   const hlines=[];
-  if(isFinite(stats.max)&&Math.abs(stats.max)<100){
-    hlines.push({y:stats.max,color:'rgba(22,163,74,0.5)',lw:1,dash:[6,4],tag:'Max Profit',sub:'+$'+stats.max.toFixed(4)+'/bu'});
+  if(isFinite(stats.max)&&Math.abs(stats.max)<100000000){
+    hlines.push({y:stats.max,color:'rgba(22,163,74,0.5)',lw:1,dash:[6,4],tag:'Max Profit',sub:'+$'+stats.max.toFixed(0)});
   }
-  if(isFinite(stats.min)&&Math.abs(stats.min)<100){
-    hlines.push({y:stats.min,color:'rgba(220,38,38,0.5)',lw:1,dash:[6,4],tag:'Max Loss',sub:'-$'+Math.abs(stats.min).toFixed(4)+'/bu'});
+  if(isFinite(stats.min)&&Math.abs(stats.min)<100000000){
+    hlines.push({y:stats.min,color:'rgba(220,38,38,0.5)',lw:1,dash:[6,4],tag:'Max Loss',sub:'-$'+Math.abs(stats.min).toFixed(0)});
   }
 
   return {zones, v:vlines, h:hlines};
@@ -664,13 +661,13 @@ function buildChart(){
 
   // Green fill (profit zone above zero)
   datasets.push({
-    data:prices.map(m=>({x:m,y:Math.max(combinedPnl(m),0)})),
+    data:prices.map(m=>({x:m,y:Math.max(combinedPnlTotal(m),0)})),
     fill:'origin',backgroundColor:'rgba(22,163,74,0.12)',
     borderColor:'transparent',pointRadius:0,tension:0,order:6
   });
   // Red fill (loss zone below zero)
   datasets.push({
-    data:prices.map(m=>({x:m,y:Math.min(combinedPnl(m),0)})),
+    data:prices.map(m=>({x:m,y:Math.min(combinedPnlTotal(m),0)})),
     fill:'origin',backgroundColor:'rgba(220,38,38,0.1)',
     borderColor:'transparent',pointRadius:0,tension:0,order:6
   });
@@ -680,7 +677,7 @@ function buildChart(){
     S.legs.forEach((leg,i)=>{
       datasets.push({
         label:`Leg ${i+1}`,
-        data:prices.map(m=>({x:m,y:legPnl(leg,m)})),
+        data:prices.map(m=>({x:m,y:legPnlTotal(leg,m)})),
         borderColor:LEG_COLORS[i%LEG_COLORS.length],
         borderWidth:1.5,borderDash:[6,4],
         pointRadius:0,tension:0,fill:false,order:3,
@@ -691,7 +688,7 @@ function buildChart(){
   // Combined payoff line (bold, green/red by sign)
   datasets.push({
     label:'Combined',
-    data:prices.map(m=>({x:m,y:combinedPnl(m)})),
+    data:prices.map(m=>({x:m,y:combinedPnlTotal(m)})),
     borderWidth:S.legs.length>1?3:2.5,
     segment:{borderColor:ctx=>ctx.p1.parsed.y>=0?'#16a34a':'#dc2626'},
     pointRadius:0,tension:0,fill:false,order:1,
@@ -699,7 +696,7 @@ function buildChart(){
 
   // Scenario dot
   datasets.push({
-    data:[{x:S.scenarioPrice,y:combinedPnl(S.scenarioPrice)}],
+    data:[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}],
     type:'scatter',backgroundColor:'#7c3aed',
     pointRadius:7,pointHoverRadius:9,
     borderColor:'white',borderWidth:2,order:0,
@@ -721,10 +718,9 @@ function buildChart(){
               const lbl=item.dataset.label;
               if(!lbl)return null;
               const v=item.parsed.y;
-              if(lbl==='Combined')
-                return `Combined: ${v>=0?'+':''} $${v.toFixed(4)}/bu`;
-              if(lbl.startsWith('Leg'))
-                return `${lbl}: ${v>=0?'+':''} $${v.toFixed(4)}/bu`;
+              const fmt=n=>(n>=0?'+':'-')+' $'+Math.abs(n).toFixed(2);
+              if(lbl==='Combined') return `Combined: ${fmt(v)}`;
+              if(lbl.startsWith('Leg')) return `${lbl}: ${fmt(v)}`;
               return null;
             },
           },
@@ -737,7 +733,7 @@ function buildChart(){
           ticks:{maxTicksLimit:7,callback:v=>'$'+v.toFixed(2),font:{size:11}},
           grid:{color:'#f1f5f9'}},
         y:{
-          ticks:{callback:v=>(v>=0?'+':'')+' $'+Math.abs(v).toFixed(2),font:{size:11}},
+          ticks:{callback:v=>{const a=Math.abs(v);return(v>=0?'+':'-')+(a>=1000?'$'+(a/1000).toFixed(1)+'k':'$'+a.toFixed(0));},font:{size:11}},
           grid:{color:ctx=>ctx.tick.value===0?'#94a3b8':'#f1f5f9',
             lineWidth:ctx=>ctx.tick.value===0?1.5:1},
         }
@@ -752,7 +748,7 @@ function updateAnno(){
   if(!myChart) return;
   myChart._anno=buildAnno();
   const lastDs=myChart.data.datasets.length-1;
-  myChart.data.datasets[lastDs].data=[{x:S.scenarioPrice,y:combinedPnl(S.scenarioPrice)}];
+  myChart.data.datasets[lastDs].data=[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}];
   myChart.update('none');
 }
 
@@ -779,25 +775,38 @@ function renderLegRows(){
         </div>
         ${S.legs.length>1?`<button class="leg-del" onclick="removeLeg(${i})" aria-label="Remove leg ${i+1}">✕</button>`:''}
       </div>
-      <div class="leg-inputs row2">
-        <div class="field" style="margin-bottom:0">
-          <label>Strike Price</label>
-          <div class="input-wrap">
-            <span class="pfx">$</span>
-            <input type="number" id="leg-strike-${i}" class="px" inputmode="decimal"
-              autocomplete="off" step="0.05" min="0.01" value="${leg.strike.toFixed(2)}"
-              oninput="updateLeg(${i})">
-            <span class="sfx">/bu</span>
+      <div class="leg-inputs">
+        <div class="row2" style="margin-bottom:8px">
+          <div class="field" style="margin-bottom:0">
+            <label>Strike Price</label>
+            <div class="input-wrap">
+              <span class="pfx">$</span>
+              <input type="number" id="leg-strike-${i}" class="px" inputmode="decimal"
+                autocomplete="off" step="0.05" min="0.01" value="${leg.strike.toFixed(2)}"
+                oninput="updateLeg(${i})">
+              <span class="sfx">/bu</span>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Option Premium</label>
+            <div class="input-wrap">
+              <span class="pfx">$</span>
+              <input type="number" id="leg-prem-${i}" class="px" inputmode="decimal"
+                autocomplete="off" step="0.01" min="0" value="${leg.premium.toFixed(2)}"
+                oninput="updateLeg(${i})">
+              <span class="sfx">/bu</span>
+            </div>
           </div>
         </div>
-        <div class="field" style="margin-bottom:0">
-          <label>Option Premium</label>
-          <div class="input-wrap">
-            <span class="pfx">$</span>
-            <input type="number" id="leg-prem-${i}" class="px" inputmode="decimal"
-              autocomplete="off" step="0.01" min="0" value="${leg.premium.toFixed(2)}"
-              oninput="updateLeg(${i})">
-            <span class="sfx">/bu</span>
+        <div style="max-width:200px">
+          <div class="field" style="margin-bottom:0">
+            <label>Contracts</label>
+            <div class="input-wrap">
+              <input type="number" id="leg-contracts-${i}" class="sfx-in" inputmode="numeric"
+                autocomplete="off" step="1" min="1" value="${leg.contracts}"
+                oninput="updateLeg(${i})">
+              <span class="sfx">× 5k bu</span>
+            </div>
           </div>
         </div>
       </div>
@@ -817,9 +826,10 @@ function renderLegSummary(i){
   const fc=leg.type==='put'
     ?`${leg.dir==='long'?'Floor':'Breakeven'}: $${(leg.strike-leg.premium).toFixed(4)}/bu`
     :`${leg.dir==='short'?'Ceiling':'Breakeven'}: $${(leg.strike+leg.premium).toFixed(4)}/bu`;
+  const totBu=CS*leg.contracts;
   const premStr=leg.dir==='long'
-    ?`Pay $${leg.premium.toFixed(2)}/bu · $${(leg.premium*CS*S.contracts).toFixed(0)} total`
-    :`Receive $${leg.premium.toFixed(2)}/bu · $${(leg.premium*CS*S.contracts).toFixed(0)} total`;
+    ?`Pay $${leg.premium.toFixed(2)}/bu · $${(leg.premium*totBu).toFixed(0)} total`
+    :`Receive $${leg.premium.toFixed(2)}/bu · $${(leg.premium*totBu).toFixed(0)} total`;
   el.textContent=`${fc} · ${premStr}`;
 }
 
@@ -856,31 +866,30 @@ function renderLegend(){
 // ─── RENDER: SCENARIO ─────────────────────────────────────────────────────────
 function renderScenario(){
   const m=S.scenarioPrice;
-  const total=combinedPnl(m);
-  const totalDollars=total*CS*S.contracts;
+  const total=combinedPnlTotal(m);
+  const totBu=totalBushels();
+  const perBu=totBu>0?total/totBu:0;
   const stats=pnlStats();
   const bes=findBreakevens();
-  const pCls=total>=0?'pos':'neg';
-  const tCls=totalDollars>=0?'pos':'neg';
+  const tCls=total>=0?'pos':'neg';
 
   document.getElementById('bd-price-label').textContent='$'+m.toFixed(2)+'/bu';
 
-  // stats grid
-  const maxStr=isFinite(stats.max)&&Math.abs(stats.max)<9999
-    ?`+$${stats.max.toFixed(4)}/bu`:'Unlimited';
-  const minStr=isFinite(stats.min)&&Math.abs(stats.min)<9999
-    ?`-$${Math.abs(stats.min).toFixed(4)}/bu`:'Unlimited';
+  const maxStr=isFinite(stats.max)&&Math.abs(stats.max)<100000000
+    ?`+$${stats.max.toFixed(2)}`:'Unlimited';
+  const minStr=isFinite(stats.min)&&Math.abs(stats.min)<100000000
+    ?`-$${Math.abs(stats.min).toFixed(2)}`:'Unlimited';
 
   document.getElementById('stats-grid').innerHTML=`
-    <div class="stat-box ${pCls}">
-      <div class="s-lbl">Combined P&amp;L at $${m.toFixed(2)}</div>
-      <div class="s-val" style="color:${total>=0?'#16a34a':'#dc2626'}">${total>=0?'+':'-'}$${Math.abs(total).toFixed(4)}</div>
-      <div class="s-sub">per bushel</div>
-    </div>
     <div class="stat-box ${tCls}">
-      <div class="s-lbl">Total P&amp;L (${S.contracts} contract${S.contracts>1?'s':''})</div>
-      <div class="s-val" style="color:${totalDollars>=0?'#16a34a':'#dc2626'}">${totalDollars>=0?'+':'-'}$${Math.abs(totalDollars).toFixed(2)}</div>
-      <div class="s-sub">${(CS*S.contracts).toLocaleString()} bu</div>
+      <div class="s-lbl">Position P&amp;L at $${m.toFixed(2)}</div>
+      <div class="s-val" style="color:${total>=0?'#16a34a':'#dc2626'}">${total>=0?'+':'-'}$${Math.abs(total).toFixed(2)}</div>
+      <div class="s-sub">${totBu.toLocaleString()} bu total</div>
+    </div>
+    <div class="stat-box ${perBu>=0?'pos':'neg'}">
+      <div class="s-lbl">Avg $/bu at $${m.toFixed(2)}</div>
+      <div class="s-val" style="color:${perBu>=0?'#16a34a':'#dc2626'}">${perBu>=0?'+':'-'}$${Math.abs(perBu).toFixed(4)}</div>
+      <div class="s-sub">weighted across all legs</div>
     </div>
     <div class="stat-box">
       <div class="s-lbl">Max Profit</div>
@@ -895,18 +904,18 @@ function renderScenario(){
   let bdHtml='';
   S.legs.forEach((leg,i)=>{
     const pnl=legPnl(leg,m);
-    const pnlTot=pnl*CS*S.contracts;
+    const pnlTot=legPnlTotal(leg,m);
     bdHtml+=`
       <div class="bd-row c${i}">
-        <span class="bd-lbl">Leg ${i+1}: ${legName(leg)} @ $${leg.strike.toFixed(2)}</span>
-        <span class="bd-val ${pnl>=0?'pos':'neg'}">${pSign(pnl)}/bu (${pSignD(pnlTot)})</span>
+        <span class="bd-lbl">Leg ${i+1}: ${legName(leg)} @ $${leg.strike.toFixed(2)} × ${leg.contracts} contract${leg.contracts>1?'s':''}</span>
+        <span class="bd-val ${pnlTot>=0?'pos':'neg'}">${pSignD(pnlTot)} (${pSign(pnl)}/bu)</span>
       </div>`;
   });
   if(S.legs.length>1){
     bdHtml+=`
       <div class="bd-row bd-total">
         <span class="bd-lbl" style="font-weight:700;color:var(--slate)">Combined P&amp;L</span>
-        <span class="bd-val" style="color:${total>=0?'#16a34a':'#dc2626'};font-size:.88rem">${pSign(total)}/bu (${pSignD(totalDollars)})</span>
+        <span class="bd-val" style="color:${total>=0?'#16a34a':'#dc2626'};font-size:.88rem">${pSignD(total)}</span>
       </div>`;
   }
   document.getElementById('bd-rows').innerHTML=bdHtml;
@@ -945,13 +954,12 @@ function renderMargin(){
   document.getElementById('margin-content').style.display=shorts.length?'block':'none';
   if(!shorts.length)return;
 
-  const nc=S.contracts;
   const totInit=totalInitMargin();
   const totMaint=totalMaintMargin();
-  const totPrem=shorts.reduce((s,l)=>s+l.premium,0)*CS*nc;
+  const totPrem=shorts.reduce((s,l)=>s+l.premium*CS*l.contracts,0);
   const m=S.scenarioPrice;
   const equity=accountEquity(m);
-  const comboTot=combinedPnl(m)*CS*nc;
+  const comboTot=combinedPnlTotal(m);
 
   document.getElementById('margin-summary-badge').innerHTML=`
     <div class="alert blue"><span class="alert-icon">ℹ️</span><div class="alert-body">
@@ -979,7 +987,7 @@ function renderMargin(){
     <div class="bd-row"><span class="bd-lbl">Total premium received</span><span class="bd-val pos">+${d$(totPrem)}</span></div>
     <div class="bd-row"><span class="bd-lbl">Combined option result at $${m.toFixed(2)}</span><span class="bd-val ${comboTot>=0?'pos':'neg'}">${pSignD(comboTot)}</span></div>
     <div class="bd-row bd-total"><span class="bd-lbl">Account equity</span><span class="bd-val ${eqCls}">${d$(equity)} — ${eqTxt}</span></div>
-    <div class="bd-row"><span class="bd-lbl">Initial margin (${shorts.length} short leg${shorts.length>1?'s':''} × ${nc} contracts × $${S.init})</span><span class="bd-val">${d$(totInit)}</span></div>
+    <div class="bd-row"><span class="bd-lbl">Initial margin (${shorts.reduce((s,l)=>s+l.contracts,0)} short contracts × $${S.init}/contract)</span><span class="bd-val">${d$(totInit)}</span></div>
     <div class="bd-row"><span class="bd-lbl">Maintenance margin</span><span class="bd-val">${d$(totMaint)}</span></div>
     <div class="bd-row"><span class="bd-lbl">Buffer above maintenance</span><span class="bd-val ${equity-totMaint>=0?'ok':'danger'}">${pSignD(equity-totMaint)}</span></div>`;
 
@@ -1011,7 +1019,7 @@ function renderMargin(){
     if(nearTrig){
       const eq=accountEquity(nearTrig);
       const call=Math.max(0,totInit-eq);
-      const callPerBu=call/(CS*nc);
+      const callPerBu=totalBushels()>0?call/totalBushels():0;
       document.getElementById('call-rows').innerHTML=`
         <div class="bd-row"><span class="bd-lbl">Account equity at nearest trigger</span><span class="bd-val">${d$(eq)}</span></div>
         <div class="bd-row"><span class="bd-lbl">Maintenance margin level</span><span class="bd-val">${d$(totMaint)}</span></div>
@@ -1041,11 +1049,10 @@ function syncSlider(){
 // ─── READ INPUTS ──────────────────────────────────────────────────────────────
 function readGlobal(){
   const g=id=>parseFloat(document.getElementById(id).value);
-  S.ref      = g('i-ref')      ||S.ref;
-  S.contracts= Math.max(1,parseInt(document.getElementById('i-contracts').value)||1);
-  S.acct     = Math.max(0,g('i-acct') ||0);
-  S.init     = Math.max(0,g('i-init') ||0);
-  S.maint    = Math.max(0,g('i-maint')||0);
+  S.ref  = g('i-ref') ||S.ref;
+  S.acct = Math.max(0,g('i-acct') ||0);
+  S.init = Math.max(0,g('i-init') ||0);
+  S.maint= Math.max(0,g('i-maint')||0);
 }
 
 // ─── LEG ACTIONS ─────────────────────────────────────────────────────────────
@@ -1060,7 +1067,8 @@ function setLegType(i,type){
 function updateLeg(i){
   const s=parseFloat(document.getElementById('leg-strike-'+i).value)||S.legs[i].strike;
   const p=Math.max(0,parseFloat(document.getElementById('leg-prem-'+i).value)||0);
-  S.legs[i].strike=s;S.legs[i].premium=p;
+  const c=Math.max(1,parseInt(document.getElementById('leg-contracts-'+i).value)||1);
+  S.legs[i].strike=s;S.legs[i].premium=p;S.legs[i].contracts=c;
   renderLegSummary(i);
   fullRender();
 }
@@ -1070,17 +1078,17 @@ function removeLeg(i){
 }
 function addLeg(){
   if(S.legs.length>=MAX_LEGS) return;
-  S.legs.push({dir:'long',type:'put',strike:S.ref,premium:0.15});
+  S.legs.push({dir:'long',type:'put',strike:S.ref,premium:0.15,contracts:1});
   renderLegRows();fullRender();
 }
 function applyTemplate(idx){
   const tpl=TEMPLATES[idx];
   S.legs=tpl.legs.map(t=>({
-    dir:t.dir,type:t.type,
+    dir:t.dir, type:t.type,
     strike:S.ref+(t.strikeOffset||0),
-    premium:COM_DEF[S.commodity]?.init ? 0.15 : 0.15,
+    premium:0.15,
+    contracts:1,
   }));
-  // Use reasonable default premiums based on commodity ref
   S.legs.forEach(leg=>{
     if(leg.type==='put')  leg.premium=parseFloat((S.ref*0.04).toFixed(2));
     if(leg.type==='call') leg.premium=parseFloat((S.ref*0.03).toFixed(2));
@@ -1101,7 +1109,6 @@ function switchTab(tab){
 
 function fullRender(){
   readGlobal();
-  document.getElementById('bu-hint').textContent='= '+(CS*S.contracts).toLocaleString()+' bu';
   syncSlider();
   if(document.getElementById('sec-chart').classList.contains('active')){
     buildChart();renderScenario();renderLegend();
@@ -1125,9 +1132,7 @@ document.getElementById('commodity-chips').addEventListener('click',e=>{
   renderLegRows();fullRender();
 });
 
-['i-ref','i-contracts'].forEach(id=>{
-  document.getElementById(id).addEventListener('input',()=>{readGlobal();fullRender();});
-});
+document.getElementById('i-ref').addEventListener('input',()=>{readGlobal();fullRender();});
 
 ['i-acct','i-init','i-maint'].forEach(id=>{
   document.getElementById(id).addEventListener('input',()=>{
