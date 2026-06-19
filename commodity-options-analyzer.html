@@ -11,7 +11,6 @@
 <title>Commodity Options Analyzer</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-/* ─── RESET ──────────────────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
@@ -24,7 +23,6 @@
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-l:env(safe-area-inset-left,0px);
   --safe-r:env(safe-area-inset-right,0px);
-  /* leg colors */
   --c0:#2563eb;--c1:#d97706;--c2:#7c3aed;--c3:#059669;
 }
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
@@ -62,7 +60,8 @@ body{
 
 /* ─── CARDS ──────────────────────────────────────────────────────────────── */
 .card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
-.card-title{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:12px}
+.card-title{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-title-txt{flex:1}
 
 /* ─── CHIPS ──────────────────────────────────────────────────────────────── */
 .chip-group{display:flex;gap:8px;flex-wrap:wrap}
@@ -75,7 +74,7 @@ body{
 .chip.active{background:var(--green);border-color:var(--green);color:white}
 .chip:active{opacity:.75}
 
-/* ─── TEMPLATE CHIPS (quick strategies) ─────────────────────────────────── */
+/* ─── TEMPLATE CHIPS ─────────────────────────────────────────────────────── */
 .tpl-scroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:3px;-webkit-overflow-scrolling:touch}
 .tpl-scroll::-webkit-scrollbar{display:none}
 .tpl-btn{
@@ -113,54 +112,56 @@ input.px{padding-left:28px;padding-right:46px}
 
 /* ─── LEG ROWS ───────────────────────────────────────────────────────────── */
 #legs-wrap{display:flex;flex-direction:column;gap:10px}
-.leg-row{
-  border:2px solid var(--border);border-radius:var(--rad);
-  overflow:hidden;
-  background:white;
-}
+.leg-row{border:2px solid var(--border);border-radius:var(--rad);overflow:hidden;background:white;}
 .leg-row[data-idx="0"]{border-color:var(--c0)}
 .leg-row[data-idx="1"]{border-color:var(--c1)}
 .leg-row[data-idx="2"]{border-color:var(--c2)}
 .leg-row[data-idx="3"]{border-color:var(--c3)}
 .leg-header{
   display:flex;align-items:center;gap:8px;
-  padding:10px 12px 8px;
-  background:#f8fafc;
-  border-bottom:1px solid var(--border);
-  flex-wrap:wrap;
+  padding:8px 12px;background:#f8fafc;
+  border-bottom:1px solid var(--border);flex-wrap:wrap;
 }
 .leg-badge{
   font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-  padding:3px 8px;border-radius:999px;flex-shrink:0;
-  color:white;
+  padding:3px 8px;border-radius:999px;flex-shrink:0;color:white;
 }
 .leg-row[data-idx="0"] .leg-badge{background:var(--c0)}
 .leg-row[data-idx="1"] .leg-badge{background:var(--c1)}
 .leg-row[data-idx="2"] .leg-badge{background:var(--c2)}
 .leg-row[data-idx="3"] .leg-badge{background:var(--c3)}
 
-/* small toggles inside leg header */
+/* direction toggle */
 .mini-toggle{display:flex;background:#e2e8f0;border-radius:7px;padding:2px;gap:1px;flex-shrink:0}
 .mini-btn{
   background:none;border:none;border-radius:5px;
   padding:5px 11px;font-size:.78rem;font-weight:700;color:var(--slate-m);
-  cursor:pointer;transition:all .12s;min-height:32px;
-  touch-action:manipulation;
+  cursor:pointer;transition:all .12s;min-height:32px;touch-action:manipulation;
 }
 .mini-btn.active{background:white;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.mini-btn.active.buy{color:#16a34a}
-.mini-btn.active.sell{color:#dc2626}
-.mini-btn.active.put{color:#d97706}
-.mini-btn.active.call{color:#2563eb}
+.mini-btn.active.buy-cls{color:#16a34a}
+.mini-btn.active.sell-cls{color:#dc2626}
+.mini-btn.active.long-cls{color:#16a34a}
+.mini-btn.active.short-cls{color:#dc2626}
+
+/* type selector row */
+.type-row{display:flex;gap:4px;padding:6px 12px;background:#f8fafc;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.type-btn{
+  background:white;border:1.5px solid var(--border);border-radius:7px;
+  padding:4px 10px;font-size:.73rem;font-weight:700;color:var(--slate-m);
+  cursor:pointer;transition:all .12s;min-height:30px;touch-action:manipulation;
+}
+.type-btn.active.put{background:#fffbeb;border-color:var(--amber);color:var(--amber)}
+.type-btn.active.call{background:#eff6ff;border-color:var(--blue);color:var(--blue)}
+.type-btn.active.futures{background:#f0fdf4;border-color:#16a34a;color:#16a34a}
+.type-btn.active.cash{background:#fdf4ff;border-color:#7c3aed;color:#7c3aed}
 
 .leg-del{
   margin-left:auto;background:none;border:none;
   color:#94a3b8;font-size:1.1rem;line-height:1;cursor:pointer;
-  padding:4px 6px;border-radius:6px;
-  touch-action:manipulation;flex-shrink:0;
+  padding:4px 6px;border-radius:6px;touch-action:manipulation;flex-shrink:0;
 }
 .leg-del:active{background:#fee2e2;color:var(--red)}
-
 .leg-inputs{padding:10px 12px 12px}
 .leg-summary{
   padding:6px 12px 8px;background:#f8fafc;
@@ -204,6 +205,48 @@ input[type=range]::-moz-range-thumb{
 .leg-swatch{width:14px;height:10px;flex-shrink:0;border-radius:2px}
 .leg-dash{width:18px;height:0;border-bottom:2.5px dashed;flex-shrink:0}
 
+/* fullscreen button */
+.fs-btn{
+  background:none;border:1px solid var(--border);border-radius:7px;
+  padding:4px 9px;font-size:.72rem;font-weight:700;color:var(--slate-m);
+  cursor:pointer;touch-action:manipulation;white-space:nowrap;flex-shrink:0;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.fs-btn:active{background:#f1f5f9}
+
+/* ─── FULLSCREEN OVERLAY ──────────────────────────────────────────────────── */
+#fs-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  z-index:200;background:white;flex-direction:column;
+  padding-top:var(--safe-t);
+  padding-left:var(--safe-l);
+  padding-right:var(--safe-r);
+  padding-bottom:var(--safe-b);
+}
+#fs-overlay.open{display:flex}
+#fs-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
+  background:#f8fafc;
+}
+#fs-title{font-size:.8rem;font-weight:700;color:var(--slate)}
+#fs-pnl{font-size:1rem;font-weight:800}
+#fs-close-btn{
+  background:var(--slate);color:white;border:none;border-radius:8px;
+  padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer;
+  touch-action:manipulation;
+}
+#fs-chart-wrap{
+  flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:10px 8px 6px;
+}
+#fs-payoff-chart{max-width:100%;max-height:100%;display:block}
+#fs-controls{
+  flex-shrink:0;padding:8px 16px 12px;border-top:1px solid var(--border);background:#f8fafc;
+}
+#fs-controls .sl-val{font-size:1.1rem}
+#fs-legend{display:flex;flex-wrap:wrap;gap:6px 12px;padding:4px 16px 8px;background:#f8fafc;border-bottom:1px solid var(--border);flex-shrink:0}
+
 /* ─── STATS GRID ─────────────────────────────────────────────────────────── */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
 .stat-box{background:white;border:1px solid var(--border);border-radius:var(--rad);padding:11px 12px}
@@ -223,12 +266,10 @@ input[type=range]::-moz-range-thumb{
 .bd-val.pos{color:#16a34a}.bd-val.neg{color:var(--red)}
 .bd-val.ok{color:#16a34a}.bd-val.warn{color:var(--amber)}.bd-val.danger{color:var(--red);font-weight:700}
 .bd-total{border-top:2px solid var(--border);padding-top:7px;margin-top:4px}
-
-/* leg-colored bd rows */
-.bd-row.c0 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c0);margin-right:5px;vertical-align:middle;flex-shrink:0}
-.bd-row.c1 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c1);margin-right:5px;vertical-align:middle;flex-shrink:0}
-.bd-row.c2 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c2);margin-right:5px;vertical-align:middle;flex-shrink:0}
-.bd-row.c3 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c3);margin-right:5px;vertical-align:middle;flex-shrink:0}
+.bd-row.c0 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c0);margin-right:5px;vertical-align:middle}
+.bd-row.c1 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c1);margin-right:5px;vertical-align:middle}
+.bd-row.c2 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c2);margin-right:5px;vertical-align:middle}
+.bd-row.c3 .bd-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c3);margin-right:5px;vertical-align:middle}
 
 /* ─── ALERTS ─────────────────────────────────────────────────────────────── */
 .alert{border-radius:var(--rad);padding:12px 13px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start}
@@ -270,8 +311,8 @@ input[type=range]::-moz-range-thumb{
       </svg>
     </div>
     <div>
-      <div id="hdr-title">Options Payoff Analyzer</div>
-      <div id="hdr-sub">Build positions · See floors, ceilings &amp; combined payoffs</div>
+      <div id="hdr-title">Options &amp; Hedge Analyzer</div>
+      <div id="hdr-sub">Options · Futures · Cash Sales · Combined P&amp;L</div>
     </div>
   </div>
 </div>
@@ -282,7 +323,7 @@ input[type=range]::-moz-range-thumb{
 <div id="sec-setup" class="sec active">
 
   <div class="card">
-    <div class="card-title">Commodity &amp; Reference Price</div>
+    <div class="card-title"><span class="card-title-txt">Commodity &amp; Reference Price</span></div>
     <div class="chip-group" id="commodity-chips" style="margin-bottom:12px">
       <button class="chip active" data-com="corn">Corn</button>
       <button class="chip" data-com="soybeans">Soybeans</button>
@@ -300,12 +341,12 @@ input[type=range]::-moz-range-thumb{
   </div>
 
   <div class="card">
-    <div class="card-title">Quick Strategies</div>
+    <div class="card-title"><span class="card-title-txt">Quick Strategies</span></div>
     <div class="tpl-scroll" id="tpl-row"></div>
   </div>
 
   <div class="card">
-    <div class="card-title">Position Builder</div>
+    <div class="card-title"><span class="card-title-txt">Position Builder</span></div>
     <div id="legs-wrap"></div>
     <div style="margin-top:10px">
       <button id="add-leg-btn" onclick="addLeg()">
@@ -321,7 +362,7 @@ input[type=range]::-moz-range-thumb{
 <div id="sec-chart" class="sec">
 
   <div class="card">
-    <div class="card-title">Simulate a Market Price</div>
+    <div class="card-title"><span class="card-title-txt">Simulate a Market Price</span></div>
     <div class="sl-hdr">
       <span class="sl-lbl">Market Price at Expiration</span>
       <span class="sl-val" id="sl-display" style="color:var(--green)">$4.50/bu</span>
@@ -333,7 +374,13 @@ input[type=range]::-moz-range-thumb{
   </div>
 
   <div class="card">
-    <div class="card-title">Combined Payoff Diagram — Total Position P&amp;L ($)</div>
+    <div class="card-title">
+      <span class="card-title-txt">Combined Payoff — Total Position P&amp;L ($)</span>
+      <button class="fs-btn" onclick="openFs()" title="Full screen chart">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        Full Screen
+      </button>
+    </div>
     <canvas id="payoff-chart" role="img" aria-label="Option payoff chart"></canvas>
     <div class="leg" id="chart-legend"></div>
   </div>
@@ -341,12 +388,12 @@ input[type=range]::-moz-range-thumb{
   <div class="stats-grid" id="stats-grid"></div>
 
   <div class="card" id="scenario-card">
-    <div class="card-title">Breakdown at <span id="bd-price-label">$4.50/bu</span></div>
+    <div class="card-title"><span class="card-title-txt">Breakdown at <span id="bd-price-label">$4.50/bu</span></span></div>
     <div id="bd-rows"></div>
   </div>
 
   <div class="card" id="range-card" style="display:none">
-    <div class="card-title">Price Range Summary</div>
+    <div class="card-title"><span class="card-title-txt">Price Range Summary</span></div>
     <div id="range-rows"></div>
   </div>
 
@@ -356,7 +403,7 @@ input[type=range]::-moz-range-thumb{
 <div id="sec-margin" class="sec">
 
   <div id="margin-na" class="na-box" style="display:none">
-    <p>Margin is only required when you <strong>sell</strong> an option (short put or short call).<br><br>Add a short position on the Setup tab to analyze margin requirements here.</p>
+    <p>Margin is required when you <strong>sell</strong> an option (short put/call) or hold a <strong>short/long futures</strong> position.<br><br>Add one of those legs on the Setup tab to analyze margin here.</p>
   </div>
 
   <div id="margin-content" style="display:none">
@@ -364,7 +411,7 @@ input[type=range]::-moz-range-thumb{
     <div id="margin-summary-badge" style="margin-bottom:10px"></div>
 
     <div class="card">
-      <div class="card-title">Account &amp; Margin Settings</div>
+      <div class="card-title"><span class="card-title-txt">Account &amp; Margin Settings</span></div>
       <div class="field">
         <label for="i-acct">Trading Account Balance</label>
         <div class="input-wrap">
@@ -383,7 +430,7 @@ input[type=range]::-moz-range-thumb{
               autocomplete="off" step="50" min="0" value="500">
             <span class="sfx">/con.</span>
           </div>
-          <div class="hint">Required to open (per short leg)</div>
+          <div class="hint">Required to open (per margined leg)</div>
         </div>
         <div class="field">
           <label for="i-maint">Maintenance Margin</label>
@@ -401,17 +448,17 @@ input[type=range]::-moz-range-thumb{
     <div id="margin-alert-wrap"></div>
 
     <div class="card">
-      <div class="card-title">Account Equity — Scenario <span id="eq-lbl" style="color:var(--green);font-weight:700"></span></div>
+      <div class="card-title"><span class="card-title-txt">Account Equity — Scenario <span id="eq-lbl" style="color:var(--green);font-weight:700"></span></span></div>
       <div id="equity-rows"></div>
     </div>
 
     <div class="card">
-      <div class="card-title">Margin Call Trigger Prices</div>
+      <div class="card-title"><span class="card-title-txt">Margin Call Trigger Prices</span></div>
       <div id="trigger-rows"></div>
     </div>
 
     <div class="card">
-      <div class="card-title">If a Margin Call Is Triggered</div>
+      <div class="card-title"><span class="card-title-txt">If a Margin Call Is Triggered</span></div>
       <div id="call-rows"></div>
     </div>
 
@@ -419,6 +466,31 @@ input[type=range]::-moz-range-thumb{
 </div>
 
 </div><!-- /scroll -->
+
+<!-- ═══════════════════════ FULLSCREEN OVERLAY ════════════ -->
+<div id="fs-overlay">
+  <div id="fs-hdr">
+    <div>
+      <div id="fs-title">Hedge Position — Total P&amp;L ($)</div>
+      <div id="fs-pnl"></div>
+    </div>
+    <button id="fs-close-btn" onclick="exitFs()">✕ Close</button>
+  </div>
+  <div id="fs-legend"></div>
+  <div id="fs-chart-wrap">
+    <canvas id="fs-payoff-chart"></canvas>
+  </div>
+  <div id="fs-controls">
+    <div class="sl-hdr">
+      <span class="sl-lbl">Market Price at Expiration</span>
+      <span class="sl-val" id="fs-sl-display" style="color:var(--green)">$4.50/bu</span>
+    </div>
+    <div class="slider-wrap">
+      <input type="range" id="fs-price-slider" min="1" max="10" step="0.01" value="4.50">
+    </div>
+    <div class="sl-minmax"><span id="fs-sl-min">$1.00</span><span id="fs-sl-max">$10.00</span></div>
+  </div>
+</div>
 
 <nav id="bnav">
   <button class="nbtn active" data-sec="setup" onclick="switchTab('setup')">
@@ -437,7 +509,7 @@ input[type=range]::-moz-range-thumb{
 
 <script>
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const CS = 5000; // bushels per contract
+const CS = 5000;
 const LEG_COLORS = ['#2563eb','#d97706','#7c3aed','#059669'];
 const MAX_LEGS = 4;
 
@@ -447,14 +519,16 @@ const COM_DEF = {
   wheat:    {ref:5.50,  init:600,  maint:450 },
 };
 
-// Quick-strategy templates (null strike/premium → auto-fill from ref price)
+// Templates — each leg has: dir, type, strikeOffset (optional), premium (options only)
 const TEMPLATES = [
-  {label:'🔒 Buy Put',    legs:[{dir:'long', type:'put'}]},
-  {label:'📤 Sell Call',  legs:[{dir:'short',type:'call'}]},
-  {label:'↔ Collar',     legs:[{dir:'long', type:'put'},{dir:'short',type:'call',strikeOffset:0.5}]},
-  {label:'📥 Buy Call',   legs:[{dir:'long', type:'call'}]},
-  {label:'💰 Sell Put',   legs:[{dir:'short',type:'put'}]},
-  {label:'🔓 Fence',      legs:[{dir:'long', type:'call',strikeOffset:0.5},{dir:'short',type:'put',strikeOffset:-0.5}]},
+  {label:'🔒 Buy Put',       legs:[{dir:'long', type:'put'}]},
+  {label:'📤 Sell Call',     legs:[{dir:'short',type:'call'}]},
+  {label:'↔ Collar',        legs:[{dir:'long', type:'put'},{dir:'short',type:'call',strikeOffset:0.5}]},
+  {label:'📉 Short Futures', legs:[{dir:'short',type:'futures'}]},
+  {label:'📈 Long Futures',  legs:[{dir:'long', type:'futures'}]},
+  {label:'💵 Cash Sale',     legs:[{dir:'short',type:'cash'}]},
+  {label:'🌾 Covered Call',  legs:[{dir:'short',type:'call'},{dir:'short',type:'cash'}]},
+  {label:'🔓 Fence',         legs:[{dir:'long', type:'call',strikeOffset:0.5},{dir:'short',type:'put',strikeOffset:-0.5}]},
 ];
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -469,133 +543,115 @@ const S = {
 
 // ─── CALCULATIONS ─────────────────────────────────────────────────────────────
 function legPnl(leg, m) {
-  const iv = leg.type==='put' ? Math.max(leg.strike-m,0) : Math.max(m-leg.strike,0);
-  return leg.dir==='long' ? iv - leg.premium : leg.premium - iv;
+  if(leg.type==='put'){
+    const iv=Math.max(leg.strike-m,0);
+    return leg.dir==='long'?iv-leg.premium:leg.premium-iv;
+  }
+  if(leg.type==='call'){
+    const iv=Math.max(m-leg.strike,0);
+    return leg.dir==='long'?iv-leg.premium:leg.premium-iv;
+  }
+  // futures: long = (m - entry), short = (entry - m)
+  // cash sale: short = (cashPrice - m), cash buy: long = (m - cashPrice)
+  return leg.dir==='long'?(m-leg.strike):(leg.strike-m);
 }
 
-function legPnlTotal(leg, m) {
-  return legPnl(leg, m) * CS * leg.contracts;
+function legPnlTotal(leg,m){ return legPnl(leg,m)*CS*leg.contracts; }
+
+function combinedPnlTotal(m){ return S.legs.reduce((s,l)=>s+legPnlTotal(l,m),0); }
+
+function totalBushels(){ return S.legs.reduce((s,l)=>s+CS*l.contracts,0); }
+
+function chartRange(){
+  const vals=[...S.legs.map(l=>l.strike),S.ref].filter(v=>v>0);
+  const lo=Math.max(0.01,Math.min(...vals)*0.5);
+  const hi=Math.max(...vals)*1.5;
+  return {lo,hi};
 }
 
-function combinedPnlTotal(m) {
-  return S.legs.reduce((s,l) => s + legPnlTotal(l,m), 0);
-}
-
-function totalBushels() {
-  return S.legs.reduce((s,l) => s + CS * l.contracts, 0);
-}
-
-function chartRange() {
-  const vals = [...S.legs.map(l=>l.strike), S.ref].filter(v=>v>0);
-  const lo = Math.max(0.01, Math.min(...vals)*0.5);
-  const hi = Math.max(...vals)*1.5;
-  return {lo, hi};
-}
-
-function samplePrices(N=400) {
+function samplePrices(N=400){
   const {lo,hi}=chartRange();
   return Array.from({length:N+1},(_,i)=>lo+(hi-lo)*i/N);
 }
 
-function findBreakevens() {
+function findBreakevens(){
   const prices=samplePrices(2000);
   const bes=[];
   for(let i=1;i<prices.length;i++){
-    const p0=combinedPnlTotal(prices[i-1]), p1=combinedPnlTotal(prices[i]);
+    const p0=combinedPnlTotal(prices[i-1]),p1=combinedPnlTotal(prices[i]);
     if((p0<0&&p1>=0)||(p0>=0&&p1<0)){
-      const be=prices[i-1]+(prices[i]-prices[i-1])*(-p0)/(p1-p0);
-      bes.push(be);
+      bes.push(prices[i-1]+(prices[i]-prices[i-1])*(-p0)/(p1-p0));
     }
   }
   return bes;
 }
 
-function pnlStats() {
+function pnlStats(){
   const prices=samplePrices(2000);
   const pnls=prices.map(p=>combinedPnlTotal(p));
-  return {
-    max:Math.max(...pnls),
-    min:Math.min(...pnls),
-    atRef:combinedPnlTotal(S.ref),
-  };
+  return {max:Math.max(...pnls),min:Math.min(...pnls),atRef:combinedPnlTotal(S.ref)};
 }
 
 // ─── MARGIN CALCULATIONS ──────────────────────────────────────────────────────
-function shortLegs() { return S.legs.filter(l=>l.dir==='short'); }
+// Cash sales don't require margin; options + futures do
+function marginLegs(){ return S.legs.filter(l=>l.type!=='cash'); }
+function shortMarginLegs(){ return marginLegs().filter(l=>l.dir==='short'); }
 
-function totalInitMargin() { return shortLegs().reduce((s,l)=>s+S.init*l.contracts,0); }
-function totalMaintMargin(){ return shortLegs().reduce((s,l)=>s+S.maint*l.contracts,0); }
+function totalInitMargin() { return shortMarginLegs().reduce((s,l)=>s+S.init*l.contracts,0); }
+function totalMaintMargin(){ return shortMarginLegs().reduce((s,l)=>s+S.maint*l.contracts,0); }
 
-function accountEquity(m) {
-  return S.acct + combinedPnlTotal(m);
-}
+function accountEquity(m){ return S.acct+combinedPnlTotal(m); }
 
-function triggerPrices() {
-  if(!shortLegs().length) return {up:null,down:null};
+function triggerPrices(){
+  if(!shortMarginLegs().length) return {up:null,down:null};
   const {lo,hi}=chartRange();
   const tm=totalMaintMargin();
   const step=(hi-lo)/3000;
-  let up=null, down=null;
-
-  // scan up from ref
-  for(let m=S.ref;m<=hi;m+=step){
-    if(accountEquity(m)<tm){up=m;break;}
-  }
-  // scan down from ref
-  for(let m=S.ref;m>=lo;m-=step){
-    if(accountEquity(m)<tm){down=m;break;}
-  }
+  let up=null,down=null;
+  for(let m=S.ref;m<=hi;m+=step){ if(accountEquity(m)<tm){up=m;break;} }
+  for(let m=S.ref;m>=lo;m-=step){ if(accountEquity(m)<tm){down=m;break;} }
   return {up,down};
 }
 
-// ─── CHART ────────────────────────────────────────────────────────────────────
-let myChart=null;
+// ─── CHART BUILDING ───────────────────────────────────────────────────────────
+let myChart=null, fsChart=null;
 
 const annoPlugin={
   id:'anno',
   afterDraw(ch){
-    const A=ch._anno; if(!A) return;
+    const A=ch._anno;if(!A)return;
     const {ctx,chartArea:a,scales}=ch;
-    // draw zone fills first (background)
     (A.zones||[]).forEach(z=>{
-      const x1=Math.max(a.left, scales.x.getPixelForValue(z.from));
+      const x1=Math.max(a.left,scales.x.getPixelForValue(z.from));
       const x2=Math.min(a.right,scales.x.getPixelForValue(z.to));
-      if(x2<=x1) return;
-      ctx.save();
-      ctx.fillStyle=z.color;
-      ctx.fillRect(x1,a.top,x2-x1,a.bottom-a.top);
-      ctx.restore();
+      if(x2<=x1)return;
+      ctx.save();ctx.fillStyle=z.color;ctx.fillRect(x1,a.top,x2-x1,a.bottom-a.top);ctx.restore();
     });
-    // vertical lines
     (A.v||[]).forEach(l=>{
       const x=scales.x.getPixelForValue(l.x);
-      if(x<a.left-1||x>a.right+1) return;
+      if(x<a.left-1||x>a.right+1)return;
       ctx.save();
       ctx.beginPath();ctx.moveTo(x,a.top);ctx.lineTo(x,a.bottom);
       ctx.strokeStyle=l.color;ctx.lineWidth=l.lw||2;
       ctx.setLineDash(l.dash||[]);ctx.stroke();ctx.setLineDash([]);
       if(l.tag){
-        ctx.font='600 10px -apple-system,sans-serif';
-        ctx.fillStyle=l.color;
-        const right=x>a.right-72;
-        ctx.textAlign=right?'right':'left';
+        ctx.font='600 10px -apple-system,sans-serif';ctx.fillStyle=l.color;
+        const right=x>a.right-72;ctx.textAlign=right?'right':'left';
         const tx=right?x-4:x+4;
         ctx.fillText(l.tag,tx,a.top+11);
         if(l.sub)ctx.fillText(l.sub,tx,a.top+24);
       }
       ctx.restore();
     });
-    // horizontal lines
     (A.h||[]).forEach(l=>{
       const y=scales.y.getPixelForValue(l.y);
-      if(y<a.top-1||y>a.bottom+1) return;
+      if(y<a.top-1||y>a.bottom+1)return;
       ctx.save();
       ctx.beginPath();ctx.moveTo(a.left,y);ctx.lineTo(a.right,y);
       ctx.strokeStyle=l.color;ctx.lineWidth=l.lw||1.5;
       ctx.setLineDash(l.dash||[]);ctx.stroke();ctx.setLineDash([]);
       if(l.tag){
-        ctx.font='600 10px -apple-system,sans-serif';
-        ctx.fillStyle=l.color;ctx.textAlign='right';
+        ctx.font='600 10px -apple-system,sans-serif';ctx.fillStyle=l.color;ctx.textAlign='right';
         ctx.fillText(l.tag,a.right-4,y-5);
         if(l.sub)ctx.fillText(l.sub,a.right-4,y+14);
       }
@@ -609,9 +665,7 @@ function buildAnno(){
   const {lo,hi}=chartRange();
   const bes=findBreakevens();
   const stats=pnlStats();
-  const trigs=shortLegs().length?triggerPrices():{up:null,down:null};
-
-  // Build vertical zone fills from sorted strike list
+  const trigs=shortMarginLegs().length?triggerPrices():{up:null,down:null};
   const strikes=[...new Set(S.legs.map(l=>l.strike))].sort((a,b)=>a-b);
   const zoneColors=['rgba(59,130,246,0.06)','rgba(100,116,139,0.05)','rgba(245,158,11,0.06)','rgba(139,92,246,0.05)'];
   const zones=[];
@@ -619,60 +673,40 @@ function buildAnno(){
   for(let i=0;i<allBounds.length-1;i++){
     zones.push({from:allBounds[i],to:allBounds[i+1],color:zoneColors[i%zoneColors.length]});
   }
-
   const vlines=[];
-  // Strike lines (one per unique strike)
   strikes.forEach((s,i)=>{
     vlines.push({x:s,color:LEG_COLORS[i%LEG_COLORS.length],lw:1.5,dash:[5,4],
       tag:'Strike'+(strikes.length>1?` ${i+1}`:''),sub:'$'+s.toFixed(2)});
   });
-  // Scenario price
   vlines.push({x:S.scenarioPrice,color:'#7c3aed',lw:2,dash:[],tag:'Scenario',sub:'$'+S.scenarioPrice.toFixed(2)});
-  // Breakeven prices
   bes.forEach((be,i)=>{
     vlines.push({x:be,color:'#64748b',lw:1.5,dash:[3,3],tag:i===0?'Breakeven':'BE'+(i+1),sub:'$'+be.toFixed(2)});
   });
-  // Margin trigger prices
-  if(trigs.up!=null&&isFinite(trigs.up)&&trigs.up>0){
+  if(trigs.up!=null&&isFinite(trigs.up)&&trigs.up>0)
     vlines.push({x:trigs.up,color:'#dc2626',lw:1.5,dash:[4,3],tag:'Margin↑',sub:'$'+trigs.up.toFixed(2)});
-  }
-  if(trigs.down!=null&&isFinite(trigs.down)&&trigs.down>0){
+  if(trigs.down!=null&&isFinite(trigs.down)&&trigs.down>0)
     vlines.push({x:trigs.down,color:'#dc2626',lw:1.5,dash:[4,3],tag:'Margin↓',sub:'$'+trigs.down.toFixed(2)});
-  }
-
-  // Horizontal lines for max profit and max loss (if bounded)
   const hlines=[];
-  if(isFinite(stats.max)&&Math.abs(stats.max)<100000000){
+  if(isFinite(stats.max)&&Math.abs(stats.max)<100000000)
     hlines.push({y:stats.max,color:'rgba(22,163,74,0.5)',lw:1,dash:[6,4],tag:'Max Profit',sub:'+$'+stats.max.toFixed(0)});
-  }
-  if(isFinite(stats.min)&&Math.abs(stats.min)<100000000){
+  if(isFinite(stats.min)&&Math.abs(stats.min)<100000000)
     hlines.push({y:stats.min,color:'rgba(220,38,38,0.5)',lw:1,dash:[6,4],tag:'Max Loss',sub:'-$'+Math.abs(stats.min).toFixed(0)});
-  }
-
-  return {zones, v:vlines, h:hlines};
+  return {zones,v:vlines,h:hlines};
 }
 
-function buildChart(){
-  const canvas=document.getElementById('payoff-chart');
+function makeDatasets(){
   const prices=samplePrices();
-  if(myChart){myChart.destroy();myChart=null;}
-
   const datasets=[];
-
-  // Green fill (profit zone above zero)
   datasets.push({
     data:prices.map(m=>({x:m,y:Math.max(combinedPnlTotal(m),0)})),
     fill:'origin',backgroundColor:'rgba(22,163,74,0.12)',
     borderColor:'transparent',pointRadius:0,tension:0,order:6
   });
-  // Red fill (loss zone below zero)
   datasets.push({
     data:prices.map(m=>({x:m,y:Math.min(combinedPnlTotal(m),0)})),
     fill:'origin',backgroundColor:'rgba(220,38,38,0.1)',
     borderColor:'transparent',pointRadius:0,tension:0,order:6
   });
-
-  // Individual leg lines (dashed, only when >1 leg)
   if(S.legs.length>1){
     S.legs.forEach((leg,i)=>{
       datasets.push({
@@ -684,8 +718,6 @@ function buildChart(){
       });
     });
   }
-
-  // Combined payoff line (bold, green/red by sign)
   datasets.push({
     label:'Combined',
     data:prices.map(m=>({x:m,y:combinedPnlTotal(m)})),
@@ -693,92 +725,182 @@ function buildChart(){
     segment:{borderColor:ctx=>ctx.p1.parsed.y>=0?'#16a34a':'#dc2626'},
     pointRadius:0,tension:0,fill:false,order:1,
   });
-
-  // Scenario dot
   datasets.push({
     data:[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}],
     type:'scatter',backgroundColor:'#7c3aed',
     pointRadius:7,pointHoverRadius:9,
     borderColor:'white',borderWidth:2,order:0,
   });
+  return datasets;
+}
 
+function chartOptions(ar){
   const {lo,hi}=chartRange();
-  myChart=new Chart(canvas,{
-    type:'line',
-    data:{datasets},
-    options:{
-      responsive:true,maintainAspectRatio:true,aspectRatio:1.65,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{
-            title:items=>`Market: $${items[0].parsed.x.toFixed(2)}/bu`,
-            label:item=>{
-              const lbl=item.dataset.label;
-              if(!lbl)return null;
-              const v=item.parsed.y;
-              const fmt=n=>(n>=0?'+':'-')+' $'+Math.abs(n).toFixed(2);
-              if(lbl==='Combined') return `Combined: ${fmt(v)}`;
-              if(lbl.startsWith('Leg')) return `${lbl}: ${fmt(v)}`;
-              return null;
-            },
+  return {
+    responsive:true,maintainAspectRatio:!!ar,aspectRatio:ar||1.65,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        callbacks:{
+          title:items=>`Market: $${items[0].parsed.x.toFixed(2)}/bu`,
+          label:item=>{
+            const lbl=item.dataset.label;if(!lbl)return null;
+            const v=item.parsed.y;
+            const fmt=n=>(n>=0?'+':'-')+' $'+Math.abs(n).toFixed(2);
+            if(lbl==='Combined')return `Combined: ${fmt(v)}`;
+            if(lbl.startsWith('Leg'))return `${lbl}: ${fmt(v)}`;
+            return null;
           },
-          filter:item=>!!item.dataset.label,
         },
-        anno:{},
+        filter:item=>!!item.dataset.label,
       },
-      scales:{
-        x:{type:'linear',min:lo,max:hi,
-          ticks:{maxTicksLimit:7,callback:v=>'$'+v.toFixed(2),font:{size:11}},
-          grid:{color:'#f1f5f9'}},
-        y:{
-          ticks:{callback:v=>{const a=Math.abs(v);return(v>=0?'+':'-')+(a>=1000?'$'+(a/1000).toFixed(1)+'k':'$'+a.toFixed(0));},font:{size:11}},
-          grid:{color:ctx=>ctx.tick.value===0?'#94a3b8':'#f1f5f9',
-            lineWidth:ctx=>ctx.tick.value===0?1.5:1},
-        }
+      anno:{},
+    },
+    scales:{
+      x:{type:'linear',min:lo,max:hi,
+        ticks:{maxTicksLimit:7,callback:v=>'$'+v.toFixed(2),font:{size:11}},
+        grid:{color:'#f1f5f9'}},
+      y:{
+        ticks:{callback:v=>{const a=Math.abs(v);return(v>=0?'+':'-')+(a>=1000?'$'+(a/1000).toFixed(1)+'k':'$'+a.toFixed(0));},font:{size:11}},
+        grid:{color:ctx=>ctx.tick.value===0?'#94a3b8':'#f1f5f9',
+          lineWidth:ctx=>ctx.tick.value===0?1.5:1},
       }
     }
-  });
-  myChart._anno=buildAnno();
-  myChart.update('none');
+  };
+}
+
+function buildChart(){
+  const canvas=document.getElementById('payoff-chart');
+  if(myChart){myChart.destroy();myChart=null;}
+  myChart=new Chart(canvas,{type:'line',data:{datasets:makeDatasets()},options:chartOptions(1.65)});
+  myChart._anno=buildAnno();myChart.update('none');
 }
 
 function updateAnno(){
-  if(!myChart) return;
+  if(!myChart)return;
   myChart._anno=buildAnno();
-  const lastDs=myChart.data.datasets.length-1;
-  myChart.data.datasets[lastDs].data=[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}];
+  const ds=myChart.data.datasets;
+  ds[ds.length-1].data=[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}];
   myChart.update('none');
 }
+
+// ─── FULLSCREEN ───────────────────────────────────────────────────────────────
+function syncFsSlider(){
+  const {lo,hi}=chartRange();
+  const fs=document.getElementById('fs-price-slider');
+  fs.min=lo.toFixed(2);fs.max=hi.toFixed(2);fs.step='0.01';
+  fs.value=S.scenarioPrice.toFixed(2);
+  document.getElementById('fs-sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
+  document.getElementById('fs-sl-min').textContent='$'+lo.toFixed(2);
+  document.getElementById('fs-sl-max').textContent='$'+hi.toFixed(2);
+}
+
+function buildFsChart(){
+  const canvas=document.getElementById('fs-payoff-chart');
+  if(fsChart){fsChart.destroy();fsChart=null;}
+  fsChart=new Chart(canvas,{type:'line',data:{datasets:makeDatasets()},options:chartOptions(null)});
+  fsChart._anno=buildAnno();fsChart.update('none');
+  updateFsPnl();
+}
+
+function updateFsAnno(){
+  if(!fsChart)return;
+  fsChart._anno=buildAnno();
+  const ds=fsChart.data.datasets;
+  ds[ds.length-1].data=[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}];
+  fsChart.update('none');
+  updateFsPnl();
+}
+
+function updateFsPnl(){
+  const total=combinedPnlTotal(S.scenarioPrice);
+  const el=document.getElementById('fs-pnl');
+  el.style.color=total>=0?'#16a34a':'#dc2626';
+  el.textContent=(total>=0?'+':'-')+'$'+Math.abs(total).toFixed(2)+' at $'+S.scenarioPrice.toFixed(2)+'/bu';
+}
+
+function renderFsLegend(){
+  const bes=findBreakevens();
+  let html=`
+    <div class="leg-i"><div class="leg-swatch" style="background:rgba(22,163,74,0.3)"></div>Profit</div>
+    <div class="leg-i"><div class="leg-swatch" style="background:rgba(220,38,38,0.2)"></div>Loss</div>`;
+  if(S.legs.length>1){
+    S.legs.forEach((leg,i)=>{
+      html+=`<div class="leg-i"><div class="leg-dash" style="border-color:${LEG_COLORS[i%LEG_COLORS.length]}"></div>Leg ${i+1}: ${legName(leg)}</div>`;
+    });
+    html+=`<div class="leg-i"><div class="leg-line" style="background:linear-gradient(90deg,#16a34a,#dc2626)"></div>Combined</div>`;
+  }
+  if(bes.length){
+    html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#64748b"></div>BE ${bes.map(b=>'$'+b.toFixed(2)).join(', ')}</div>`;
+  }
+  document.getElementById('fs-legend').innerHTML=html;
+}
+
+function openFs(){
+  document.getElementById('fs-overlay').classList.add('open');
+  syncFsSlider();
+  renderFsLegend();
+  requestAnimationFrame(()=>buildFsChart());
+}
+
+function exitFs(){
+  document.getElementById('fs-overlay').classList.remove('open');
+  if(fsChart){fsChart.destroy();fsChart=null;}
+}
+
+document.getElementById('fs-price-slider').addEventListener('input',e=>{
+  S.scenarioPrice=parseFloat(e.target.value);
+  document.getElementById('fs-sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
+  // keep main slider in sync
+  const sl=document.getElementById('price-slider');
+  sl.value=S.scenarioPrice.toFixed(2);
+  document.getElementById('sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
+  updateFsAnno();
+  renderScenario();renderMargin();
+});
 
 // ─── FORMATTERS ──────────────────────────────────────────────────────────────
 const d$=(v,dp=2)=>'$'+Math.abs(v).toFixed(dp);
 const pSign=(v,dp=4)=>(v>=0?'+':'-')+' $'+Math.abs(v).toFixed(dp);
 const pSignD=(v,dp=2)=>(v>=0?'+':'-')+' $'+Math.abs(v).toFixed(dp);
-const legName=l=>`${l.dir==='long'?'Buy':'Sell'} ${l.type.charAt(0).toUpperCase()+l.type.slice(1)}`;
 
-// ─── RENDER: LEG ROWS ─────────────────────────────────────────────────────────
+const legName=l=>{
+  if(l.type==='futures') return `${l.dir==='long'?'Long':'Short'} Futures`;
+  if(l.type==='cash')    return `Cash ${l.dir==='short'?'Sale':'Purchase'}`;
+  return `${l.dir==='long'?'Buy':'Sell'} ${l.type.charAt(0).toUpperCase()+l.type.slice(1)}`;
+};
+
+const isOption=t=>t==='put'||t==='call';
+
+// ─── RENDER: LEG ROWS ────────────────────────────────────────────────────────
 function renderLegRows(){
   const wrap=document.getElementById('legs-wrap');
-  wrap.innerHTML=S.legs.map((leg,i)=>`
+  wrap.innerHTML=S.legs.map((leg,i)=>{
+    const opt=isOption(leg.type);
+    const strikeLbl=leg.type==='futures'?'Entry Price':leg.type==='cash'?'Cash Price':'Strike Price';
+    const dirLong=leg.type==='cash'?'Buy':'Long';
+    const dirShort=leg.type==='cash'?'Sell':'Short';
+    return `
     <div class="leg-row" data-idx="${i}">
       <div class="leg-header">
         <span class="leg-badge">Leg ${i+1}</span>
-        <div class="mini-toggle" id="dir-tog-${i}">
-          <button class="mini-btn${leg.dir==='long'?' active buy':''}" onclick="setLegDir(${i},'long')">Buy</button>
-          <button class="mini-btn${leg.dir==='short'?' active sell':''}" onclick="setLegDir(${i},'short')">Sell</button>
-        </div>
-        <div class="mini-toggle" id="type-tog-${i}">
-          <button class="mini-btn${leg.type==='put'?' active put':''}" onclick="setLegType(${i},'put')">Put</button>
-          <button class="mini-btn${leg.type==='call'?' active call':''}" onclick="setLegType(${i},'call')">Call</button>
+        <div class="mini-toggle">
+          <button class="mini-btn${leg.dir==='long'?' active long-cls':''}" onclick="setLegDir(${i},'long')">${dirLong}</button>
+          <button class="mini-btn${leg.dir==='short'?' active short-cls':''}" onclick="setLegDir(${i},'short')">${dirShort}</button>
         </div>
         ${S.legs.length>1?`<button class="leg-del" onclick="removeLeg(${i})" aria-label="Remove leg ${i+1}">✕</button>`:''}
       </div>
+      <div class="type-row">
+        <button class="type-btn${leg.type==='put'?' active put':''}" onclick="setLegType(${i},'put')">Put</button>
+        <button class="type-btn${leg.type==='call'?' active call':''}" onclick="setLegType(${i},'call')">Call</button>
+        <button class="type-btn${leg.type==='futures'?' active futures':''}" onclick="setLegType(${i},'futures')">Futures</button>
+        <button class="type-btn${leg.type==='cash'?' active cash':''}" onclick="setLegType(${i},'cash')">Cash Sale</button>
+      </div>
       <div class="leg-inputs">
-        <div class="row2" style="margin-bottom:8px">
+        <div class="${opt?'row2':''}" style="margin-bottom:8px">
           <div class="field" style="margin-bottom:0">
-            <label>Strike Price</label>
+            <label>${strikeLbl}</label>
             <div class="input-wrap">
               <span class="pfx">$</span>
               <input type="number" id="leg-strike-${i}" class="px" inputmode="decimal"
@@ -787,16 +909,17 @@ function renderLegRows(){
               <span class="sfx">/bu</span>
             </div>
           </div>
+          ${opt?`
           <div class="field" style="margin-bottom:0">
             <label>Option Premium</label>
             <div class="input-wrap">
               <span class="pfx">$</span>
               <input type="number" id="leg-prem-${i}" class="px" inputmode="decimal"
-                autocomplete="off" step="0.01" min="0" value="${leg.premium.toFixed(2)}"
+                autocomplete="off" step="0.01" min="0" value="${(leg.premium||0).toFixed(2)}"
                 oninput="updateLeg(${i})">
               <span class="sfx">/bu</span>
             </div>
-          </div>
+          </div>`:''}
         </div>
         <div style="max-width:200px">
           <div class="field" style="margin-bottom:0">
@@ -811,39 +934,46 @@ function renderLegRows(){
         </div>
       </div>
       <div class="leg-summary" id="leg-sum-${i}"></div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   S.legs.forEach((_,i)=>renderLegSummary(i));
-
-  document.getElementById('add-leg-btn').style.display=
-    S.legs.length>=MAX_LEGS?'none':'flex';
+  document.getElementById('add-leg-btn').style.display=S.legs.length>=MAX_LEGS?'none':'flex';
 }
 
 function renderLegSummary(i){
   const leg=S.legs[i];
   const el=document.getElementById('leg-sum-'+i);
   if(!el)return;
-  const fc=leg.type==='put'
-    ?`${leg.dir==='long'?'Floor':'Breakeven'}: $${(leg.strike-leg.premium).toFixed(4)}/bu`
-    :`${leg.dir==='short'?'Ceiling':'Breakeven'}: $${(leg.strike+leg.premium).toFixed(4)}/bu`;
   const totBu=CS*leg.contracts;
-  const premStr=leg.dir==='long'
-    ?`Pay $${leg.premium.toFixed(2)}/bu · $${(leg.premium*totBu).toFixed(0)} total`
-    :`Receive $${leg.premium.toFixed(2)}/bu · $${(leg.premium*totBu).toFixed(0)} total`;
-  el.textContent=`${fc} · ${premStr}`;
+  if(leg.type==='put'||leg.type==='call'){
+    const p=leg.premium||0;
+    const fc=leg.type==='put'
+      ?`${leg.dir==='long'?'Floor':'BE'}: $${(leg.strike-p).toFixed(4)}/bu`
+      :`${leg.dir==='short'?'Ceiling':'BE'}: $${(leg.strike+p).toFixed(4)}/bu`;
+    const premStr=leg.dir==='long'
+      ?`Pay $${p.toFixed(2)}/bu · $${(p*totBu).toFixed(0)} total`
+      :`Receive $${p.toFixed(2)}/bu · $${(p*totBu).toFixed(0)} total`;
+    el.textContent=`${fc} · ${premStr}`;
+  } else if(leg.type==='futures'){
+    const dir=leg.dir==='long'?'Long (buy)':'Short (sell)';
+    el.textContent=`${dir} ${totBu.toLocaleString()} bu @ $${leg.strike.toFixed(2)}/bu — P&L = $${leg.strike.toFixed(2)} ${leg.dir==='long'?'−':'+'} market price`;
+  } else if(leg.type==='cash'){
+    const dir=leg.dir==='short'?'Cash SOLD':'Cash BOUGHT';
+    el.textContent=`${dir} ${totBu.toLocaleString()} bu locked @ $${leg.strike.toFixed(2)}/bu ($${(leg.strike*totBu).toLocaleString(undefined,{maximumFractionDigits:0})} revenue)`;
+  }
 }
 
-// ─── RENDER: TEMPLATES ────────────────────────────────────────────────────────
+// ─── RENDER: TEMPLATES ───────────────────────────────────────────────────────
 function renderTemplates(){
   document.getElementById('tpl-row').innerHTML=TEMPLATES.map((t,i)=>
     `<button class="tpl-btn" onclick="applyTemplate(${i})">${t.label}</button>`
   ).join('');
 }
 
-// ─── RENDER: LEGEND ───────────────────────────────────────────────────────────
+// ─── RENDER: LEGEND ──────────────────────────────────────────────────────────
 function renderLegend(){
   const bes=findBreakevens();
-  const trigs=shortLegs().length?triggerPrices():{up:null,down:null};
+  const trigs=shortMarginLegs().length?triggerPrices():{up:null,down:null};
   const showTrig=(trigs.up!=null&&isFinite(trigs.up))||(trigs.down!=null&&isFinite(trigs.down));
   let html=`
     <div class="leg-i"><div class="leg-swatch" style="background:rgba(22,163,74,0.3)"></div>Profit</div>
@@ -863,7 +993,7 @@ function renderLegend(){
   document.getElementById('chart-legend').innerHTML=html;
 }
 
-// ─── RENDER: SCENARIO ─────────────────────────────────────────────────────────
+// ─── RENDER: SCENARIO ────────────────────────────────────────────────────────
 function renderScenario(){
   const m=S.scenarioPrice;
   const total=combinedPnlTotal(m);
@@ -871,17 +1001,14 @@ function renderScenario(){
   const perBu=totBu>0?total/totBu:0;
   const stats=pnlStats();
   const bes=findBreakevens();
-  const tCls=total>=0?'pos':'neg';
 
   document.getElementById('bd-price-label').textContent='$'+m.toFixed(2)+'/bu';
 
-  const maxStr=isFinite(stats.max)&&Math.abs(stats.max)<100000000
-    ?`+$${stats.max.toFixed(2)}`:'Unlimited';
-  const minStr=isFinite(stats.min)&&Math.abs(stats.min)<100000000
-    ?`-$${Math.abs(stats.min).toFixed(2)}`:'Unlimited';
+  const maxStr=isFinite(stats.max)&&Math.abs(stats.max)<1e8?`+$${stats.max.toFixed(2)}`:'Unlimited';
+  const minStr=isFinite(stats.min)&&Math.abs(stats.min)<1e8?`-$${Math.abs(stats.min).toFixed(2)}`:'Unlimited';
 
   document.getElementById('stats-grid').innerHTML=`
-    <div class="stat-box ${tCls}">
+    <div class="stat-box ${total>=0?'pos':'neg'}">
       <div class="s-lbl">Position P&amp;L at $${m.toFixed(2)}</div>
       <div class="s-val" style="color:${total>=0?'#16a34a':'#dc2626'}">${total>=0?'+':'-'}$${Math.abs(total).toFixed(2)}</div>
       <div class="s-sub">${totBu.toLocaleString()} bu total</div>
@@ -900,7 +1027,6 @@ function renderScenario(){
       <div class="s-val" style="color:#dc2626">${minStr}</div>
     </div>`;
 
-  // breakdown rows (one per leg + combined total)
   let bdHtml='';
   S.legs.forEach((leg,i)=>{
     const pnl=legPnl(leg,m);
@@ -920,7 +1046,22 @@ function renderScenario(){
   }
   document.getElementById('bd-rows').innerHTML=bdHtml;
 
-  // price range summary card
+  // cash legs: show effective price summary
+  const cashLegs=S.legs.filter(l=>l.type==='cash'&&l.dir==='short');
+  if(cashLegs.length&&S.legs.length>1){
+    const cashRevenue=cashLegs.reduce((s,l)=>s+l.strike*CS*l.contracts,0);
+    const nonCashPnl=S.legs.filter(l=>l.type!=='cash').reduce((s,l)=>s+legPnlTotal(l,m),0);
+    const totalRevenue=cashRevenue+nonCashPnl;
+    const cashBu=cashLegs.reduce((s,l)=>s+CS*l.contracts,0);
+    const effPrice=cashBu>0?(cashRevenue+nonCashPnl)/cashBu:null;
+    bdHtml+=`
+      <div class="bd-row bd-total" style="margin-top:8px">
+        <span class="bd-lbl" style="font-weight:700;color:var(--slate)">Effective Net Price (cash + hedge)</span>
+        <span class="bd-val pos" style="font-size:.88rem">${effPrice!=null?'$'+effPrice.toFixed(4)+'/bu':d$(totalRevenue)+' total'}</span>
+      </div>`;
+  }
+
+  // price range card
   const rangeCard=document.getElementById('range-card');
   if(S.legs.length>1&&bes.length){
     rangeCard.style.display='block';
@@ -928,45 +1069,45 @@ function renderScenario(){
     let rangeHtml='';
     if(bes.length===1){
       rangeHtml+=`<div class="bd-row"><span class="bd-lbl">Single breakeven</span><span class="bd-val">$${bes[0].toFixed(4)}/bu</span></div>`;
-    } else if(bes.length===2){
+    } else if(bes.length>=2){
       rangeHtml+=`
         <div class="bd-row"><span class="bd-lbl">Lower breakeven</span><span class="bd-val">$${bes[0].toFixed(4)}/bu</span></div>
-        <div class="bd-row"><span class="bd-lbl">Upper breakeven</span><span class="bd-val">$${bes[1].toFixed(4)}/bu</span></div>
-        <div class="bd-row"><span class="bd-lbl">Profitable price range</span><span class="bd-val pos">$${bes[0].toFixed(2)} – $${bes[1].toFixed(2)}</span></div>`;
+        <div class="bd-row"><span class="bd-lbl">Upper breakeven</span><span class="bd-val">$${bes[bes.length-1].toFixed(4)}/bu</span></div>
+        <div class="bd-row"><span class="bd-lbl">Profitable price range</span><span class="bd-val pos">$${bes[0].toFixed(2)} – $${bes[bes.length-1].toFixed(2)}</span></div>`;
     }
     if(strikes.length===2){
       rangeHtml+=`
-        <div class="bd-row"><span class="bd-lbl">Between strikes (neutral zone)</span><span class="bd-val">$${strikes[0].toFixed(2)} – $${strikes[1].toFixed(2)}</span></div>
-        <div class="bd-row"><span class="bd-lbl">Net premium</span>
-          <span class="bd-val ${combinedPnl(strikes[0]+0.01)>=0?'pos':'neg'}">${pSign(combinedPnl((strikes[0]+strikes[1])/2))}/bu</span>
-        </div>`;
+        <div class="bd-row"><span class="bd-lbl">Between strikes (neutral zone)</span><span class="bd-val">$${strikes[0].toFixed(2)} – $${strikes[1].toFixed(2)}</span></div>`;
     }
-    document.getElementById('range-rows').innerHTML=rangeHtml||'<div style="color:var(--slate-m);font-size:.8rem;padding:8px 0">Run the scenario slider to explore price levels.</div>';
+    document.getElementById('range-rows').innerHTML=rangeHtml||'';
   } else {
     rangeCard.style.display='none';
   }
 }
 
-// ─── RENDER: MARGIN ───────────────────────────────────────────────────────────
+// ─── RENDER: MARGIN ──────────────────────────────────────────────────────────
 function renderMargin(){
-  const shorts=shortLegs();
-  document.getElementById('margin-na').style.display=shorts.length?'none':'block';
-  document.getElementById('margin-content').style.display=shorts.length?'block':'none';
-  if(!shorts.length)return;
+  const smLegs=shortMarginLegs();
+  document.getElementById('margin-na').style.display=smLegs.length?'none':'block';
+  document.getElementById('margin-content').style.display=smLegs.length?'block':'none';
+  if(!smLegs.length)return;
 
   const totInit=totalInitMargin();
   const totMaint=totalMaintMargin();
-  const totPrem=shorts.reduce((s,l)=>s+l.premium*CS*l.contracts,0);
+  const shortOpts=smLegs.filter(l=>isOption(l.type));
+  const shortFuts=smLegs.filter(l=>l.type==='futures');
+  const totPrem=shortOpts.reduce((s,l)=>s+(l.premium||0)*CS*l.contracts,0);
   const m=S.scenarioPrice;
   const equity=accountEquity(m);
   const comboTot=combinedPnlTotal(m);
 
   document.getElementById('margin-summary-badge').innerHTML=`
     <div class="alert blue"><span class="alert-icon">ℹ️</span><div class="alert-body">
-      You have <strong>${shorts.length} short leg${shorts.length>1?'s':''}</strong>
-      (${shorts.map(l=>legName(l)).join(' + ')}).
-      Total premium received: <strong>${d$(totPrem)}</strong>.
-      Margin is required as security against your obligation.
+      You have <strong>${smLegs.length} margin-required leg${smLegs.length>1?'s':''}</strong>
+      (${smLegs.map(l=>legName(l)).join(' + ')}).
+      ${totPrem>0?`Total option premium received: <strong>$${totPrem.toFixed(2)}</strong>.`:''}
+      ${shortFuts.length?`Short futures require daily mark-to-market margin.`:''}
+      Margin is held as security.
     </div></div>`;
 
   let eqCls,eqTxt;
@@ -978,16 +1119,17 @@ function renderMargin(){
   if(equity<totMaint){
     al.innerHTML=`<div class="alert red"><span class="alert-icon">⚠️</span><div class="alert-body"><strong>Margin call at $${m.toFixed(2)}/bu</strong> — Equity ($${equity.toFixed(2)}) is below maintenance margin ($${totMaint.toFixed(2)}). Funds must be deposited immediately.</div></div>`;
   } else if(equity<totInit){
-    al.innerHTML=`<div class="alert amber"><span class="alert-icon">⚡</span><div class="alert-body"><strong>Caution</strong> — Equity ($${equity.toFixed(2)}) below initial margin ($${totInit.toFixed(2)}). One more adverse move triggers a margin call.</div></div>`;
+    al.innerHTML=`<div class="alert amber"><span class="alert-icon">⚡</span><div class="alert-body"><strong>Caution</strong> — Equity ($${equity.toFixed(2)}) below initial margin ($${totInit.toFixed(2)}). An adverse move triggers a margin call.</div></div>`;
   } else {al.innerHTML='';}
 
   document.getElementById('eq-lbl').textContent='$'+m.toFixed(2)+'/bu';
+  const shortContracts=smLegs.reduce((s,l)=>s+l.contracts,0);
   document.getElementById('equity-rows').innerHTML=`
     <div class="bd-row"><span class="bd-lbl">Account balance</span><span class="bd-val">${d$(S.acct)}</span></div>
-    <div class="bd-row"><span class="bd-lbl">Total premium received</span><span class="bd-val pos">+${d$(totPrem)}</span></div>
-    <div class="bd-row"><span class="bd-lbl">Combined option result at $${m.toFixed(2)}</span><span class="bd-val ${comboTot>=0?'pos':'neg'}">${pSignD(comboTot)}</span></div>
+    ${totPrem>0?`<div class="bd-row"><span class="bd-lbl">Option premium received</span><span class="bd-val pos">+${d$(totPrem)}</span></div>`:''}
+    <div class="bd-row"><span class="bd-lbl">Combined hedge result at $${m.toFixed(2)}</span><span class="bd-val ${comboTot>=0?'pos':'neg'}">${pSignD(comboTot)}</span></div>
     <div class="bd-row bd-total"><span class="bd-lbl">Account equity</span><span class="bd-val ${eqCls}">${d$(equity)} — ${eqTxt}</span></div>
-    <div class="bd-row"><span class="bd-lbl">Initial margin (${shorts.reduce((s,l)=>s+l.contracts,0)} short contracts × $${S.init}/contract)</span><span class="bd-val">${d$(totInit)}</span></div>
+    <div class="bd-row"><span class="bd-lbl">Initial margin (${shortContracts} contracts × $${S.init})</span><span class="bd-val">${d$(totInit)}</span></div>
     <div class="bd-row"><span class="bd-lbl">Maintenance margin</span><span class="bd-val">${d$(totMaint)}</span></div>
     <div class="bd-row"><span class="bd-lbl">Buffer above maintenance</span><span class="bd-val ${equity-totMaint>=0?'ok':'danger'}">${pSignD(equity-totMaint)}</span></div>`;
 
@@ -998,22 +1140,17 @@ function renderMargin(){
   if(hasUp||hasDown){
     let tHtml='';
     if(hasDown){
-      const eq=accountEquity(trigs.down);
-      const call=Math.max(0,totInit-eq);
       tHtml+=`
         <div class="bd-row"><span class="bd-lbl">Price falls to (↓ trigger)</span><span class="bd-val danger">${d$(trigs.down,4)}/bu</span></div>
         <div class="bd-row"><span class="bd-lbl">Move from reference</span><span class="bd-val neg">${pSign(trigs.down-S.ref,4)}/bu (${((Math.abs(trigs.down-S.ref)/S.ref)*100).toFixed(1)}%)</span></div>`;
     }
     if(hasUp){
-      const eq=accountEquity(trigs.up);
-      const call=Math.max(0,totInit-eq);
       tHtml+=`
         <div class="bd-row"><span class="bd-lbl">Price rises to (↑ trigger)</span><span class="bd-val danger">${d$(trigs.up,4)}/bu</span></div>
         <div class="bd-row"><span class="bd-lbl">Move from reference</span><span class="bd-val neg">${pSign(trigs.up-S.ref,4)}/bu (${((Math.abs(trigs.up-S.ref)/S.ref)*100).toFixed(1)}%)</span></div>`;
     }
     document.getElementById('trigger-rows').innerHTML=tHtml;
 
-    // margin call detail for the nearest trigger
     const nearTrig=([trigs.up,trigs.down].filter(t=>t!=null&&isFinite(t)&&t>0)
       .sort((a,b)=>Math.abs(a-S.ref)-Math.abs(b-S.ref)))[0];
     if(nearTrig){
@@ -1023,8 +1160,8 @@ function renderMargin(){
       document.getElementById('call-rows').innerHTML=`
         <div class="bd-row"><span class="bd-lbl">Account equity at nearest trigger</span><span class="bd-val">${d$(eq)}</span></div>
         <div class="bd-row"><span class="bd-lbl">Maintenance margin level</span><span class="bd-val">${d$(totMaint)}</span></div>
-        <div class="bd-row bd-total"><span class="bd-lbl" style="color:var(--red);font-weight:700">Margin call — deposit required</span><span class="bd-val danger" style="font-size:.88rem">${d$(call)}</span></div>
-        <div class="bd-row"><span class="bd-lbl">That is per bushel</span><span class="bd-val danger">${d$(callPerBu,4)}/bu (${(callPerBu*100).toFixed(2)}¢/bu)</span></div>
+        <div class="bd-row bd-total"><span class="bd-lbl" style="color:var(--red);font-weight:700">Margin call — deposit required</span><span class="bd-val danger">${d$(call)}</span></div>
+        <div class="bd-row"><span class="bd-lbl">Per bushel</span><span class="bd-val danger">${d$(callPerBu,4)}/bu (${(callPerBu*100).toFixed(2)}¢/bu)</span></div>
         <div class="bd-row"><span class="bd-lbl">After deposit, restored to</span><span class="bd-val ok">${d$(totInit)} (initial margin)</span></div>`;
     }
   } else {
@@ -1056,38 +1193,42 @@ function readGlobal(){
 }
 
 // ─── LEG ACTIONS ─────────────────────────────────────────────────────────────
-function setLegDir(i,dir){
-  S.legs[i].dir=dir;
-  renderLegRows();fullRender();
-}
+function setLegDir(i,dir){ S.legs[i].dir=dir; renderLegRows();fullRender(); }
+
 function setLegType(i,type){
   S.legs[i].type=type;
+  // preserve direction logic: cash sale defaults to 'short', futures/options keep existing dir
+  if(type==='cash'&&S.legs[i].dir!=='short'&&S.legs[i].dir!=='long') S.legs[i].dir='short';
   renderLegRows();fullRender();
 }
+
 function updateLeg(i){
-  const s=parseFloat(document.getElementById('leg-strike-'+i).value)||S.legs[i].strike;
-  const p=Math.max(0,parseFloat(document.getElementById('leg-prem-'+i).value)||0);
+  const leg=S.legs[i];
+  const s=parseFloat(document.getElementById('leg-strike-'+i).value)||leg.strike;
+  const opt=isOption(leg.type);
+  const pEl=opt?document.getElementById('leg-prem-'+i):null;
+  const p=pEl?Math.max(0,parseFloat(pEl.value)||0):0;
   const c=Math.max(1,parseInt(document.getElementById('leg-contracts-'+i).value)||1);
-  S.legs[i].strike=s;S.legs[i].premium=p;S.legs[i].contracts=c;
-  renderLegSummary(i);
-  fullRender();
+  S.legs[i].strike=s;
+  if(opt) S.legs[i].premium=p;
+  S.legs[i].contracts=c;
+  renderLegSummary(i);fullRender();
 }
-function removeLeg(i){
-  S.legs.splice(i,1);
-  renderLegRows();fullRender();
-}
+
+function removeLeg(i){ S.legs.splice(i,1); renderLegRows();fullRender(); }
+
 function addLeg(){
-  if(S.legs.length>=MAX_LEGS) return;
-  S.legs.push({dir:'long',type:'put',strike:S.ref,premium:0.15,contracts:1});
+  if(S.legs.length>=MAX_LEGS)return;
+  S.legs.push({dir:'short',type:'put',strike:S.ref,premium:0.15,contracts:1});
   renderLegRows();fullRender();
 }
+
 function applyTemplate(idx){
   const tpl=TEMPLATES[idx];
   S.legs=tpl.legs.map(t=>({
-    dir:t.dir, type:t.type,
+    dir:t.dir,type:t.type,
     strike:S.ref+(t.strikeOffset||0),
-    premium:0.15,
-    contracts:1,
+    premium:0,contracts:1,
   }));
   S.legs.forEach(leg=>{
     if(leg.type==='put')  leg.premium=parseFloat((S.ref*0.04).toFixed(2));
@@ -1108,12 +1249,15 @@ function switchTab(tab){
 }
 
 function fullRender(){
-  readGlobal();
-  syncSlider();
+  readGlobal();syncSlider();
   if(document.getElementById('sec-chart').classList.contains('active')){
     buildChart();renderScenario();renderLegend();
   }
   if(document.getElementById('sec-margin').classList.contains('active'))renderMargin();
+  // refresh fullscreen chart if open
+  if(document.getElementById('fs-overlay').classList.contains('open')){
+    syncFsSlider();renderFsLegend();buildFsChart();
+  }
 }
 
 // ─── GLOBAL EVENT LISTENERS ───────────────────────────────────────────────────
@@ -1127,7 +1271,6 @@ document.getElementById('commodity-chips').addEventListener('click',e=>{
   document.getElementById('i-init').value=d.init;
   document.getElementById('i-maint').value=d.maint;
   S.ref=d.ref;S.scenarioPrice=d.ref;
-  // Update all leg strikes to new ref price
   S.legs.forEach(l=>l.strike=d.ref);
   renderLegRows();fullRender();
 });
@@ -1138,6 +1281,7 @@ document.getElementById('i-ref').addEventListener('input',()=>{readGlobal();full
   document.getElementById(id).addEventListener('input',()=>{
     readGlobal();renderMargin();
     if(myChart){myChart._anno=buildAnno();myChart.update('none');renderLegend();}
+    if(fsChart){fsChart._anno=buildAnno();fsChart.update('none');}
   });
 });
 
@@ -1145,6 +1289,12 @@ document.getElementById('price-slider').addEventListener('input',e=>{
   S.scenarioPrice=parseFloat(e.target.value);
   document.getElementById('sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
   updateAnno();renderScenario();renderMargin();
+  // keep fs slider in sync
+  if(document.getElementById('fs-overlay').classList.contains('open')){
+    document.getElementById('fs-price-slider').value=S.scenarioPrice.toFixed(2);
+    document.getElementById('fs-sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
+    updateFsAnno();
+  }
 });
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
