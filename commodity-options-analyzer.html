@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Options Analyzer">
+<meta name="apple-mobile-web-app-title" content="Hedge Analyzer">
 <meta name="theme-color" content="#1e5a3c">
 <link rel="manifest" href="manifest.json">
-<title>Commodity Options Analyzer</title>
+<title>Commodity Hedge Analyzer</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -24,6 +24,9 @@
   --safe-l:env(safe-area-inset-left,0px);
   --safe-r:env(safe-area-inset-right,0px);
   --c0:#2563eb;--c1:#d97706;--c2:#7c3aed;--c3:#059669;
+  --cash:#d97706;   /* physical grain (gold) */
+  --hedge:#2563eb;  /* futures/options (blue) */
+  --net:#1e5a3c;    /* combined (green) */
 }
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{height:100%}
@@ -60,6 +63,9 @@ body{
 
 /* ─── CARDS ──────────────────────────────────────────────────────────────── */
 .card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card.cash-bdr{border-left:4px solid var(--cash)}
+.card.hedge-bdr{border-left:4px solid var(--hedge)}
+.card.net-bdr{border-left:4px solid var(--net)}
 .card-title{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .card-title-txt{flex:1}
 
@@ -73,6 +79,14 @@ body{
 }
 .chip.active{background:var(--green);border-color:var(--green);color:white}
 .chip:active{opacity:.75}
+
+/* ─── SWITCH ─────────────────────────────────────────────────────────────── */
+.switch{position:relative;width:48px;height:28px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.switch .track{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:.2s;cursor:pointer}
+.switch .track::before{content:'';position:absolute;height:22px;width:22px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.switch input:checked + .track{background:var(--green)}
+.switch input:checked + .track::before{transform:translateX(20px)}
 
 /* ─── TEMPLATE CHIPS ─────────────────────────────────────────────────────── */
 .tpl-scroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:3px;-webkit-overflow-scrolling:touch}
@@ -131,7 +145,6 @@ input.px{padding-left:28px;padding-right:46px}
 .leg-row[data-idx="2"] .leg-badge{background:var(--c2)}
 .leg-row[data-idx="3"] .leg-badge{background:var(--c3)}
 
-/* direction toggle */
 .mini-toggle{display:flex;background:#e2e8f0;border-radius:7px;padding:2px;gap:1px;flex-shrink:0}
 .mini-btn{
   background:none;border:none;border-radius:5px;
@@ -139,12 +152,9 @@ input.px{padding-left:28px;padding-right:46px}
   cursor:pointer;transition:all .12s;min-height:32px;touch-action:manipulation;
 }
 .mini-btn.active{background:white;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.mini-btn.active.buy-cls{color:#16a34a}
-.mini-btn.active.sell-cls{color:#dc2626}
 .mini-btn.active.long-cls{color:#16a34a}
 .mini-btn.active.short-cls{color:#dc2626}
 
-/* type selector row */
 .type-row{display:flex;gap:4px;padding:6px 12px;background:#f8fafc;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .type-btn{
   background:white;border:1.5px solid var(--border);border-radius:7px;
@@ -154,7 +164,6 @@ input.px{padding-left:28px;padding-right:46px}
 .type-btn.active.put{background:#fffbeb;border-color:var(--amber);color:var(--amber)}
 .type-btn.active.call{background:#eff6ff;border-color:var(--blue);color:var(--blue)}
 .type-btn.active.futures{background:#f0fdf4;border-color:#16a34a;color:#16a34a}
-.type-btn.active.cash{background:#fdf4ff;border-color:#7c3aed;color:#7c3aed}
 
 .leg-del{
   margin-left:auto;background:none;border:none;
@@ -205,7 +214,6 @@ input[type=range]::-moz-range-thumb{
 .leg-swatch{width:14px;height:10px;flex-shrink:0;border-radius:2px}
 .leg-dash{width:18px;height:0;border-bottom:2.5px dashed;flex-shrink:0}
 
-/* fullscreen button */
 .fs-btn{
   background:none;border:1px solid var(--border);border-radius:7px;
   padding:4px 9px;font-size:.72rem;font-weight:700;color:var(--slate-m);
@@ -218,34 +226,25 @@ input[type=range]::-moz-range-thumb{
 #fs-overlay{
   display:none;position:fixed;top:0;left:0;right:0;bottom:0;
   z-index:200;background:white;flex-direction:column;
-  padding-top:var(--safe-t);
-  padding-left:var(--safe-l);
-  padding-right:var(--safe-r);
-  padding-bottom:var(--safe-b);
+  padding-top:var(--safe-t);padding-left:var(--safe-l);
+  padding-right:var(--safe-r);padding-bottom:var(--safe-b);
 }
 #fs-overlay.open{display:flex}
 #fs-hdr{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
-  background:#f8fafc;
+  padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:#f8fafc;
 }
 #fs-title{font-size:.8rem;font-weight:700;color:var(--slate)}
-#fs-pnl{font-size:1rem;font-weight:800}
+#fs-pnl{font-size:.95rem;font-weight:800;margin-top:2px}
 #fs-close-btn{
   background:var(--slate);color:white;border:none;border-radius:8px;
-  padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer;
-  touch-action:manipulation;
+  padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer;touch-action:manipulation;
 }
-#fs-chart-wrap{
-  flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
-  padding:10px 8px 6px;
-}
+#fs-chart-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:10px 8px 6px;}
 #fs-payoff-chart{max-width:100%;max-height:100%;display:block}
-#fs-controls{
-  flex-shrink:0;padding:8px 16px 12px;border-top:1px solid var(--border);background:#f8fafc;
-}
+#fs-controls{flex-shrink:0;padding:8px 16px 12px;border-top:1px solid var(--border);background:#f8fafc;}
 #fs-controls .sl-val{font-size:1.1rem}
-#fs-legend{display:flex;flex-wrap:wrap;gap:6px 12px;padding:4px 16px 8px;background:#f8fafc;border-bottom:1px solid var(--border);flex-shrink:0}
+#fs-legend{display:flex;flex-wrap:wrap;gap:6px 12px;padding:6px 16px 8px;background:#f8fafc;border-bottom:1px solid var(--border);flex-shrink:0}
 
 /* ─── STATS GRID ─────────────────────────────────────────────────────────── */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
@@ -253,7 +252,8 @@ input[type=range]::-moz-range-thumb{
 .stat-box.pos{background:#f0fdf4;border-color:#86efac}
 .stat-box.neg{background:var(--red-l);border-color:var(--red-m)}
 .stat-box.neutral{background:#f8fafc}
-.stat-box.amber{background:var(--amber-l);border-color:#fcd34d}
+.stat-box.gold{background:var(--amber-l);border-color:#fcd34d}
+.stat-box.hl{background:#ecfdf5;border-color:var(--green);border-width:2px}
 .s-lbl{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate-m);line-height:1}
 .s-val{font-size:clamp(.95rem,3.5vw,1.2rem);font-weight:800;letter-spacing:-.3px;margin-top:3px;line-height:1.1;word-break:break-all}
 .s-sub{font-size:.65rem;color:var(--slate-m);margin-top:2px}
@@ -311,8 +311,8 @@ input[type=range]::-moz-range-thumb{
       </svg>
     </div>
     <div>
-      <div id="hdr-title">Options &amp; Hedge Analyzer</div>
-      <div id="hdr-sub">Options · Futures · Cash Sales · Combined P&amp;L</div>
+      <div id="hdr-title">Farm Hedge Analyzer</div>
+      <div id="hdr-sub">Cash grain + Futures + Options · See your net price</div>
     </div>
   </div>
 </div>
@@ -337,6 +337,45 @@ input[type=range]::-moz-range-thumb{
           autocomplete="off" autocorrect="off" step="0.01" min="0.01" value="4.50">
         <span class="sfx">/bu</span>
       </div>
+      <div class="hint">Today's board price — the starting point for every scenario.</div>
+    </div>
+  </div>
+
+  <!-- CASH GRAIN (PHYSICAL CROP) -->
+  <div class="card cash-bdr">
+    <div class="card-title">
+      <span class="card-title-txt">🌾 Your Cash Grain (Physical Crop)</span>
+      <label class="switch">
+        <input type="checkbox" id="grain-toggle" checked onchange="toggleGrain()">
+        <span class="track"></span>
+      </label>
+    </div>
+    <div id="grain-fields">
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label for="i-grain-bu">Bushels to Sell</label>
+          <div class="input-wrap">
+            <input type="number" id="i-grain-bu" class="sfx-in" inputmode="numeric"
+              autocomplete="off" step="1000" min="0" value="5000">
+            <span class="sfx">bu</span>
+          </div>
+          <div class="hint" id="grain-con-hint">= 1.0 contracts</div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="i-basis">Expected Basis</label>
+          <div class="input-wrap">
+            <span class="pfx">$</span>
+            <input type="number" id="i-basis" class="px" inputmode="decimal"
+              autocomplete="off" step="0.05" value="-0.25">
+            <span class="sfx">/bu</span>
+          </div>
+          <div class="hint">Cash − futures (often negative)</div>
+        </div>
+      </div>
+      <div class="alert blue" style="margin:12px 0 0">
+        <span class="alert-icon">🌾</span>
+        <div class="alert-body">This is grain you'll sell at the local <strong>cash</strong> market. Its value <strong>rises</strong> as prices rise and <strong>falls</strong> as prices fall — your futures &amp; options sit on top of it to lock in or protect a price.</div>
+      </div>
     </div>
   </div>
 
@@ -345,13 +384,13 @@ input[type=range]::-moz-range-thumb{
     <div class="tpl-scroll" id="tpl-row"></div>
   </div>
 
-  <div class="card">
-    <div class="card-title"><span class="card-title-txt">Position Builder</span></div>
+  <div class="card hedge-bdr">
+    <div class="card-title"><span class="card-title-txt">⚙️ Hedge — Futures &amp; Options</span></div>
     <div id="legs-wrap"></div>
     <div style="margin-top:10px">
       <button id="add-leg-btn" onclick="addLeg()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add Another Leg
+        Add Another Hedge Leg
       </button>
     </div>
   </div>
@@ -364,7 +403,7 @@ input[type=range]::-moz-range-thumb{
   <div class="card">
     <div class="card-title"><span class="card-title-txt">Simulate a Market Price</span></div>
     <div class="sl-hdr">
-      <span class="sl-lbl">Market Price at Expiration</span>
+      <span class="sl-lbl">Market Price at Sale / Expiration</span>
       <span class="sl-val" id="sl-display" style="color:var(--green)">$4.50/bu</span>
     </div>
     <div class="slider-wrap">
@@ -375,21 +414,34 @@ input[type=range]::-moz-range-thumb{
 
   <div class="card">
     <div class="card-title">
-      <span class="card-title-txt">Combined Payoff — Total Position P&amp;L ($)</span>
+      <span class="card-title-txt">Cash vs. Hedge — Gain / Loss vs Today ($)</span>
       <button class="fs-btn" onclick="openFs()" title="Full screen chart">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
         Full Screen
       </button>
     </div>
-    <canvas id="payoff-chart" role="img" aria-label="Option payoff chart"></canvas>
+    <canvas id="payoff-chart" role="img" aria-label="Cash vs hedge payoff chart"></canvas>
     <div class="leg" id="chart-legend"></div>
   </div>
 
   <div class="stats-grid" id="stats-grid"></div>
 
-  <div class="card" id="scenario-card">
-    <div class="card-title"><span class="card-title-txt">Breakdown at <span id="bd-price-label">$4.50/bu</span></span></div>
-    <div id="bd-rows"></div>
+  <!-- CASH SIDE -->
+  <div class="card cash-bdr" id="cash-card">
+    <div class="card-title"><span class="card-title-txt">🌾 Cash Grain Side — at <span id="cash-price-label">$4.50/bu</span></span></div>
+    <div id="cash-rows"></div>
+  </div>
+
+  <!-- HEDGE SIDE -->
+  <div class="card hedge-bdr" id="hedge-card">
+    <div class="card-title"><span class="card-title-txt">⚙️ Futures &amp; Options Side (Hedge Account)</span></div>
+    <div id="hedge-rows"></div>
+  </div>
+
+  <!-- NET RESULT -->
+  <div class="card net-bdr" id="net-card">
+    <div class="card-title"><span class="card-title-txt">✅ Net Result — What You Actually Get</span></div>
+    <div id="net-rows"></div>
   </div>
 
   <div class="card" id="range-card" style="display:none">
@@ -403,7 +455,7 @@ input[type=range]::-moz-range-thumb{
 <div id="sec-margin" class="sec">
 
   <div id="margin-na" class="na-box" style="display:none">
-    <p>Margin is required when you <strong>sell</strong> an option (short put/call) or hold a <strong>short/long futures</strong> position.<br><br>Add one of those legs on the Setup tab to analyze margin here.</p>
+    <p>Margin is required when you <strong>sell</strong> an option or hold a <strong>futures</strong> position.<br><br>Your physical cash grain is <strong>not</strong> in the margin account — only the futures/options are.<br><br>Add a futures or short-option leg on the Setup tab to analyze margin here.</p>
   </div>
 
   <div id="margin-content" style="display:none">
@@ -419,7 +471,7 @@ input[type=range]::-moz-range-thumb{
           <input type="number" id="i-acct" class="pfx-in" inputmode="decimal"
             autocomplete="off" step="100" min="0" value="10000">
         </div>
-        <div class="hint">Total funds available in your account</div>
+        <div class="hint">Cash in your brokerage / margin account (grain value not included)</div>
       </div>
       <div class="row2">
         <div class="field">
@@ -471,7 +523,7 @@ input[type=range]::-moz-range-thumb{
 <div id="fs-overlay">
   <div id="fs-hdr">
     <div>
-      <div id="fs-title">Hedge Position — Total P&amp;L ($)</div>
+      <div id="fs-title">Cash vs Hedge — Gain/Loss vs Today ($)</div>
       <div id="fs-pnl"></div>
     </div>
     <button id="fs-close-btn" onclick="exitFs()">✕ Close</button>
@@ -482,7 +534,7 @@ input[type=range]::-moz-range-thumb{
   </div>
   <div id="fs-controls">
     <div class="sl-hdr">
-      <span class="sl-lbl">Market Price at Expiration</span>
+      <span class="sl-lbl">Market Price at Sale / Expiration</span>
       <span class="sl-val" id="fs-sl-display" style="color:var(--green)">$4.50/bu</span>
     </div>
     <div class="slider-wrap">
@@ -499,7 +551,7 @@ input[type=range]::-moz-range-thumb{
   </button>
   <button class="nbtn" data-sec="chart" onclick="switchTab('chart')">
     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    <span>Chart</span>
+    <span>Scenarios</span>
   </button>
   <button class="nbtn" data-sec="margin" onclick="switchTab('margin')">
     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M12 12v4M10 14h4"/></svg>
@@ -514,26 +566,25 @@ const LEG_COLORS = ['#2563eb','#d97706','#7c3aed','#059669'];
 const MAX_LEGS = 4;
 
 const COM_DEF = {
-  corn:     {ref:4.50,  init:500,  maint:400 },
-  soybeans: {ref:12.00, init:1200, maint:900 },
-  wheat:    {ref:5.50,  init:600,  maint:450 },
+  corn:     {ref:4.50,  init:500,  maint:400,  basis:-0.25 },
+  soybeans: {ref:12.00, init:1200, maint:900,  basis:-0.40 },
+  wheat:    {ref:5.50,  init:600,  maint:450,  basis:-0.35 },
 };
 
-// Templates — each leg has: dir, type, strikeOffset (optional), premium (options only)
+// Templates — hedge legs only (cash grain handled separately)
 const TEMPLATES = [
+  {label:'📉 Short Futures', legs:[{dir:'short',type:'futures'}]},
   {label:'🔒 Buy Put',       legs:[{dir:'long', type:'put'}]},
   {label:'📤 Sell Call',     legs:[{dir:'short',type:'call'}]},
   {label:'↔ Collar',        legs:[{dir:'long', type:'put'},{dir:'short',type:'call',strikeOffset:0.5}]},
-  {label:'📉 Short Futures', legs:[{dir:'short',type:'futures'}]},
   {label:'📈 Long Futures',  legs:[{dir:'long', type:'futures'}]},
-  {label:'💵 Cash Sale',     legs:[{dir:'short',type:'cash'}]},
-  {label:'🌾 Covered Call',  legs:[{dir:'short',type:'call'},{dir:'short',type:'cash'}]},
-  {label:'🔓 Fence',         legs:[{dir:'long', type:'call',strikeOffset:0.5},{dir:'short',type:'put',strikeOffset:-0.5}]},
+  {label:'🚫 No Hedge',      legs:[]},
 ];
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 const S = {
   commodity:'corn', ref:4.50, scenarioPrice:4.50,
+  grain:{enabled:true, bushels:5000, basis:-0.25},
   legs:[
     {dir:'long',  type:'put',  strike:4.50, premium:0.20, contracts:1},
     {dir:'short', type:'call', strike:5.00, premium:0.15, contracts:1},
@@ -542,7 +593,15 @@ const S = {
 };
 
 // ─── CALCULATIONS ─────────────────────────────────────────────────────────────
-function legPnl(leg, m) {
+// PHYSICAL CASH GRAIN
+function grainBushels(){ return S.grain.enabled ? Math.max(0,S.grain.bushels) : 0; }
+// cash-side gain/loss vs reference (basis is constant, cancels in the change)
+function cashPnl(m){ return grainBushels()*(m - S.ref); }
+// absolute cash revenue if grain sold at market+basis
+function cashRevenue(m){ return grainBushels()*(m + S.grain.basis); }
+
+// HEDGE LEGS (futures + options) — $/bu
+function legPnl(leg, m){
   if(leg.type==='put'){
     const iv=Math.max(leg.strike-m,0);
     return leg.dir==='long'?iv-leg.premium:leg.premium-iv;
@@ -552,15 +611,16 @@ function legPnl(leg, m) {
     return leg.dir==='long'?iv-leg.premium:leg.premium-iv;
   }
   // futures: long = (m - entry), short = (entry - m)
-  // cash sale: short = (cashPrice - m), cash buy: long = (m - cashPrice)
   return leg.dir==='long'?(m-leg.strike):(leg.strike-m);
 }
-
 function legPnlTotal(leg,m){ return legPnl(leg,m)*CS*leg.contracts; }
+function hedgePnl(m){ return S.legs.reduce((s,l)=>s+legPnlTotal(l,m),0); }
+function hedgeBushels(){ return S.legs.reduce((s,l)=>s+CS*l.contracts,0); }
 
-function combinedPnlTotal(m){ return S.legs.reduce((s,l)=>s+legPnlTotal(l,m),0); }
-
-function totalBushels(){ return S.legs.reduce((s,l)=>s+CS*l.contracts,0); }
+// NET (vs today) and ABSOLUTE outcome
+function netPnl(m){ return cashPnl(m) + hedgePnl(m); }            // gain/loss vs selling all cash at ref today
+function totalRevenue(m){ return cashRevenue(m) + hedgePnl(m); }  // actual dollars realized
+function effectivePrice(m){ const b=grainBushels(); return b>0 ? totalRevenue(m)/b : null; }
 
 function chartRange(){
   const vals=[...S.legs.map(l=>l.strike),S.ref].filter(v=>v>0);
@@ -568,39 +628,31 @@ function chartRange(){
   const hi=Math.max(...vals)*1.5;
   return {lo,hi};
 }
-
 function samplePrices(N=400){
   const {lo,hi}=chartRange();
   return Array.from({length:N+1},(_,i)=>lo+(hi-lo)*i/N);
 }
-
 function findBreakevens(){
   const prices=samplePrices(2000);
   const bes=[];
   for(let i=1;i<prices.length;i++){
-    const p0=combinedPnlTotal(prices[i-1]),p1=combinedPnlTotal(prices[i]);
-    if((p0<0&&p1>=0)||(p0>=0&&p1<0)){
-      bes.push(prices[i-1]+(prices[i]-prices[i-1])*(-p0)/(p1-p0));
-    }
+    const p0=netPnl(prices[i-1]),p1=netPnl(prices[i]);
+    if((p0<0&&p1>=0)||(p0>=0&&p1<0)) bes.push(prices[i-1]+(prices[i]-prices[i-1])*(-p0)/(p1-p0));
   }
   return bes;
 }
-
-function pnlStats(){
+function netStats(){
   const prices=samplePrices(2000);
-  const pnls=prices.map(p=>combinedPnlTotal(p));
-  return {max:Math.max(...pnls),min:Math.min(...pnls),atRef:combinedPnlTotal(S.ref)};
+  const v=prices.map(p=>netPnl(p));
+  return {max:Math.max(...v),min:Math.min(...v)};
 }
 
-// ─── MARGIN CALCULATIONS ──────────────────────────────────────────────────────
-// Cash sales don't require margin; options + futures do
-function marginLegs(){ return S.legs.filter(l=>l.type!=='cash'); }
-function shortMarginLegs(){ return marginLegs().filter(l=>l.dir==='short'); }
-
+// ─── MARGIN (only futures + short options; NOT the physical grain) ──────────────
+function shortMarginLegs(){ return S.legs.filter(l=>l.dir==='short'||l.type==='futures'); }
 function totalInitMargin() { return shortMarginLegs().reduce((s,l)=>s+S.init*l.contracts,0); }
 function totalMaintMargin(){ return shortMarginLegs().reduce((s,l)=>s+S.maint*l.contracts,0); }
-
-function accountEquity(m){ return S.acct+combinedPnlTotal(m); }
+// Margin account holds ONLY the derivatives — grain value is physical, not in the account
+function accountEquity(m){ return S.acct + hedgePnl(m); }
 
 function triggerPrices(){
   if(!shortMarginLegs().length) return {up:null,down:null};
@@ -613,20 +665,16 @@ function triggerPrices(){
   return {up,down};
 }
 
-// ─── CHART BUILDING ───────────────────────────────────────────────────────────
+// ─── CHART ────────────────────────────────────────────────────────────────────
 let myChart=null, fsChart=null;
+const showCash=()=>grainBushels()>0;
+const showHedge=()=>S.legs.length>0;
 
 const annoPlugin={
   id:'anno',
   afterDraw(ch){
     const A=ch._anno;if(!A)return;
     const {ctx,chartArea:a,scales}=ch;
-    (A.zones||[]).forEach(z=>{
-      const x1=Math.max(a.left,scales.x.getPixelForValue(z.from));
-      const x2=Math.min(a.right,scales.x.getPixelForValue(z.to));
-      if(x2<=x1)return;
-      ctx.save();ctx.fillStyle=z.color;ctx.fillRect(x1,a.top,x2-x1,a.bottom-a.top);ctx.restore();
-    });
     (A.v||[]).forEach(l=>{
       const x=scales.x.getPixelForValue(l.x);
       if(x<a.left-1||x>a.right+1)return;
@@ -643,41 +691,20 @@ const annoPlugin={
       }
       ctx.restore();
     });
-    (A.h||[]).forEach(l=>{
-      const y=scales.y.getPixelForValue(l.y);
-      if(y<a.top-1||y>a.bottom+1)return;
-      ctx.save();
-      ctx.beginPath();ctx.moveTo(a.left,y);ctx.lineTo(a.right,y);
-      ctx.strokeStyle=l.color;ctx.lineWidth=l.lw||1.5;
-      ctx.setLineDash(l.dash||[]);ctx.stroke();ctx.setLineDash([]);
-      if(l.tag){
-        ctx.font='600 10px -apple-system,sans-serif';ctx.fillStyle=l.color;ctx.textAlign='right';
-        ctx.fillText(l.tag,a.right-4,y-5);
-        if(l.sub)ctx.fillText(l.sub,a.right-4,y+14);
-      }
-      ctx.restore();
-    });
   }
 };
 Chart.register(annoPlugin);
 
 function buildAnno(){
-  const {lo,hi}=chartRange();
   const bes=findBreakevens();
-  const stats=pnlStats();
   const trigs=shortMarginLegs().length?triggerPrices():{up:null,down:null};
   const strikes=[...new Set(S.legs.map(l=>l.strike))].sort((a,b)=>a-b);
-  const zoneColors=['rgba(59,130,246,0.06)','rgba(100,116,139,0.05)','rgba(245,158,11,0.06)','rgba(139,92,246,0.05)'];
-  const zones=[];
-  const allBounds=[lo,...strikes,hi];
-  for(let i=0;i<allBounds.length-1;i++){
-    zones.push({from:allBounds[i],to:allBounds[i+1],color:zoneColors[i%zoneColors.length]});
-  }
   const vlines=[];
   strikes.forEach((s,i)=>{
     vlines.push({x:s,color:LEG_COLORS[i%LEG_COLORS.length],lw:1.5,dash:[5,4],
       tag:'Strike'+(strikes.length>1?` ${i+1}`:''),sub:'$'+s.toFixed(2)});
   });
+  vlines.push({x:S.ref,color:'#94a3b8',lw:1.5,dash:[2,3],tag:'Today',sub:'$'+S.ref.toFixed(2)});
   vlines.push({x:S.scenarioPrice,color:'#7c3aed',lw:2,dash:[],tag:'Scenario',sub:'$'+S.scenarioPrice.toFixed(2)});
   bes.forEach((be,i)=>{
     vlines.push({x:be,color:'#64748b',lw:1.5,dash:[3,3],tag:i===0?'Breakeven':'BE'+(i+1),sub:'$'+be.toFixed(2)});
@@ -686,52 +713,56 @@ function buildAnno(){
     vlines.push({x:trigs.up,color:'#dc2626',lw:1.5,dash:[4,3],tag:'Margin↑',sub:'$'+trigs.up.toFixed(2)});
   if(trigs.down!=null&&isFinite(trigs.down)&&trigs.down>0)
     vlines.push({x:trigs.down,color:'#dc2626',lw:1.5,dash:[4,3],tag:'Margin↓',sub:'$'+trigs.down.toFixed(2)});
-  const hlines=[];
-  if(isFinite(stats.max)&&Math.abs(stats.max)<100000000)
-    hlines.push({y:stats.max,color:'rgba(22,163,74,0.5)',lw:1,dash:[6,4],tag:'Max Profit',sub:'+$'+stats.max.toFixed(0)});
-  if(isFinite(stats.min)&&Math.abs(stats.min)<100000000)
-    hlines.push({y:stats.min,color:'rgba(220,38,38,0.5)',lw:1,dash:[6,4],tag:'Max Loss',sub:'-$'+Math.abs(stats.min).toFixed(0)});
-  return {zones,v:vlines,h:hlines};
+  return {v:vlines};
 }
 
 function makeDatasets(){
   const prices=samplePrices();
-  const datasets=[];
-  datasets.push({
-    data:prices.map(m=>({x:m,y:Math.max(combinedPnlTotal(m),0)})),
-    fill:'origin',backgroundColor:'rgba(22,163,74,0.12)',
-    borderColor:'transparent',pointRadius:0,tension:0,order:6
+  const ds=[];
+  // NET fill (profit/loss) under the net line
+  ds.push({
+    data:prices.map(m=>({x:m,y:Math.max(netPnl(m),0)})),
+    fill:'origin',backgroundColor:'rgba(30,90,60,0.10)',
+    borderColor:'transparent',pointRadius:0,tension:0,order:8
   });
-  datasets.push({
-    data:prices.map(m=>({x:m,y:Math.min(combinedPnlTotal(m),0)})),
-    fill:'origin',backgroundColor:'rgba(220,38,38,0.1)',
-    borderColor:'transparent',pointRadius:0,tension:0,order:6
+  ds.push({
+    data:prices.map(m=>({x:m,y:Math.min(netPnl(m),0)})),
+    fill:'origin',backgroundColor:'rgba(220,38,38,0.08)',
+    borderColor:'transparent',pointRadius:0,tension:0,order:8
   });
-  if(S.legs.length>1){
-    S.legs.forEach((leg,i)=>{
-      datasets.push({
-        label:`Leg ${i+1}`,
-        data:prices.map(m=>({x:m,y:legPnlTotal(leg,m)})),
-        borderColor:LEG_COLORS[i%LEG_COLORS.length],
-        borderWidth:1.5,borderDash:[6,4],
-        pointRadius:0,tension:0,fill:false,order:3,
-      });
+  // CASH side line
+  if(showCash()){
+    ds.push({
+      label:'Cash Grain',
+      data:prices.map(m=>({x:m,y:cashPnl(m)})),
+      borderColor:'#d97706',borderWidth:2,borderDash:[7,4],
+      pointRadius:0,tension:0,fill:false,order:4,
     });
   }
-  datasets.push({
-    label:'Combined',
-    data:prices.map(m=>({x:m,y:combinedPnlTotal(m)})),
-    borderWidth:S.legs.length>1?3:2.5,
+  // HEDGE side line
+  if(showHedge()){
+    ds.push({
+      label:'Futures/Options',
+      data:prices.map(m=>({x:m,y:hedgePnl(m)})),
+      borderColor:'#2563eb',borderWidth:2,borderDash:[7,4],
+      pointRadius:0,tension:0,fill:false,order:4,
+    });
+  }
+  // NET line (bold, sign-colored)
+  ds.push({
+    label:'Net Result',
+    data:prices.map(m=>({x:m,y:netPnl(m)})),
+    borderColor:'#1e5a3c',borderWidth:3.5,
     segment:{borderColor:ctx=>ctx.p1.parsed.y>=0?'#16a34a':'#dc2626'},
     pointRadius:0,tension:0,fill:false,order:1,
   });
-  datasets.push({
-    data:[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}],
+  // scenario dot on net line
+  ds.push({
+    data:[{x:S.scenarioPrice,y:netPnl(S.scenarioPrice)}],
     type:'scatter',backgroundColor:'#7c3aed',
-    pointRadius:7,pointHoverRadius:9,
-    borderColor:'white',borderWidth:2,order:0,
+    pointRadius:7,pointHoverRadius:9,borderColor:'white',borderWidth:2,order:0,
   });
-  return datasets;
+  return ds;
 }
 
 function chartOptions(ar){
@@ -748,9 +779,7 @@ function chartOptions(ar){
             const lbl=item.dataset.label;if(!lbl)return null;
             const v=item.parsed.y;
             const fmt=n=>(n>=0?'+':'-')+' $'+Math.abs(n).toFixed(2);
-            if(lbl==='Combined')return `Combined: ${fmt(v)}`;
-            if(lbl.startsWith('Leg'))return `${lbl}: ${fmt(v)}`;
-            return null;
+            return `${lbl}: ${fmt(v)}`;
           },
         },
         filter:item=>!!item.dataset.label,
@@ -776,12 +805,11 @@ function buildChart(){
   myChart=new Chart(canvas,{type:'line',data:{datasets:makeDatasets()},options:chartOptions(1.65)});
   myChart._anno=buildAnno();myChart.update('none');
 }
-
 function updateAnno(){
   if(!myChart)return;
   myChart._anno=buildAnno();
   const ds=myChart.data.datasets;
-  ds[ds.length-1].data=[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}];
+  ds[ds.length-1].data=[{x:S.scenarioPrice,y:netPnl(S.scenarioPrice)}];
   myChart.update('none');
 }
 
@@ -795,7 +823,6 @@ function syncFsSlider(){
   document.getElementById('fs-sl-min').textContent='$'+lo.toFixed(2);
   document.getElementById('fs-sl-max').textContent='$'+hi.toFixed(2);
 }
-
 function buildFsChart(){
   const canvas=document.getElementById('fs-payoff-chart');
   if(fsChart){fsChart.destroy();fsChart=null;}
@@ -803,99 +830,77 @@ function buildFsChart(){
   fsChart._anno=buildAnno();fsChart.update('none');
   updateFsPnl();
 }
-
 function updateFsAnno(){
   if(!fsChart)return;
   fsChart._anno=buildAnno();
   const ds=fsChart.data.datasets;
-  ds[ds.length-1].data=[{x:S.scenarioPrice,y:combinedPnlTotal(S.scenarioPrice)}];
+  ds[ds.length-1].data=[{x:S.scenarioPrice,y:netPnl(S.scenarioPrice)}];
   fsChart.update('none');
   updateFsPnl();
 }
-
 function updateFsPnl(){
-  const total=combinedPnlTotal(S.scenarioPrice);
+  const m=S.scenarioPrice;
+  const net=netPnl(m);
+  const eff=effectivePrice(m);
   const el=document.getElementById('fs-pnl');
-  el.style.color=total>=0?'#16a34a':'#dc2626';
-  el.textContent=(total>=0?'+':'-')+'$'+Math.abs(total).toFixed(2)+' at $'+S.scenarioPrice.toFixed(2)+'/bu';
+  el.style.color=net>=0?'#16a34a':'#dc2626';
+  el.textContent=(eff!=null?`Net $${eff.toFixed(4)}/bu · `:'')+
+    `${net>=0?'+':'-'}$${Math.abs(net).toFixed(2)} vs today @ $${m.toFixed(2)}`;
 }
-
-function renderFsLegend(){
-  const bes=findBreakevens();
-  let html=`
-    <div class="leg-i"><div class="leg-swatch" style="background:rgba(22,163,74,0.3)"></div>Profit</div>
-    <div class="leg-i"><div class="leg-swatch" style="background:rgba(220,38,38,0.2)"></div>Loss</div>`;
-  if(S.legs.length>1){
-    S.legs.forEach((leg,i)=>{
-      html+=`<div class="leg-i"><div class="leg-dash" style="border-color:${LEG_COLORS[i%LEG_COLORS.length]}"></div>Leg ${i+1}: ${legName(leg)}</div>`;
-    });
-    html+=`<div class="leg-i"><div class="leg-line" style="background:linear-gradient(90deg,#16a34a,#dc2626)"></div>Combined</div>`;
-  }
-  if(bes.length){
-    html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#64748b"></div>BE ${bes.map(b=>'$'+b.toFixed(2)).join(', ')}</div>`;
-  }
-  document.getElementById('fs-legend').innerHTML=html;
-}
-
+function renderFsLegend(){ document.getElementById('fs-legend').innerHTML=legendHtml(); }
 function openFs(){
   document.getElementById('fs-overlay').classList.add('open');
-  syncFsSlider();
-  renderFsLegend();
+  syncFsSlider();renderFsLegend();
   requestAnimationFrame(()=>buildFsChart());
 }
-
 function exitFs(){
   document.getElementById('fs-overlay').classList.remove('open');
   if(fsChart){fsChart.destroy();fsChart=null;}
 }
-
 document.getElementById('fs-price-slider').addEventListener('input',e=>{
   S.scenarioPrice=parseFloat(e.target.value);
   document.getElementById('fs-sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
-  // keep main slider in sync
   const sl=document.getElementById('price-slider');
   sl.value=S.scenarioPrice.toFixed(2);
   document.getElementById('sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
-  updateFsAnno();
-  renderScenario();renderMargin();
+  updateFsAnno();renderScenario();renderMargin();
 });
 
 // ─── FORMATTERS ──────────────────────────────────────────────────────────────
 const d$=(v,dp=2)=>'$'+Math.abs(v).toFixed(dp);
 const pSign=(v,dp=4)=>(v>=0?'+':'-')+' $'+Math.abs(v).toFixed(dp);
 const pSignD=(v,dp=2)=>(v>=0?'+':'-')+' $'+Math.abs(v).toFixed(dp);
-
 const legName=l=>{
   if(l.type==='futures') return `${l.dir==='long'?'Long':'Short'} Futures`;
-  if(l.type==='cash')    return `Cash ${l.dir==='short'?'Sale':'Purchase'}`;
   return `${l.dir==='long'?'Buy':'Sell'} ${l.type.charAt(0).toUpperCase()+l.type.slice(1)}`;
 };
-
 const isOption=t=>t==='put'||t==='call';
 
 // ─── RENDER: LEG ROWS ────────────────────────────────────────────────────────
 function renderLegRows(){
   const wrap=document.getElementById('legs-wrap');
+  if(!S.legs.length){
+    wrap.innerHTML=`<div class="na-box" style="margin:0"><p>No hedge legs — your cash grain is fully exposed to the market. Add a leg below or pick a Quick Strategy.</p></div>`;
+    document.getElementById('add-leg-btn').style.display='flex';
+    return;
+  }
   wrap.innerHTML=S.legs.map((leg,i)=>{
     const opt=isOption(leg.type);
-    const strikeLbl=leg.type==='futures'?'Entry Price':leg.type==='cash'?'Cash Price':'Strike Price';
-    const dirLong=leg.type==='cash'?'Buy':'Long';
-    const dirShort=leg.type==='cash'?'Sell':'Short';
+    const strikeLbl=leg.type==='futures'?'Entry Price':'Strike Price';
     return `
     <div class="leg-row" data-idx="${i}">
       <div class="leg-header">
         <span class="leg-badge">Leg ${i+1}</span>
         <div class="mini-toggle">
-          <button class="mini-btn${leg.dir==='long'?' active long-cls':''}" onclick="setLegDir(${i},'long')">${dirLong}</button>
-          <button class="mini-btn${leg.dir==='short'?' active short-cls':''}" onclick="setLegDir(${i},'short')">${dirShort}</button>
+          <button class="mini-btn${leg.dir==='long'?' active long-cls':''}" onclick="setLegDir(${i},'long')">${leg.type==='futures'?'Long':'Buy'}</button>
+          <button class="mini-btn${leg.dir==='short'?' active short-cls':''}" onclick="setLegDir(${i},'short')">${leg.type==='futures'?'Short':'Sell'}</button>
         </div>
-        ${S.legs.length>1?`<button class="leg-del" onclick="removeLeg(${i})" aria-label="Remove leg ${i+1}">✕</button>`:''}
+        <button class="leg-del" onclick="removeLeg(${i})" aria-label="Remove leg ${i+1}">✕</button>
       </div>
       <div class="type-row">
         <button class="type-btn${leg.type==='put'?' active put':''}" onclick="setLegType(${i},'put')">Put</button>
         <button class="type-btn${leg.type==='call'?' active call':''}" onclick="setLegType(${i},'call')">Call</button>
         <button class="type-btn${leg.type==='futures'?' active futures':''}" onclick="setLegType(${i},'futures')">Futures</button>
-        <button class="type-btn${leg.type==='cash'?' active cash':''}" onclick="setLegType(${i},'cash')">Cash Sale</button>
       </div>
       <div class="leg-inputs">
         <div class="${opt?'row2':''}" style="margin-bottom:8px">
@@ -945,21 +950,18 @@ function renderLegSummary(i){
   const el=document.getElementById('leg-sum-'+i);
   if(!el)return;
   const totBu=CS*leg.contracts;
-  if(leg.type==='put'||leg.type==='call'){
+  if(isOption(leg.type)){
     const p=leg.premium||0;
     const fc=leg.type==='put'
-      ?`${leg.dir==='long'?'Floor':'BE'}: $${(leg.strike-p).toFixed(4)}/bu`
-      :`${leg.dir==='short'?'Ceiling':'BE'}: $${(leg.strike+p).toFixed(4)}/bu`;
+      ?`${leg.dir==='long'?'Sets a floor near':'BE'} $${(leg.strike-p).toFixed(2)}/bu`
+      :`${leg.dir==='short'?'Sets a ceiling near':'BE'} $${(leg.strike+p).toFixed(2)}/bu`;
     const premStr=leg.dir==='long'
-      ?`Pay $${p.toFixed(2)}/bu · $${(p*totBu).toFixed(0)} total`
-      :`Receive $${p.toFixed(2)}/bu · $${(p*totBu).toFixed(0)} total`;
-    el.textContent=`${fc} · ${premStr}`;
-  } else if(leg.type==='futures'){
-    const dir=leg.dir==='long'?'Long (buy)':'Short (sell)';
-    el.textContent=`${dir} ${totBu.toLocaleString()} bu @ $${leg.strike.toFixed(2)}/bu — P&L = $${leg.strike.toFixed(2)} ${leg.dir==='long'?'−':'+'} market price`;
-  } else if(leg.type==='cash'){
-    const dir=leg.dir==='short'?'Cash SOLD':'Cash BOUGHT';
-    el.textContent=`${dir} ${totBu.toLocaleString()} bu locked @ $${leg.strike.toFixed(2)}/bu ($${(leg.strike*totBu).toLocaleString(undefined,{maximumFractionDigits:0})} revenue)`;
+      ?`Pay $${p.toFixed(2)}/bu ($${(p*totBu).toFixed(0)})`
+      :`Collect $${p.toFixed(2)}/bu ($${(p*totBu).toFixed(0)})`;
+    el.textContent=`${fc} · ${premStr} · ${totBu.toLocaleString()} bu`;
+  } else {
+    const dir=leg.dir==='short'?'Short (sell)':'Long (buy)';
+    el.textContent=`${dir} ${totBu.toLocaleString()} bu @ $${leg.strike.toFixed(2)} — gains when price ${leg.dir==='short'?'falls':'rises'}`;
   }
 }
 
@@ -970,119 +972,156 @@ function renderTemplates(){
   ).join('');
 }
 
-// ─── RENDER: LEGEND ──────────────────────────────────────────────────────────
-function renderLegend(){
+// ─── LEGEND ──────────────────────────────────────────────────────────────────
+function legendHtml(){
   const bes=findBreakevens();
   const trigs=shortMarginLegs().length?triggerPrices():{up:null,down:null};
   const showTrig=(trigs.up!=null&&isFinite(trigs.up))||(trigs.down!=null&&isFinite(trigs.down));
-  let html=`
-    <div class="leg-i"><div class="leg-swatch" style="background:rgba(22,163,74,0.3)"></div>Profit</div>
-    <div class="leg-i"><div class="leg-swatch" style="background:rgba(220,38,38,0.2)"></div>Loss</div>`;
-  if(S.legs.length>1){
-    S.legs.forEach((leg,i)=>{
-      html+=`<div class="leg-i"><div class="leg-dash" style="border-color:${LEG_COLORS[i%LEG_COLORS.length]}"></div>Leg ${i+1}: ${legName(leg)}</div>`;
-    });
-    html+=`<div class="leg-i"><div class="leg-line" style="background:linear-gradient(90deg,#16a34a,#dc2626)"></div>Combined</div>`;
-  }
-  if(bes.length){
-    html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#64748b"></div>Breakeven${bes.length>1?'s':''} ${bes.map(b=>'$'+b.toFixed(2)).join(', ')}</div>`;
-  }
-  if(showTrig){
-    html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#dc2626"></div>Margin call trigger</div>`;
-  }
-  document.getElementById('chart-legend').innerHTML=html;
+  let html='';
+  if(showCash())  html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#d97706"></div>Cash Grain (your crop)</div>`;
+  if(showHedge()) html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#2563eb"></div>Futures/Options (hedge)</div>`;
+  html+=`<div class="leg-i"><div class="leg-line" style="background:linear-gradient(90deg,#16a34a,#dc2626)"></div>Net Result</div>`;
+  if(bes.length) html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#64748b"></div>Breakeven ${bes.map(b=>'$'+b.toFixed(2)).join(', ')}</div>`;
+  if(showTrig)   html+=`<div class="leg-i"><div class="leg-dash" style="border-color:#dc2626"></div>Margin call trigger</div>`;
+  return html;
 }
+function renderLegend(){ document.getElementById('chart-legend').innerHTML=legendHtml(); }
 
 // ─── RENDER: SCENARIO ────────────────────────────────────────────────────────
 function renderScenario(){
   const m=S.scenarioPrice;
-  const total=combinedPnlTotal(m);
-  const totBu=totalBushels();
-  const perBu=totBu>0?total/totBu:0;
-  const stats=pnlStats();
-  const bes=findBreakevens();
+  const gBu=grainBushels();
+  const cashPx=m+S.grain.basis;
+  const cashRev=cashRevenue(m);
+  const cashChg=cashPnl(m);
+  const hedge=hedgePnl(m);
+  const net=netPnl(m);
+  const eff=effectivePrice(m);
 
-  document.getElementById('bd-price-label').textContent='$'+m.toFixed(2)+'/bu';
+  document.getElementById('cash-price-label').textContent='$'+m.toFixed(2)+'/bu';
 
-  const maxStr=isFinite(stats.max)&&Math.abs(stats.max)<1e8?`+$${stats.max.toFixed(2)}`:'Unlimited';
-  const minStr=isFinite(stats.min)&&Math.abs(stats.min)<1e8?`-$${Math.abs(stats.min).toFixed(2)}`:'Unlimited';
-
-  document.getElementById('stats-grid').innerHTML=`
-    <div class="stat-box ${total>=0?'pos':'neg'}">
-      <div class="s-lbl">Position P&amp;L at $${m.toFixed(2)}</div>
-      <div class="s-val" style="color:${total>=0?'#16a34a':'#dc2626'}">${total>=0?'+':'-'}$${Math.abs(total).toFixed(2)}</div>
-      <div class="s-sub">${totBu.toLocaleString()} bu total</div>
-    </div>
-    <div class="stat-box ${perBu>=0?'pos':'neg'}">
-      <div class="s-lbl">Avg $/bu at $${m.toFixed(2)}</div>
-      <div class="s-val" style="color:${perBu>=0?'#16a34a':'#dc2626'}">${perBu>=0?'+':'-'}$${Math.abs(perBu).toFixed(4)}</div>
-      <div class="s-sub">weighted across all legs</div>
-    </div>
-    <div class="stat-box">
-      <div class="s-lbl">Max Profit</div>
-      <div class="s-val" style="color:#16a34a">${maxStr}</div>
-    </div>
-    <div class="stat-box">
-      <div class="s-lbl">Max Loss</div>
-      <div class="s-val" style="color:#dc2626">${minStr}</div>
-    </div>`;
-
-  let bdHtml='';
-  S.legs.forEach((leg,i)=>{
-    const pnl=legPnl(leg,m);
-    const pnlTot=legPnlTotal(leg,m);
-    bdHtml+=`
-      <div class="bd-row c${i}">
-        <span class="bd-lbl">Leg ${i+1}: ${legName(leg)} @ $${leg.strike.toFixed(2)} × ${leg.contracts} contract${leg.contracts>1?'s':''}</span>
-        <span class="bd-val ${pnlTot>=0?'pos':'neg'}">${pSignD(pnlTot)} (${pSign(pnl)}/bu)</span>
+  // ── STATS GRID ──
+  let statHtml='';
+  if(gBu>0){
+    statHtml+=`
+      <div class="stat-box hl">
+        <div class="s-lbl">Effective Net Price</div>
+        <div class="s-val" style="color:var(--green)">$${eff.toFixed(4)}</div>
+        <div class="s-sub">per bushel, after hedge</div>
+      </div>
+      <div class="stat-box gold">
+        <div class="s-lbl">Unhedged Cash Price</div>
+        <div class="s-val" style="color:var(--amber)">$${cashPx.toFixed(4)}</div>
+        <div class="s-sub">market $${m.toFixed(2)} ${S.grain.basis>=0?'+':'−'} $${Math.abs(S.grain.basis).toFixed(2)} basis</div>
       </div>`;
-  });
-  if(S.legs.length>1){
-    bdHtml+=`
-      <div class="bd-row bd-total">
-        <span class="bd-lbl" style="font-weight:700;color:var(--slate)">Combined P&amp;L</span>
-        <span class="bd-val" style="color:${total>=0?'#16a34a':'#dc2626'};font-size:.88rem">${pSignD(total)}</span>
-      </div>`;
-  }
-  document.getElementById('bd-rows').innerHTML=bdHtml;
-
-  // cash legs: show effective price summary
-  const cashLegs=S.legs.filter(l=>l.type==='cash'&&l.dir==='short');
-  if(cashLegs.length&&S.legs.length>1){
-    const cashRevenue=cashLegs.reduce((s,l)=>s+l.strike*CS*l.contracts,0);
-    const nonCashPnl=S.legs.filter(l=>l.type!=='cash').reduce((s,l)=>s+legPnlTotal(l,m),0);
-    const totalRevenue=cashRevenue+nonCashPnl;
-    const cashBu=cashLegs.reduce((s,l)=>s+CS*l.contracts,0);
-    const effPrice=cashBu>0?(cashRevenue+nonCashPnl)/cashBu:null;
-    bdHtml+=`
-      <div class="bd-row bd-total" style="margin-top:8px">
-        <span class="bd-lbl" style="font-weight:700;color:var(--slate)">Effective Net Price (cash + hedge)</span>
-        <span class="bd-val pos" style="font-size:.88rem">${effPrice!=null?'$'+effPrice.toFixed(4)+'/bu':d$(totalRevenue)+' total'}</span>
-      </div>`;
-  }
-
-  // price range card
-  const rangeCard=document.getElementById('range-card');
-  if(S.legs.length>1&&bes.length){
-    rangeCard.style.display='block';
-    const strikes=[...new Set(S.legs.map(l=>l.strike))].sort((a,b)=>a-b);
-    let rangeHtml='';
-    if(bes.length===1){
-      rangeHtml+=`<div class="bd-row"><span class="bd-lbl">Single breakeven</span><span class="bd-val">$${bes[0].toFixed(4)}/bu</span></div>`;
-    } else if(bes.length>=2){
-      rangeHtml+=`
-        <div class="bd-row"><span class="bd-lbl">Lower breakeven</span><span class="bd-val">$${bes[0].toFixed(4)}/bu</span></div>
-        <div class="bd-row"><span class="bd-lbl">Upper breakeven</span><span class="bd-val">$${bes[bes.length-1].toFixed(4)}/bu</span></div>
-        <div class="bd-row"><span class="bd-lbl">Profitable price range</span><span class="bd-val pos">$${bes[0].toFixed(2)} – $${bes[bes.length-1].toFixed(2)}</span></div>`;
-    }
-    if(strikes.length===2){
-      rangeHtml+=`
-        <div class="bd-row"><span class="bd-lbl">Between strikes (neutral zone)</span><span class="bd-val">$${strikes[0].toFixed(2)} – $${strikes[1].toFixed(2)}</span></div>`;
-    }
-    document.getElementById('range-rows').innerHTML=rangeHtml||'';
   } else {
-    rangeCard.style.display='none';
+    statHtml+=`
+      <div class="stat-box ${net>=0?'pos':'neg'}">
+        <div class="s-lbl">Net P&amp;L vs Today</div>
+        <div class="s-val" style="color:${net>=0?'#16a34a':'#dc2626'}">${net>=0?'+':'-'}$${Math.abs(net).toFixed(2)}</div>
+        <div class="s-sub">hedge account only</div>
+      </div>
+      <div class="stat-box neutral">
+        <div class="s-lbl">Hedged Bushels</div>
+        <div class="s-val">${hedgeBushels().toLocaleString()}</div>
+        <div class="s-sub">bu of futures/options</div>
+      </div>`;
   }
+  statHtml+=`
+    <div class="stat-box ${hedge>=0?'pos':'neg'}">
+      <div class="s-lbl">Hedge Account Result</div>
+      <div class="s-val" style="color:${hedge>=0?'#16a34a':'#dc2626'}">${hedge>=0?'+':'-'}$${Math.abs(hedge).toFixed(2)}</div>
+      <div class="s-sub">futures + options</div>
+    </div>
+    <div class="stat-box ${cashChg>=0?'pos':'neg'}">
+      <div class="s-lbl">Cash Grain vs Today</div>
+      <div class="s-val" style="color:${cashChg>=0?'#16a34a':'#dc2626'}">${cashChg>=0?'+':'-'}$${Math.abs(cashChg).toFixed(2)}</div>
+      <div class="s-sub">${gBu>0?gBu.toLocaleString()+' bu':'no cash grain'}</div>
+    </div>`;
+  document.getElementById('stats-grid').innerHTML=statHtml;
+
+  // ── CASH CARD ──
+  const cashCard=document.getElementById('cash-card');
+  if(gBu>0){
+    cashCard.style.display='block';
+    document.getElementById('cash-rows').innerHTML=`
+      <div class="bd-row"><span class="bd-lbl">Physical grain to sell</span><span class="bd-val">${gBu.toLocaleString()} bu</span></div>
+      <div class="bd-row"><span class="bd-lbl">Market futures price</span><span class="bd-val">$${m.toFixed(2)}/bu</span></div>
+      <div class="bd-row"><span class="bd-lbl">Basis (cash − futures)</span><span class="bd-val">${pSign(S.grain.basis,2)}/bu</span></div>
+      <div class="bd-row"><span class="bd-lbl">Local cash price received</span><span class="bd-val" style="color:var(--amber);font-weight:700">$${cashPx.toFixed(4)}/bu</span></div>
+      <div class="bd-row bd-total"><span class="bd-lbl" style="font-weight:700;color:var(--slate)">Cash sale revenue</span><span class="bd-val">${d$(cashRev)}</span></div>
+      <div class="bd-row"><span class="bd-lbl">Change vs selling at today's price</span><span class="bd-val ${cashChg>=0?'pos':'neg'}">${pSignD(cashChg)}</span></div>`;
+  } else {
+    cashCard.style.display='none';
+  }
+
+  // ── HEDGE CARD ──
+  const hedgeCard=document.getElementById('hedge-card');
+  hedgeCard.style.display='block';
+  if(S.legs.length){
+    let hHtml='';
+    S.legs.forEach((leg,i)=>{
+      const pnlTot=legPnlTotal(leg,m);
+      hHtml+=`
+        <div class="bd-row c${i}">
+          <span class="bd-lbl">Leg ${i+1}: ${legName(leg)} @ $${leg.strike.toFixed(2)} × ${leg.contracts}</span>
+          <span class="bd-val ${pnlTot>=0?'pos':'neg'}">${pSignD(pnlTot)}</span>
+        </div>`;
+    });
+    hHtml+=`
+      <div class="bd-row bd-total"><span class="bd-lbl" style="font-weight:700;color:var(--slate)">Hedge account total</span>
+        <span class="bd-val" style="color:${hedge>=0?'#16a34a':'#dc2626'};font-size:.88rem">${pSignD(hedge)}</span></div>
+      <div class="bd-row"><span class="bd-lbl">Gain/loss in your brokerage / margin account</span><span class="bd-val"></span></div>`;
+    document.getElementById('hedge-rows').innerHTML=hHtml;
+  } else {
+    document.getElementById('hedge-rows').innerHTML=`<div style="padding:8px 0;color:var(--slate-m);font-size:.8rem">No hedge in place — cash grain is fully exposed to the market.</div>`;
+  }
+
+  // ── NET CARD ──
+  let nHtml='';
+  if(gBu>0){
+    const hedgeBenefit=eff-cashPx;
+    nHtml+=`
+      <div class="bd-row"><span class="bd-lbl">Cash sale revenue</span><span class="bd-val">${d$(cashRev)}</span></div>
+      <div class="bd-row"><span class="bd-lbl">Futures/options result</span><span class="bd-val ${hedge>=0?'pos':'neg'}">${pSignD(hedge)}</span></div>
+      <div class="bd-row bd-total"><span class="bd-lbl" style="font-weight:700;color:var(--slate)">Total money received</span><span class="bd-val" style="font-size:.9rem">${d$(totalRevenue(m))}</span></div>
+      <div class="bd-row"><span class="bd-lbl" style="font-weight:700;color:var(--green)">Effective net price</span><span class="bd-val" style="color:var(--green);font-weight:800;font-size:.95rem">$${eff.toFixed(4)}/bu</span></div>
+      <div class="bd-row"><span class="bd-lbl">vs. unhedged cash ($${cashPx.toFixed(4)})</span><span class="bd-val ${hedgeBenefit>=0?'pos':'neg'}">${pSign(hedgeBenefit)}/bu (hedge ${hedgeBenefit>=0?'added':'cost'})</span></div>`;
+  } else {
+    nHtml+=`
+      <div class="bd-row bd-total"><span class="bd-lbl" style="font-weight:700;color:var(--slate)">Net P&amp;L vs today</span><span class="bd-val" style="color:${net>=0?'#16a34a':'#dc2626'};font-size:.9rem">${pSignD(net)}</span></div>
+      <div class="bd-row"><span class="bd-lbl">Turn on Cash Grain in Setup to see your effective price per bushel.</span><span class="bd-val"></span></div>`;
+  }
+  document.getElementById('net-rows').innerHTML=nHtml;
+
+  renderRangeCard();
+}
+
+function renderRangeCard(){
+  const bes=findBreakevens();
+  const card=document.getElementById('range-card');
+  const gBu=grainBushels();
+  let rows='';
+  if(bes.length){
+    rows+=`<div class="bd-row"><span class="bd-lbl">Breakeven${bes.length>1?'s':''} vs today</span><span class="bd-val">${bes.map(b=>'$'+b.toFixed(4)).join(' · ')}</span></div>`;
+  }
+  if(gBu>0){
+    const {lo,hi}=chartRange();
+    const effLo=effectivePrice(lo), effHi=effectivePrice(hi);
+    rows+=`
+      <div class="bd-row"><span class="bd-lbl">Effective price if market → $${lo.toFixed(2)}</span><span class="bd-val">$${effLo.toFixed(4)}/bu</span></div>
+      <div class="bd-row"><span class="bd-lbl">Effective price if market → $${hi.toFixed(2)}</span><span class="bd-val">$${effHi.toFixed(4)}/bu</span></div>`;
+    const spread=Math.abs(effHi-effLo);
+    if(spread<0.02){
+      rows+=`<div class="bd-row"><span class="bd-lbl">Outcome</span><span class="bd-val pos">🔒 Price essentially locked across the range</span></div>`;
+    } else if(effHi>effLo){
+      rows+=`<div class="bd-row"><span class="bd-lbl">Outcome</span><span class="bd-val">Floor protected, upside stays open</span></div>`;
+    } else {
+      rows+=`<div class="bd-row"><span class="bd-lbl">Outcome</span><span class="bd-val">Ceiling capped, downside stays open</span></div>`;
+    }
+  }
+  if(rows){ card.style.display='block'; document.getElementById('range-rows').innerHTML=rows; }
+  else card.style.display='none';
 }
 
 // ─── RENDER: MARGIN ──────────────────────────────────────────────────────────
@@ -1094,20 +1133,19 @@ function renderMargin(){
 
   const totInit=totalInitMargin();
   const totMaint=totalMaintMargin();
-  const shortOpts=smLegs.filter(l=>isOption(l.type));
-  const shortFuts=smLegs.filter(l=>l.type==='futures');
+  const shortOpts=smLegs.filter(l=>isOption(l.type)&&l.dir==='short');
+  const futs=smLegs.filter(l=>l.type==='futures');
   const totPrem=shortOpts.reduce((s,l)=>s+(l.premium||0)*CS*l.contracts,0);
   const m=S.scenarioPrice;
   const equity=accountEquity(m);
-  const comboTot=combinedPnlTotal(m);
+  const hedge=hedgePnl(m);
 
   document.getElementById('margin-summary-badge').innerHTML=`
     <div class="alert blue"><span class="alert-icon">ℹ️</span><div class="alert-body">
-      You have <strong>${smLegs.length} margin-required leg${smLegs.length>1?'s':''}</strong>
+      <strong>${smLegs.length} margined leg${smLegs.length>1?'s':''}</strong>
       (${smLegs.map(l=>legName(l)).join(' + ')}).
-      ${totPrem>0?`Total option premium received: <strong>$${totPrem.toFixed(2)}</strong>.`:''}
-      ${shortFuts.length?`Short futures require daily mark-to-market margin.`:''}
-      Margin is held as security.
+      ${totPrem>0?`Option premium collected: <strong>$${totPrem.toFixed(2)}</strong>.`:''}
+      ${futs.length?`<strong>Note:</strong> a short futures hedge loses money in the account as prices rise — even though your grain is worth more. That grain value is <em>not</em> in this account, so rising markets can trigger margin calls.`:'Margin is held as security against your obligation.'}
     </div></div>`;
 
   let eqCls,eqTxt;
@@ -1117,7 +1155,7 @@ function renderMargin(){
 
   const al=document.getElementById('margin-alert-wrap');
   if(equity<totMaint){
-    al.innerHTML=`<div class="alert red"><span class="alert-icon">⚠️</span><div class="alert-body"><strong>Margin call at $${m.toFixed(2)}/bu</strong> — Equity ($${equity.toFixed(2)}) is below maintenance margin ($${totMaint.toFixed(2)}). Funds must be deposited immediately.</div></div>`;
+    al.innerHTML=`<div class="alert red"><span class="alert-icon">⚠️</span><div class="alert-body"><strong>Margin call at $${m.toFixed(2)}/bu</strong> — Account equity ($${equity.toFixed(2)}) is below maintenance margin ($${totMaint.toFixed(2)}). Deposit funds immediately.</div></div>`;
   } else if(equity<totInit){
     al.innerHTML=`<div class="alert amber"><span class="alert-icon">⚡</span><div class="alert-body"><strong>Caution</strong> — Equity ($${equity.toFixed(2)}) below initial margin ($${totInit.toFixed(2)}). An adverse move triggers a margin call.</div></div>`;
   } else {al.innerHTML='';}
@@ -1125,9 +1163,9 @@ function renderMargin(){
   document.getElementById('eq-lbl').textContent='$'+m.toFixed(2)+'/bu';
   const shortContracts=smLegs.reduce((s,l)=>s+l.contracts,0);
   document.getElementById('equity-rows').innerHTML=`
-    <div class="bd-row"><span class="bd-lbl">Account balance</span><span class="bd-val">${d$(S.acct)}</span></div>
-    ${totPrem>0?`<div class="bd-row"><span class="bd-lbl">Option premium received</span><span class="bd-val pos">+${d$(totPrem)}</span></div>`:''}
-    <div class="bd-row"><span class="bd-lbl">Combined hedge result at $${m.toFixed(2)}</span><span class="bd-val ${comboTot>=0?'pos':'neg'}">${pSignD(comboTot)}</span></div>
+    <div class="bd-row"><span class="bd-lbl">Account balance (cash in brokerage)</span><span class="bd-val">${d$(S.acct)}</span></div>
+    ${totPrem>0?`<div class="bd-row"><span class="bd-lbl">Option premium collected</span><span class="bd-val pos">+${d$(totPrem)}</span></div>`:''}
+    <div class="bd-row"><span class="bd-lbl">Futures/options result at $${m.toFixed(2)}</span><span class="bd-val ${hedge>=0?'pos':'neg'}">${pSignD(hedge)}</span></div>
     <div class="bd-row bd-total"><span class="bd-lbl">Account equity</span><span class="bd-val ${eqCls}">${d$(equity)} — ${eqTxt}</span></div>
     <div class="bd-row"><span class="bd-lbl">Initial margin (${shortContracts} contracts × $${S.init})</span><span class="bd-val">${d$(totInit)}</span></div>
     <div class="bd-row"><span class="bd-lbl">Maintenance margin</span><span class="bd-val">${d$(totMaint)}</span></div>
@@ -1156,12 +1194,15 @@ function renderMargin(){
     if(nearTrig){
       const eq=accountEquity(nearTrig);
       const call=Math.max(0,totInit-eq);
-      const callPerBu=totalBushels()>0?call/totalBushels():0;
+      const callPerBu=hedgeBushels()>0?call/hedgeBushels():0;
+      const cashOffset=grainBushels()>0?cashPnl(nearTrig):0;
       document.getElementById('call-rows').innerHTML=`
         <div class="bd-row"><span class="bd-lbl">Account equity at nearest trigger</span><span class="bd-val">${d$(eq)}</span></div>
         <div class="bd-row"><span class="bd-lbl">Maintenance margin level</span><span class="bd-val">${d$(totMaint)}</span></div>
         <div class="bd-row bd-total"><span class="bd-lbl" style="color:var(--red);font-weight:700">Margin call — deposit required</span><span class="bd-val danger">${d$(call)}</span></div>
-        <div class="bd-row"><span class="bd-lbl">Per bushel</span><span class="bd-val danger">${d$(callPerBu,4)}/bu (${(callPerBu*100).toFixed(2)}¢/bu)</span></div>
+        <div class="bd-row"><span class="bd-lbl">Per hedged bushel</span><span class="bd-val danger">${d$(callPerBu,4)}/bu (${(callPerBu*100).toFixed(2)}¢/bu)</span></div>
+        ${grainBushels()>0?`<div class="bd-row"><span class="bd-lbl">📌 Your cash grain is worth this much more there</span><span class="bd-val pos">${pSignD(cashOffset)}</span></div>
+        <div class="bd-row"><span class="bd-lbl" style="line-height:1.4">A margin call here is a cash-flow timing issue — the grain gain offsets it at sale, but you must fund the account now.</span><span class="bd-val"></span></div>`:''}
         <div class="bd-row"><span class="bd-lbl">After deposit, restored to</span><span class="bd-val ok">${d$(totInit)} (initial margin)</span></div>`;
     }
   } else {
@@ -1187,21 +1228,25 @@ function syncSlider(){
 function readGlobal(){
   const g=id=>parseFloat(document.getElementById(id).value);
   S.ref  = g('i-ref') ||S.ref;
+  S.grain.bushels = Math.max(0,parseInt(document.getElementById('i-grain-bu').value)||0);
+  const b=document.getElementById('i-basis').value;
+  S.grain.basis = b===''?0:(parseFloat(b)||0);
   S.acct = Math.max(0,g('i-acct') ||0);
   S.init = Math.max(0,g('i-init') ||0);
   S.maint= Math.max(0,g('i-maint')||0);
+  document.getElementById('grain-con-hint').textContent='= '+(S.grain.bushels/CS).toFixed(1)+' contracts';
 }
 
-// ─── LEG ACTIONS ─────────────────────────────────────────────────────────────
+// ─── ACTIONS ─────────────────────────────────────────────────────────────────
+function toggleGrain(){
+  S.grain.enabled=document.getElementById('grain-toggle').checked;
+  const f=document.getElementById('grain-fields');
+  f.style.opacity=S.grain.enabled?'1':'.4';
+  f.style.pointerEvents=S.grain.enabled?'auto':'none';
+  fullRender();
+}
 function setLegDir(i,dir){ S.legs[i].dir=dir; renderLegRows();fullRender(); }
-
-function setLegType(i,type){
-  S.legs[i].type=type;
-  // preserve direction logic: cash sale defaults to 'short', futures/options keep existing dir
-  if(type==='cash'&&S.legs[i].dir!=='short'&&S.legs[i].dir!=='long') S.legs[i].dir='short';
-  renderLegRows();fullRender();
-}
-
+function setLegType(i,type){ S.legs[i].type=type; renderLegRows();fullRender(); }
 function updateLeg(i){
   const leg=S.legs[i];
   const s=parseFloat(document.getElementById('leg-strike-'+i).value)||leg.strike;
@@ -1214,15 +1259,12 @@ function updateLeg(i){
   S.legs[i].contracts=c;
   renderLegSummary(i);fullRender();
 }
-
 function removeLeg(i){ S.legs.splice(i,1); renderLegRows();fullRender(); }
-
 function addLeg(){
   if(S.legs.length>=MAX_LEGS)return;
-  S.legs.push({dir:'short',type:'put',strike:S.ref,premium:0.15,contracts:1});
+  S.legs.push({dir:'short',type:'futures',strike:S.ref,premium:0,contracts:1});
   renderLegRows();fullRender();
 }
-
 function applyTemplate(idx){
   const tpl=TEMPLATES[idx];
   S.legs=tpl.legs.map(t=>({
@@ -1247,14 +1289,12 @@ function switchTab(tab){
   if(tab==='chart'){syncSlider();buildChart();renderScenario();renderLegend();}
   if(tab==='margin')renderMargin();
 }
-
 function fullRender(){
   readGlobal();syncSlider();
   if(document.getElementById('sec-chart').classList.contains('active')){
     buildChart();renderScenario();renderLegend();
   }
   if(document.getElementById('sec-margin').classList.contains('active'))renderMargin();
-  // refresh fullscreen chart if open
   if(document.getElementById('fs-overlay').classList.contains('open')){
     syncFsSlider();renderFsLegend();buildFsChart();
   }
@@ -1270,13 +1310,15 @@ document.getElementById('commodity-chips').addEventListener('click',e=>{
   document.getElementById('i-ref').value=d.ref;
   document.getElementById('i-init').value=d.init;
   document.getElementById('i-maint').value=d.maint;
-  S.ref=d.ref;S.scenarioPrice=d.ref;
+  document.getElementById('i-basis').value=d.basis;
+  S.ref=d.ref;S.scenarioPrice=d.ref;S.grain.basis=d.basis;
   S.legs.forEach(l=>l.strike=d.ref);
   renderLegRows();fullRender();
 });
 
-document.getElementById('i-ref').addEventListener('input',()=>{readGlobal();fullRender();});
-
+['i-ref','i-grain-bu','i-basis'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{readGlobal();fullRender();});
+});
 ['i-acct','i-init','i-maint'].forEach(id=>{
   document.getElementById(id).addEventListener('input',()=>{
     readGlobal();renderMargin();
@@ -1284,12 +1326,10 @@ document.getElementById('i-ref').addEventListener('input',()=>{readGlobal();full
     if(fsChart){fsChart._anno=buildAnno();fsChart.update('none');}
   });
 });
-
 document.getElementById('price-slider').addEventListener('input',e=>{
   S.scenarioPrice=parseFloat(e.target.value);
   document.getElementById('sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
   updateAnno();renderScenario();renderMargin();
-  // keep fs slider in sync
   if(document.getElementById('fs-overlay').classList.contains('open')){
     document.getElementById('fs-price-slider').value=S.scenarioPrice.toFixed(2);
     document.getElementById('fs-sl-display').textContent='$'+S.scenarioPrice.toFixed(2)+'/bu';
