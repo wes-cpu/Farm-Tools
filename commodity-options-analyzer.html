@@ -7,9 +7,297 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Hedge Analyzer">
 <meta name="theme-color" content="#1e5a3c">
-<link rel="manifest" href="manifest.json">
 <title>Commodity Hedge Analyzer</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ─── INLINE CHART ENGINE — no CDN, fully offline-capable ──────────────────────
+class Chart {
+  constructor(canvas, config) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.data = config.data;
+    this.options = config.options || {};
+    this._anno = null;
+    this._tooltip = null;
+    this._ro = null;
+    this._resize();
+    this._bindEvents();
+    if (this.options.responsive !== false) {
+      this._ro = new ResizeObserver(() => { this._resize(); this._draw(); });
+      this._ro.observe(canvas.parentElement || document.body);
+    }
+  }
+  static register() {}
+  destroy() { if (this._ro) this._ro.disconnect(); }
+  update() { this._resize(); this._draw(); }
+
+  _resize() {
+    const parent = this.canvas.parentElement;
+    const opts = this.options;
+    const dpr = window.devicePixelRatio || 1;
+    let w = parent ? parent.clientWidth : 400;
+    let h = (opts.maintainAspectRatio && opts.aspectRatio)
+      ? Math.round(w / opts.aspectRatio)
+      : (parent ? Math.max(parent.clientHeight - 4, 120) : 300);
+    this.canvas.width = Math.round(w * dpr);
+    this.canvas.height = Math.round(h * dpr);
+    this.canvas.style.width = w + 'px';
+    this.canvas.style.height = h + 'px';
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this._lw = w; this._lh = h;
+  }
+
+  _area() {
+    const w = this._lw, h = this._lh;
+    return { l:68, r:w-16, t:44, b:h-42, get w(){ return this.r-this.l; }, get h(){ return this.b-this.t; } };
+  }
+
+  _range() {
+    const xs = (this.options.scales || {}).x || {};
+    const xMin = xs.min != null ? xs.min : 0;
+    const xMax = xs.max != null ? xs.max : 10;
+    let yMin = Infinity, yMax = -Infinity;
+    this.data.datasets.forEach(ds => {
+      (ds.data || []).forEach(pt => {
+        if (pt && pt.y != null && isFinite(pt.y)) {
+          if (pt.y < yMin) yMin = pt.y;
+          if (pt.y > yMax) yMax = pt.y;
+        }
+      });
+    });
+    if (!isFinite(yMin)) yMin = -100;
+    if (!isFinite(yMax)) yMax = 100;
+    const span = yMax - yMin || 200;
+    yMin -= span * 0.09; yMax += span * 0.09;
+    yMin = Math.min(yMin, 0); yMax = Math.max(yMax, 0);
+    return { xMin, xMax, yMin, yMax };
+  }
+
+  _xp(x, rng, a) { return a.l + (x - rng.xMin) / (rng.xMax - rng.xMin) * a.w; }
+  _yp(y, rng, a) { return a.t + (1 - (y - rng.yMin) / (rng.yMax - rng.yMin)) * a.h; }
+  _px2x(px, rng, a) { return rng.xMin + (px - a.l) / a.w * (rng.xMax - rng.xMin); }
+
+  _niceTicks(lo, hi, maxN) {
+    const span = hi - lo, rough = span / (maxN || 6);
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const n = rough / mag;
+    const step = n < 1.5 ? mag : n < 3.5 ? 2 * mag : n < 7.5 ? 5 * mag : 10 * mag;
+    const first = Math.ceil(lo / step) * step;
+    const ticks = [];
+    for (let v = first; v <= hi + step * 0.001; v += step)
+      ticks.push(parseFloat(v.toPrecision(10)));
+    return ticks;
+  }
+
+  _interpY(data, x) {
+    let lo = 0, hi = data.length - 1;
+    while (lo < hi - 1) { const m = lo + hi >> 1; data[m].x <= x ? lo = m : hi = m; }
+    const p0 = data[lo], p1 = data[hi] || p0;
+    if (p0.x === p1.x) return p0.y;
+    return p0.y + (p1.y - p0.y) * (x - p0.x) / (p1.x - p0.x);
+  }
+
+  _bindEvents() {
+    const c = this.canvas;
+    c.addEventListener('touchstart', e => this._touch(e), { passive: true });
+    c.addEventListener('touchmove',  e => this._touch(e), { passive: true });
+    c.addEventListener('touchend',   () => { this._tooltip = null; this._draw(); }, { passive: true });
+    c.addEventListener('mousemove',  e => this._mouse(e));
+    c.addEventListener('mouseleave', () => { this._tooltip = null; this._draw(); });
+  }
+  _touch(e) {
+    if (!e.touches.length) return;
+    const r = this.canvas.getBoundingClientRect();
+    this._setTip(e.touches[0].clientX - r.left);
+  }
+  _mouse(e) {
+    const r = this.canvas.getBoundingClientRect();
+    this._setTip(e.clientX - r.left);
+  }
+  _setTip(px) {
+    const a = this._area(), rng = this._range();
+    if (px < a.l || px > a.r) { this._tooltip = null; this._draw(); return; }
+    this._tooltip = { x: this._px2x(px, rng, a) };
+    this._draw();
+  }
+
+  _draw() {
+    const c = this.ctx, a = this._area(), rng = this._range(), opts = this.options;
+    c.clearRect(0, 0, this._lw, this._lh);
+    c.fillStyle = 'white';
+    c.fillRect(a.l, a.t, a.w, a.h);
+
+    // Y grid + labels
+    const ys = (opts.scales || {}).y || {};
+    const yTicks = this._niceTicks(rng.yMin, rng.yMax, 6);
+    yTicks.forEach(v => {
+      const py = this._yp(v, rng, a);
+      const isZ = Math.abs(v) < 1e-9;
+      c.beginPath(); c.moveTo(a.l, py); c.lineTo(a.r, py);
+      c.strokeStyle = isZ ? '#94a3b8' : '#f1f5f9';
+      c.lineWidth = isZ ? 1.5 : 1; c.setLineDash([]); c.stroke();
+      const lbl = ys.ticks && ys.ticks.callback ? ys.ticks.callback(v) : String(Math.round(v));
+      c.fillStyle = '#64748b'; c.font = '11px -apple-system,sans-serif';
+      c.textAlign = 'right'; c.textBaseline = 'middle';
+      c.fillText(lbl, a.l - 5, py);
+    });
+
+    // X grid + labels
+    const xs = (opts.scales || {}).x || {};
+    const xTicks = this._niceTicks(rng.xMin, rng.xMax, (xs.ticks && xs.ticks.maxTicksLimit) || 7);
+    xTicks.forEach(v => {
+      const px = this._xp(v, rng, a);
+      if (px < a.l || px > a.r) return;
+      c.beginPath(); c.moveTo(px, a.t); c.lineTo(px, a.b);
+      c.strokeStyle = '#f1f5f9'; c.lineWidth = 1; c.setLineDash([]); c.stroke();
+      const lbl = xs.ticks && xs.ticks.callback ? xs.ticks.callback(v) : v.toFixed(2);
+      c.fillStyle = '#64748b'; c.font = '11px -apple-system,sans-serif';
+      c.textAlign = 'center'; c.textBaseline = 'top';
+      c.fillText(lbl, px, a.b + 5);
+    });
+    c.strokeStyle = '#e2e8f0'; c.lineWidth = 1; c.setLineDash([]);
+    c.strokeRect(a.l, a.t, a.w, a.h);
+
+    // Datasets (sorted descending by order = higher order drawn first = behind)
+    c.save(); c.beginPath(); c.rect(a.l, a.t, a.w, a.h); c.clip();
+    const sorted = [...this.data.datasets].sort((x, y) => (y.order || 0) - (x.order || 0));
+    sorted.forEach(ds => {
+      if (!ds.data || !ds.data.length) return;
+
+      // Scatter dot
+      if (ds.type === 'scatter') {
+        const pt = ds.data[0]; if (!pt) return;
+        const px = this._xp(pt.x, rng, a), py = this._yp(pt.y, rng, a);
+        c.beginPath(); c.arc(px, py, ds.pointRadius || 6, 0, Math.PI * 2);
+        c.fillStyle = ds.backgroundColor || '#7c3aed'; c.fill();
+        if (ds.borderColor && ds.borderColor !== 'transparent') {
+          c.strokeStyle = ds.borderColor; c.lineWidth = ds.borderWidth || 2; c.stroke();
+        }
+        return;
+      }
+
+      // Area fill (fill:'origin')
+      if (ds.fill === 'origin' && ds.backgroundColor && ds.borderColor === 'transparent') {
+        const y0 = this._yp(0, rng, a);
+        c.beginPath();
+        let first = true;
+        ds.data.forEach(pt => {
+          const px = this._xp(pt.x, rng, a), py = this._yp(pt.y, rng, a);
+          first ? (c.moveTo(px, py), first = false) : c.lineTo(px, py);
+        });
+        const last = ds.data[ds.data.length - 1];
+        c.lineTo(this._xp(last.x, rng, a), y0);
+        c.lineTo(this._xp(ds.data[0].x, rng, a), y0);
+        c.closePath(); c.fillStyle = ds.backgroundColor; c.fill();
+        return;
+      }
+
+      if (!ds.borderColor || ds.borderColor === 'transparent') return;
+
+      c.lineWidth = ds.borderWidth || 2;
+      c.setLineDash(ds.borderDash || []);
+
+      if (ds.segment && ds.segment.borderColor) {
+        // Per-segment coloring (net line: green/red by sign)
+        for (let i = 1; i < ds.data.length; i++) {
+          const p0 = ds.data[i - 1], p1 = ds.data[i];
+          const x0 = this._xp(p0.x, rng, a), y0 = this._yp(p0.y, rng, a);
+          const x1 = this._xp(p1.x, rng, a), y1 = this._yp(p1.y, rng, a);
+          if ((p0.y >= 0) !== (p1.y >= 0)) {
+            const t = -p0.y / (p1.y - p0.y);
+            const mx = x0 + (x1 - x0) * t, my = this._yp(0, rng, a);
+            c.beginPath(); c.strokeStyle = p0.y >= 0 ? '#16a34a' : '#dc2626';
+            c.moveTo(x0, y0); c.lineTo(mx, my); c.stroke();
+            c.beginPath(); c.strokeStyle = p1.y >= 0 ? '#16a34a' : '#dc2626';
+            c.moveTo(mx, my); c.lineTo(x1, y1); c.stroke();
+          } else {
+            c.beginPath(); c.strokeStyle = p0.y >= 0 ? '#16a34a' : '#dc2626';
+            c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+          }
+        }
+      } else {
+        c.strokeStyle = ds.borderColor;
+        c.beginPath();
+        let first = true;
+        ds.data.forEach(pt => {
+          const px = this._xp(pt.x, rng, a), py = this._yp(pt.y, rng, a);
+          first ? (c.moveTo(px, py), first = false) : c.lineTo(px, py);
+        });
+        c.stroke();
+      }
+      c.setLineDash([]);
+    });
+
+    // Annotations
+    if (this._anno && this._anno.v) {
+      this._anno.v.forEach(l => {
+        const px = this._xp(l.x, rng, a);
+        if (px < a.l - 1 || px > a.r + 1) return;
+        c.beginPath(); c.moveTo(px, a.t); c.lineTo(px, a.b);
+        c.strokeStyle = l.color; c.lineWidth = l.lw || 2;
+        c.setLineDash(l.dash || []); c.stroke(); c.setLineDash([]);
+        if (l.tag) {
+          c.font = '600 10px -apple-system,sans-serif'; c.fillStyle = l.color;
+          const right = px > a.r - 72; c.textAlign = right ? 'right' : 'left';
+          const tx = right ? px - 4 : px + 4;
+          c.fillText(l.tag, tx, a.t + 11);
+          if (l.sub) c.fillText(l.sub, tx, a.t + 24);
+        }
+      });
+    }
+    c.restore(); // end clip
+
+    // Tooltip
+    if (this._tooltip) {
+      const tx = this._tooltip.x, tpx = this._xp(tx, rng, a);
+      if (tx >= rng.xMin && tx <= rng.xMax) {
+        c.save();
+        c.beginPath(); c.moveTo(tpx, a.t); c.lineTo(tpx, a.b);
+        c.strokeStyle = 'rgba(100,116,139,0.3)'; c.lineWidth = 1;
+        c.setLineDash([4, 3]); c.stroke(); c.setLineDash([]);
+
+        const topts = (opts.plugins && opts.plugins.tooltip) || {};
+        const cbs = topts.callbacks || {};
+        const filterFn = topts.filter;
+        const items = [];
+        this.data.datasets.forEach(ds => {
+          if (!ds.data || !ds.data.length || ds.type === 'scatter') return;
+          const y = this._interpY(ds.data, tx);
+          const item = { dataset: ds, parsed: { x: tx, y } };
+          if (!filterFn || filterFn(item)) items.push(item);
+        });
+
+        const lines = [];
+        if (cbs.title) lines.push({ text: cbs.title(items.map(() => ({ parsed: { x: tx } }))), bold: true });
+        items.forEach(item => {
+          const lbl = cbs.label ? cbs.label(item) : null;
+          if (lbl) lines.push({ text: lbl });
+        });
+
+        if (lines.length) {
+          const pad = 7, lh = 15, bw = 170, bh = lines.length * lh + pad * 2;
+          let bx = tpx + 10; if (bx + bw > a.r) bx = tpx - bw - 10;
+          let by = a.t + 8; if (by + bh > a.b) by = a.b - bh - 4;
+          const r = 5;
+          c.fillStyle = 'rgba(30,41,59,0.93)';
+          c.beginPath();
+          c.moveTo(bx+r,by); c.lineTo(bx+bw-r,by); c.arcTo(bx+bw,by,bx+bw,by+r,r);
+          c.lineTo(bx+bw,by+bh-r); c.arcTo(bx+bw,by+bh,bx+bw-r,by+bh,r);
+          c.lineTo(bx+r,by+bh); c.arcTo(bx,by+bh,bx,by+bh-r,r);
+          c.lineTo(bx,by+r); c.arcTo(bx,by,bx+r,by,r);
+          c.closePath(); c.fill();
+          lines.forEach((ln, i) => {
+            c.font = (ln.bold ? 'bold ' : '') + '11px -apple-system,sans-serif';
+            c.fillStyle = ln.bold ? 'white' : '#cbd5e1';
+            c.textAlign = 'left'; c.textBaseline = 'middle';
+            c.fillText(ln.text, bx + pad, by + pad + (i + 0.5) * lh);
+          });
+        }
+        c.restore();
+      }
+    }
+  }
+}
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -670,30 +958,6 @@ let myChart=null, fsChart=null;
 const showCash=()=>grainBushels()>0;
 const showHedge=()=>S.legs.length>0;
 
-const annoPlugin={
-  id:'anno',
-  afterDraw(ch){
-    const A=ch._anno;if(!A)return;
-    const {ctx,chartArea:a,scales}=ch;
-    (A.v||[]).forEach(l=>{
-      const x=scales.x.getPixelForValue(l.x);
-      if(x<a.left-1||x>a.right+1)return;
-      ctx.save();
-      ctx.beginPath();ctx.moveTo(x,a.top);ctx.lineTo(x,a.bottom);
-      ctx.strokeStyle=l.color;ctx.lineWidth=l.lw||2;
-      ctx.setLineDash(l.dash||[]);ctx.stroke();ctx.setLineDash([]);
-      if(l.tag){
-        ctx.font='600 10px -apple-system,sans-serif';ctx.fillStyle=l.color;
-        const right=x>a.right-72;ctx.textAlign=right?'right':'left';
-        const tx=right?x-4:x+4;
-        ctx.fillText(l.tag,tx,a.top+11);
-        if(l.sub)ctx.fillText(l.sub,tx,a.top+24);
-      }
-      ctx.restore();
-    });
-  }
-};
-Chart.register(annoPlugin);
 
 function buildAnno(){
   const bes=findBreakevens();
@@ -784,7 +1048,6 @@ function chartOptions(ar){
         },
         filter:item=>!!item.dataset.label,
       },
-      anno:{},
     },
     scales:{
       x:{type:'linear',min:lo,max:hi,
