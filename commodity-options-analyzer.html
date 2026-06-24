@@ -702,7 +702,7 @@ input[type=range]::-moz-range-thumb{
 
   <div class="card">
     <div class="card-title">
-      <span class="card-title-txt">Cash vs. Hedge — Gain / Loss vs Today ($)</span>
+      <span class="card-title-txt">Cash vs. Hedge — Gain / Loss (¢/bu)</span>
       <button class="fs-btn" onclick="openFs()" title="Full screen chart">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
         Full Screen
@@ -811,7 +811,7 @@ input[type=range]::-moz-range-thumb{
 <div id="fs-overlay">
   <div id="fs-hdr">
     <div>
-      <div id="fs-title">Cash vs Hedge — Gain/Loss vs Today ($)</div>
+      <div id="fs-title">Cash vs Hedge — Gain/Loss (¢/bu)</div>
       <div id="fs-pnl"></div>
     </div>
     <button id="fs-close-btn" onclick="exitFs()">✕ Close</button>
@@ -904,6 +904,10 @@ function legPnl(leg, m){
 function legPnlTotal(leg,m){ return legPnl(leg,m)*CS*leg.contracts; }
 function hedgePnl(m){ return S.legs.reduce((s,l)=>s+legPnlTotal(l,m),0); }
 function hedgeBushels(){ return S.legs.reduce((s,l)=>s+CS*l.contracts,0); }
+// Reference bushel count for per-bushel chart scaling
+function refBushels(){ const g=grainBushels(); return g>0?g:(hedgeBushels()>0?hedgeBushels():CS); }
+// Convert total $ P&L → ¢/bu for chart display
+function cents(v){ return v/refBushels()*100; }
 
 // NET (vs today) and ABSOLUTE outcome
 function netPnl(m){ return cashPnl(m) + hedgePnl(m); }            // gain/loss vs selling all cash at ref today
@@ -985,12 +989,12 @@ function makeDatasets(){
   const ds=[];
   // NET fill (profit/loss) under the net line
   ds.push({
-    data:prices.map(m=>({x:m,y:Math.max(netPnl(m),0)})),
+    data:prices.map(m=>({x:m,y:Math.max(cents(netPnl(m)),0)})),
     fill:'origin',backgroundColor:'rgba(30,90,60,0.10)',
     borderColor:'transparent',pointRadius:0,tension:0,order:8
   });
   ds.push({
-    data:prices.map(m=>({x:m,y:Math.min(netPnl(m),0)})),
+    data:prices.map(m=>({x:m,y:Math.min(cents(netPnl(m)),0)})),
     fill:'origin',backgroundColor:'rgba(220,38,38,0.08)',
     borderColor:'transparent',pointRadius:0,tension:0,order:8
   });
@@ -998,7 +1002,7 @@ function makeDatasets(){
   if(showCash()){
     ds.push({
       label:'Cash Grain',
-      data:prices.map(m=>({x:m,y:cashPnl(m)})),
+      data:prices.map(m=>({x:m,y:cents(cashPnl(m))})),
       borderColor:'#d97706',borderWidth:2,borderDash:[7,4],
       pointRadius:0,tension:0,fill:false,order:4,
     });
@@ -1007,7 +1011,7 @@ function makeDatasets(){
   if(showHedge()){
     ds.push({
       label:'Futures/Options',
-      data:prices.map(m=>({x:m,y:hedgePnl(m)})),
+      data:prices.map(m=>({x:m,y:cents(hedgePnl(m))})),
       borderColor:'#2563eb',borderWidth:2,borderDash:[7,4],
       pointRadius:0,tension:0,fill:false,order:4,
     });
@@ -1015,14 +1019,14 @@ function makeDatasets(){
   // NET line (bold, sign-colored)
   ds.push({
     label:'Net Result',
-    data:prices.map(m=>({x:m,y:netPnl(m)})),
+    data:prices.map(m=>({x:m,y:cents(netPnl(m))})),
     borderColor:'#1e5a3c',borderWidth:3.5,
     segment:{borderColor:ctx=>ctx.p1.parsed.y>=0?'#16a34a':'#dc2626'},
     pointRadius:0,tension:0,fill:false,order:1,
   });
   // scenario dot on net line
   ds.push({
-    data:[{x:S.scenarioPrice,y:netPnl(S.scenarioPrice)}],
+    data:[{x:S.scenarioPrice,y:cents(netPnl(S.scenarioPrice))}],
     type:'scatter',backgroundColor:'#7c3aed',
     pointRadius:7,pointHoverRadius:9,borderColor:'white',borderWidth:2,order:0,
   });
@@ -1042,7 +1046,7 @@ function chartOptions(ar){
           label:item=>{
             const lbl=item.dataset.label;if(!lbl)return null;
             const v=item.parsed.y;
-            const fmt=n=>(n>=0?'+':'-')+' $'+Math.abs(n).toFixed(2);
+            const fmt=n=>(n>=0?'+':'-')+Math.abs(n).toFixed(1)+'¢/bu';
             return `${lbl}: ${fmt(v)}`;
           },
         },
@@ -1054,7 +1058,7 @@ function chartOptions(ar){
         ticks:{maxTicksLimit:7,callback:v=>'$'+v.toFixed(2),font:{size:11}},
         grid:{color:'#f1f5f9'}},
       y:{
-        ticks:{callback:v=>{const a=Math.abs(v);return(v>=0?'+':'-')+(a>=1000?'$'+(a/1000).toFixed(1)+'k':'$'+a.toFixed(0));},font:{size:11}},
+        ticks:{callback:v=>{const a=Math.abs(v);return(v>=0?'+':'-')+a.toFixed(0)+'¢';},font:{size:11}},
         grid:{color:ctx=>ctx.tick.value===0?'#94a3b8':'#f1f5f9',
           lineWidth:ctx=>ctx.tick.value===0?1.5:1},
       }
@@ -1072,7 +1076,7 @@ function updateAnno(){
   if(!myChart)return;
   myChart._anno=buildAnno();
   const ds=myChart.data.datasets;
-  ds[ds.length-1].data=[{x:S.scenarioPrice,y:netPnl(S.scenarioPrice)}];
+  ds[ds.length-1].data=[{x:S.scenarioPrice,y:cents(netPnl(S.scenarioPrice))}];
   myChart.update('none');
 }
 
@@ -1097,7 +1101,7 @@ function updateFsAnno(){
   if(!fsChart)return;
   fsChart._anno=buildAnno();
   const ds=fsChart.data.datasets;
-  ds[ds.length-1].data=[{x:S.scenarioPrice,y:netPnl(S.scenarioPrice)}];
+  ds[ds.length-1].data=[{x:S.scenarioPrice,y:cents(netPnl(S.scenarioPrice))}];
   fsChart.update('none');
   updateFsPnl();
 }
