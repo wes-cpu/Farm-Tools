@@ -587,7 +587,56 @@ input[type=range]::-moz-range-thumb{
 .nbtn svg{width:22px;height:22px}
 .nbtn span{font-size:.7rem;font-weight:600}
 .sec{display:none}.sec.active{display:block}
-</style>
+
+/* ─── PRINT BUTTON ──────────────────────────────────────────────────────────── */
+.prt-btn{
+  background:none;border:1px solid var(--border);border-radius:7px;
+  padding:4px 9px;font-size:.72rem;font-weight:700;color:var(--slate-m);
+  cursor:pointer;touch-action:manipulation;white-space:nowrap;flex-shrink:0;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.prt-btn:active{background:#f1f5f9}
+
+/* ─── PRINT LAYOUT ──────────────────────────────────────────────────────────── */
+#print-view{display:none}
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body>*:not(#print-view){display:none!important}
+  body{overflow:visible!important;background:white!important;height:auto!important}
+  #print-view{display:block!important;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1e293b}
+  .pr-page{width:100%;page-break-after:always}
+  .pr-page:last-child{page-break-after:avoid}
+  .pr-hdr{background:#1e5a3c;color:white;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-radius:8px}
+  .pr-hdr-title{font-size:1.1rem;font-weight:700}
+  .pr-hdr-meta{font-size:.75rem;opacity:.85;text-align:right;line-height:1.5}
+  .pr-section{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+  .pr-section-hdr{background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:7px 12px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b}
+  .pr-section-hdr.cash{border-left:4px solid #d97706}
+  .pr-section-hdr.hedge{border-left:4px solid #2563eb}
+  .pr-section-hdr.net{border-left:4px solid #1e5a3c;color:#1e5a3c}
+  .pr-row{display:flex;justify-content:space-between;padding:5px 12px;border-bottom:1px solid #f8fafc;font-size:.78rem}
+  .pr-row:last-child{border-bottom:none}
+  .pr-row-lbl{color:#64748b}
+  .pr-row-val{font-weight:600;color:#1e293b}
+  .pr-row-val.pos{color:#16a34a}
+  .pr-row-val.neg{color:#dc2626}
+  .pr-row-val.hl{color:#1e5a3c;font-weight:800}
+  .pr-row-val.amber{color:#d97706}
+  .pr-row.total{background:#f8fafc;font-weight:700}
+  .pr-row.total .pr-row-lbl{color:#1e293b}
+  .pr-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+  .pr-stat{border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px}
+  .pr-stat-lbl{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b}
+  .pr-stat-val{font-size:1rem;font-weight:800;margin-top:2px}
+  .pr-legs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+  .pr-leg{border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;font-size:.75rem}
+  .pr-leg-badge{display:inline-block;background:#1e5a3c;color:white;border-radius:999px;padding:1px 7px;font-size:.62rem;font-weight:700;margin-bottom:3px}
+  #pr-chart-img{width:100%;display:block;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px}
+  .pr-page2-hdr{background:#f0fdf4;border:2px solid #1e5a3c;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .pr-page2-title{font-size:1rem;font-weight:700;color:#1e5a3c}
+  .pr-page2-price{font-size:1.4rem;font-weight:800;color:#1e5a3c}
+  .pr-2col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+}
 </head>
 <body>
 
@@ -703,6 +752,10 @@ input[type=range]::-moz-range-thumb{
   <div class="card">
     <div class="card-title">
       <span class="card-title-txt">Cash vs. Hedge — Gain / Loss (¢/bu)</span>
+      <button class="prt-btn" onclick="printReport()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print
+      </button>
       <button class="fs-btn" onclick="openFs()" title="Full screen chart">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
         Full Screen
@@ -1608,6 +1661,148 @@ document.getElementById('price-slider').addEventListener('input',e=>{
 renderTemplates();
 renderLegRows();
 fullRender();
+
+// ─── PRINT REPORT ─────────────────────────────────────────────────────────────
+function printReport(){
+  // Ensure chart is rendered
+  if(!myChart){ switchTab('chart'); }
+  if(!myChart){ buildChart(); renderScenario(); renderLegend(); }
+
+  const m=S.scenarioPrice;
+  const gBu=grainBushels();
+  const cashPx=m+S.grain.basis;
+  const cashRev=cashRevenue(m);
+  const cashChg=cashPnl(m);
+  const hedge=hedgePnl(m);
+  const net=netPnl(m);
+  const eff=effectivePrice(m);
+  const bes=findBreakevens();
+  const com=S.commodity.charAt(0).toUpperCase()+S.commodity.slice(1);
+  const now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+
+  // Capture chart as image
+  const chartImg=document.getElementById('payoff-chart').toDataURL('image/png');
+
+  // ── PAGE 1 ──────────────────────────────────────────────────────────────────
+  // Position summary (legs)
+  const legsHtml=S.legs.length
+    ? `<div class="pr-legs">`+S.legs.map((l,i)=>{
+        const opt=isOption(l.type);
+        const name=legName(l);
+        const detail=opt
+          ?`Strike $${l.strike.toFixed(2)} · Prem $${(l.premium||0).toFixed(2)}/bu · ${l.contracts} contract${l.contracts>1?'s':''}`
+          :`Entry $${l.strike.toFixed(2)}/bu · ${l.contracts} contract${l.contracts>1?'s':''}`;
+        return `<div class="pr-leg"><span class="pr-leg-badge">Leg ${i+1}</span><br><strong>${name}</strong><br><span style="color:#64748b;font-size:.7rem">${detail}</span></div>`;
+      }).join('')+`</div>`
+    : `<div style="font-size:.78rem;color:#64748b;margin-bottom:10px">No hedge in place — unhedged position.</div>`;
+
+  // Stats row
+  const statsHtml=`<div class="pr-stats">
+    ${gBu>0?`
+    <div class="pr-stat"><div class="pr-stat-lbl">Effective Price @ $${m.toFixed(2)}</div><div class="pr-stat-val" style="color:#1e5a3c">$${eff.toFixed(4)}</div></div>
+    <div class="pr-stat"><div class="pr-stat-lbl">Unhedged Cash Price</div><div class="pr-stat-val" style="color:#d97706">$${cashPx.toFixed(4)}</div></div>
+    `:`
+    <div class="pr-stat"><div class="pr-stat-lbl">Net P&L @ $${m.toFixed(2)}</div><div class="pr-stat-val" style="color:${net>=0?'#16a34a':'#dc2626'}">${net>=0?'+':'-'}$${Math.abs(net).toFixed(2)}</div></div>
+    `}
+    <div class="pr-stat"><div class="pr-stat-lbl">Hedge Account Result</div><div class="pr-stat-val" style="color:${hedge>=0?'#16a34a':'#dc2626'}">${hedge>=0?'+':'-'}$${Math.abs(hedge).toFixed(2)}</div></div>
+    ${bes.length?`<div class="pr-stat"><div class="pr-stat-lbl">Breakeven${bes.length>1?'s':''}</div><div class="pr-stat-val" style="font-size:.85rem">${bes.map(b=>'$'+b.toFixed(2)).join(', ')}</div></div>`
+    :`<div class="pr-stat"><div class="pr-stat-lbl">Reference Price</div><div class="pr-stat-val">$${S.ref.toFixed(2)}/bu</div></div>`}
+  </div>`;
+
+  document.getElementById('pr-p1').innerHTML=`
+    <div class="pr-hdr">
+      <div><div class="pr-hdr-title">Farm Hedge Analysis Report</div><div style="font-size:.78rem;opacity:.85;margin-top:2px">${com} · Reference $${S.ref.toFixed(2)}/bu${gBu>0?' · '+gBu.toLocaleString()+' bu':''}</div></div>
+      <div class="pr-hdr-meta">${now}<br>Scenario @ $${m.toFixed(2)}/bu</div>
+    </div>
+    ${legsHtml}
+    ${statsHtml}
+    <img id="pr-chart-img" src="${chartImg}">
+    <div style="font-size:.68rem;color:#94a3b8;text-align:center;margin-top:4px">Chart Y-axis: ¢/bu gain or loss · X-axis: futures market price</div>`;
+
+  // ── PAGE 2 ──────────────────────────────────────────────────────────────────
+  let p2='';
+  p2+=`<div class="pr-page2-hdr"><div><div class="pr-page2-title">Scenario Detail</div><div style="font-size:.75rem;color:#64748b;margin-top:2px">All values at market price $${m.toFixed(2)}/bu</div></div><div class="pr-page2-price">${eff!=null?'$'+eff.toFixed(4)+'/bu net':''}</div></div>`;
+
+  p2+=`<div class="pr-2col">`;
+
+  // Cash grain section
+  if(gBu>0){
+    p2+=`<div>
+      <div class="pr-section">
+        <div class="pr-section-hdr cash">🌾 Cash Grain Side</div>
+        <div class="pr-row"><span class="pr-row-lbl">Physical grain to sell</span><span class="pr-row-val">${gBu.toLocaleString()} bu</span></div>
+        <div class="pr-row"><span class="pr-row-lbl">Futures market price</span><span class="pr-row-val">$${m.toFixed(2)}/bu</span></div>
+        <div class="pr-row"><span class="pr-row-lbl">Basis (cash − futures)</span><span class="pr-row-val">${S.grain.basis>=0?'+':''}$${S.grain.basis.toFixed(2)}/bu</span></div>
+        <div class="pr-row"><span class="pr-row-lbl">Local cash price</span><span class="pr-row-val amber">$${cashPx.toFixed(4)}/bu</span></div>
+        <div class="pr-row total"><span class="pr-row-lbl">Cash sale revenue</span><span class="pr-row-val">$${cashRev.toFixed(2)}</span></div>
+        <div class="pr-row"><span class="pr-row-lbl">vs. selling at reference</span><span class="pr-row-val ${cashChg>=0?'pos':'neg'}">${cashChg>=0?'+':'-'}$${Math.abs(cashChg).toFixed(2)}</span></div>
+      </div>
+    </div>`;
+  }
+
+  // Hedge section
+  let hedgeHtml=`<div class="pr-section">
+    <div class="pr-section-hdr hedge">⚙️ Futures &amp; Options (Hedge Account)</div>`;
+  if(S.legs.length){
+    S.legs.forEach((leg,i)=>{
+      const pnl=legPnlTotal(leg,m);
+      hedgeHtml+=`<div class="pr-row"><span class="pr-row-lbl">Leg ${i+1}: ${legName(leg)} @ $${leg.strike.toFixed(2)} × ${leg.contracts}</span><span class="pr-row-val ${pnl>=0?'pos':'neg'}">${pnl>=0?'+':'-'}$${Math.abs(pnl).toFixed(2)}</span></div>`;
+    });
+    hedgeHtml+=`<div class="pr-row total"><span class="pr-row-lbl">Hedge account total</span><span class="pr-row-val ${hedge>=0?'pos':'neg'}">${hedge>=0?'+':'-'}$${Math.abs(hedge).toFixed(2)}</span></div>`;
+  } else {
+    hedgeHtml+=`<div class="pr-row"><span class="pr-row-lbl" style="color:#64748b">No hedge in place</span><span class="pr-row-val">—</span></div>`;
+  }
+  hedgeHtml+=`</div>`;
+  p2+=`<div>${hedgeHtml}</div>`;
+
+  p2+=`</div>`; // end pr-2col
+
+  // Net result
+  if(gBu>0){
+    const hedgeBenefit=eff-cashPx;
+    p2+=`<div class="pr-section" style="margin-top:10px">
+      <div class="pr-section-hdr net">✅ Net Result — What You Actually Get</div>
+      <div class="pr-row"><span class="pr-row-lbl">Cash sale revenue</span><span class="pr-row-val">$${cashRev.toFixed(2)}</span></div>
+      <div class="pr-row"><span class="pr-row-lbl">Futures/options result</span><span class="pr-row-val ${hedge>=0?'pos':'neg'}">${hedge>=0?'+':'-'}$${Math.abs(hedge).toFixed(2)}</span></div>
+      <div class="pr-row total"><span class="pr-row-lbl">Total money received</span><span class="pr-row-val">$${totalRevenue(m).toFixed(2)}</span></div>
+      <div class="pr-row"><span class="pr-row-lbl">Effective net price per bushel</span><span class="pr-row-val hl">$${eff.toFixed(4)}/bu</span></div>
+      <div class="pr-row"><span class="pr-row-lbl">Hedge ${hedgeBenefit>=0?'added':'cost'} vs unhedged ($${cashPx.toFixed(4)}/bu)</span><span class="pr-row-val ${hedgeBenefit>=0?'pos':'neg'}">${hedgeBenefit>=0?'+':'-'}$${Math.abs(hedgeBenefit).toFixed(4)}/bu</span></div>
+    </div>`;
+  } else {
+    p2+=`<div class="pr-section" style="margin-top:10px">
+      <div class="pr-section-hdr net">✅ Net Hedge Result</div>
+      <div class="pr-row total"><span class="pr-row-lbl">Net P&L at $${m.toFixed(2)}/bu</span><span class="pr-row-val ${net>=0?'pos':'neg'}">${net>=0?'+':'-'}$${Math.abs(net).toFixed(2)}</span></div>
+    </div>`;
+  }
+
+  // Margin summary (if applicable)
+  const smLegs=shortMarginLegs();
+  if(smLegs.length){
+    const eq=accountEquity(m);
+    const tm=totalMaintMargin();
+    const ti=totalInitMargin();
+    const eqCls=eq<tm?'neg':eq<ti?'amber':'pos';
+    p2+=`<div class="pr-section" style="margin-top:10px">
+      <div class="pr-section-hdr hedge">📋 Margin Account</div>
+      <div class="pr-row"><span class="pr-row-lbl">Account balance</span><span class="pr-row-val">$${S.acct.toFixed(2)}</span></div>
+      <div class="pr-row"><span class="pr-row-lbl">Hedge P&L at $${m.toFixed(2)}</span><span class="pr-row-val ${hedge>=0?'pos':'neg'}">${hedge>=0?'+':'-'}$${Math.abs(hedge).toFixed(2)}</span></div>
+      <div class="pr-row total"><span class="pr-row-lbl">Account equity</span><span class="pr-row-val ${eqCls}">$${eq.toFixed(2)}</span></div>
+      <div class="pr-row"><span class="pr-row-lbl">Initial / maintenance margin</span><span class="pr-row-val">$${ti.toFixed(0)} / $${tm.toFixed(0)}</span></div>
+      ${eq<tm?`<div class="pr-row" style="background:#fef2f2"><span class="pr-row-lbl" style="color:#dc2626;font-weight:700">⚠ MARGIN CALL — deposit required</span><span class="pr-row-val neg">$${Math.max(0,ti-eq).toFixed(2)}</span></div>`:''}
+    </div>`;
+  }
+
+  document.getElementById('pr-p2').innerHTML=p2;
+
+  window.print();
+}
 </script>
+
+<!-- ═══════════════════════ PRINT VIEW ════════════ -->
+<div id="print-view">
+  <div class="pr-page" id="pr-p1"></div>
+  <div class="pr-page" id="pr-p2"></div>
+</div>
+
 </body>
 </html>
