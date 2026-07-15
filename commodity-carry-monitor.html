@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carry Monitor">
+<meta name="theme-color" content="#1e5a3c">
+<link rel="manifest" href="manifest.json">
+<title>Commodity Carry Monitor</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
+  --slate:#1e293b;--slate-m:#64748b;--border:#e2e8f0;
+  --amber:#f59e0b;--red:#dc2626;--blue:#3b82f6;
+  --white:#fff;--rad:12px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0fdf4;display:flex;flex-direction:column;color:var(--slate);overflow:hidden}
+#hdr{background:var(--green);color:white;flex-shrink:0;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-icon{background:rgba(255,255,255,.15);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#hdr-title{font-size:.95rem;font-weight:700}
+#hdr-sub{font-size:.68rem;color:var(--green-m);margin-top:1px}
+#date-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:5px 12px;text-align:right;flex-shrink:0}
+#date-label{font-size:.62rem;color:var(--green-m);font-weight:600}
+#date-val{font-size:.8rem;font-weight:800;line-height:1.2}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;padding-bottom:calc(70px + var(--safe-b) + 8px)}
+#scroll::-webkit-scrollbar{display:none}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px}
+.hint{font-size:.68rem;color:#94a3b8;margin-top:3px;line-height:1.4}
+.input-wrap{position:relative}
+.pfx,.sfx{position:absolute;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.85rem;pointer-events:none}
+.pfx{left:10px}.sfx{right:10px}
+input[type=number],input[type=text],input[type=email],input[type=password],select{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.95rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
+input.sfx-in{padding-right:36px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:.87rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn-primary{background:var(--green);color:white}
+.btn-primary:active{background:var(--green2)}
+.btn-outline{background:white;border:1.5px solid var(--border);color:var(--slate-m)}
+.btn-danger-txt{background:none;border:none;color:var(--red);font-size:.75rem;font-weight:700;cursor:pointer;padding:6px}
+.btn[disabled]{opacity:.5;pointer-events:none}
+.mode-tabs{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px;margin-bottom:12px}
+.mode-tab{flex:1;background:none;border:none;padding:7px 4px;border-radius:6px;font-size:.75rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:background .15s,color .15s}
+.mode-tab.active{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.toggle{width:44px;height:24px;border-radius:999px;background:#cbd5e1;position:relative;flex-shrink:0;border:none;cursor:pointer;transition:background .2s}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
+.toggle.on::after{transform:translateX(20px)}
+#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-b);box-shadow:0 -2px 12px rgba(0,0,0,.06);z-index:100}
+.nbtn{flex:1;background:none;border:none;cursor:pointer;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate-m);transition:color .12s;min-height:56px}
+.nbtn:active{opacity:.7}
+.nbtn.active{color:var(--green)}
+.nbtn svg{width:20px;height:20px}
+.nbtn span{font-size:.68rem;font-weight:600}
+.sec{display:none}
+.sec.active{display:block}
+/* spread cards */
+.commodity-hd{display:flex;align-items:center;gap:8px;margin:14px 2px 8px;font-size:.85rem;font-weight:800;color:var(--slate)}
+.commodity-hd:first-child{margin-top:2px}
+.commodity-hd .cbadge{font-size:.6rem;background:var(--green);color:white;border-radius:5px;padding:2px 6px;font-weight:700}
+.spread-card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.spread-card:active{border-color:var(--green)}
+.sc-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.sc-pair{font-size:.85rem;font-weight:700}
+.sc-pct{font-size:1.25rem;font-weight:800;letter-spacing:-.5px}
+.sc-bar{height:7px;border-radius:999px;background:#f1f5f9;overflow:hidden;margin:6px 0 7px;position:relative}
+.sc-fill{height:100%;border-radius:999px;transition:width .3s}
+.sc-target-tick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--slate);opacity:.55;border-radius:2px}
+.sc-meta{display:flex;justify-content:space-between;font-size:.68rem;color:var(--slate-m)}
+.watch-tag{font-size:.6rem;font-weight:700;border-radius:999px;padding:2px 7px;background:#eff6ff;color:var(--blue)}
+.watch-tag.hit{background:#fef2f2;color:var(--red)}
+.pct-green{color:#16a34a}.pct-amber{color:var(--amber)}.pct-red{color:var(--red)}.pct-blue{color:var(--blue)}
+/* watches */
+.watch-row{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid #f1f5f9}
+.watch-row:last-child{border-bottom:none}
+.watch-info{flex:1;min-width:0}
+.watch-pair{font-size:.82rem;font-weight:700}
+.watch-sub{font-size:.68rem;color:var(--slate-m);margin-top:2px}
+.banner{border-radius:var(--rad);padding:12px 14px;margin-bottom:10px;font-size:.78rem;line-height:1.5}
+.banner-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.banner-err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.banner-ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.log-row{font-size:.72rem;padding:8px 2px;border-bottom:1px solid #f1f5f9;line-height:1.45}
+.log-row:last-child{border-bottom:none}
+.log-time{color:#94a3b8;font-size:.65rem}
+.log-fail{color:var(--red)}
+#chart-wrap{position:relative;width:100%}
+canvas{display:block;width:100%}
+.chart-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.stat-box{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center}
+.stat-lbl{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m)}
+.stat-val{font-size:.95rem;font-weight:800;margin-top:2px}
+.empty{color:#94a3b8;font-size:.78rem;text-align:center;padding:22px 10px;line-height:1.5}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
+.spinner.dark{border-color:#cbd5e1;border-top-color:var(--green)}
+@keyframes spin{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + var(--safe-b));background:var(--slate);color:white;font-size:.78rem;font-weight:600;padding:10px 16px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;max-width:88%;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-top">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="hdr-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 17 8 11 13 14 21 5"/><polyline points="15 5 21 5 21 11"/>
+        </svg>
+      </div>
+      <div>
+        <div id="hdr-title">Carry Monitor</div>
+        <div id="hdr-sub">% of full carry — corn · beans · wheat</div>
+      </div>
+    </div>
+    <div id="date-pill">
+      <div id="date-label">Last close</div>
+      <div id="date-val">—</div>
+    </div>
+  </div>
+</div>
+
+<div id="scroll">
+
+  <div id="setup-banner" class="banner banner-warn" style="display:none">
+    <strong>Not connected yet.</strong> The Supabase URL / key at the top of this
+    file is still a placeholder — see <code>carry-monitor/README.md</code> in the
+    repo for the 5-minute deploy steps.
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <div id="sec-dash" class="sec active">
+    <div id="dash-status"></div>
+    <div id="dash-list"><div class="empty">Loading…</div></div>
+    <button class="btn btn-outline" id="btn-refresh" onclick="loadAll()" style="margin-top:6px">
+      ↻ Refresh
+    </button>
+  </div>
+
+  <!-- ================= CHARTS ================= -->
+  <div id="sec-charts" class="sec">
+    <div class="card">
+      <div class="card-title">Spread history</div>
+      <div class="field">
+        <label>Spread</label>
+        <select id="chart-pair" onchange="drawChart()"></select>
+      </div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="cm-pct" onclick="setChartMetric('pct')">% of full carry</button>
+        <button class="mode-tab" id="cm-spread" onclick="setChartMetric('spread')">Spread ¢/bu</button>
+      </div>
+      <div id="chart-wrap"><canvas id="chart" height="240"></canvas></div>
+      <div class="chart-stats">
+        <div class="stat-box"><div class="stat-lbl">Latest</div><div class="stat-val" id="cs-latest">—</div></div>
+        <div class="stat-box"><div class="stat-lbl">High</div><div class="stat-val" id="cs-high">—</div></div>
+        <div class="stat-box"><div class="stat-lbl">Low</div><div class="stat-val" id="cs-low">—</div></div>
+      </div>
+      <p class="hint" id="chart-note"></p>
+    </div>
+  </div>
+
+  <!-- ================= ALERTS ================= -->
+  <div id="sec-alerts" class="sec">
+    <div class="card">
+      <div class="card-title">Add alert target</div>
+      <div class="field">
+        <label>Spread to watch</label>
+        <select id="watch-pair"></select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Target % of full carry</label>
+          <div class="input-wrap">
+            <input type="number" id="watch-target" step="1" value="80" class="sfx-in">
+            <span class="sfx">%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Email me</label>
+          <select id="watch-freq">
+            <option value="once">Once, when first hit</option>
+            <option value="daily">Every day it's at/above</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addWatch()">+ Add alert</button>
+      <p class="hint">“Once” re-arms automatically if the spread falls back below your target.
+      Alerts stop when the front contract reaches first notice day.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Your alert targets</div>
+      <div id="watch-list"><div class="empty">No alerts set yet.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent emails</div>
+      <div id="alert-log"><div class="empty">Nothing sent yet.</div></div>
+    </div>
+  </div>
+
+  <!-- ================= SETTINGS ================= -->
+  <div id="sec-settings" class="sec">
+    <div class="card">
+      <div class="card-title">Email delivery</div>
+      <div class="field">
+        <label>Alert email address</label>
+        <input type="email" id="set-email">
+      </div>
+      <div class="field">
+        <label>Market digest email</label>
+        <select id="set-digest">
+          <option value="off">Off — only target alerts</option>
+          <option value="daily">Daily after the close</option>
+          <option value="weekly">Weekly (Mondays)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Resend API key <span id="key-status" style="font-weight:400;color:#94a3b8"></span></label>
+        <input type="password" id="set-resend" placeholder="re_…  (paste once — stored write-only)">
+        <p class="hint">Free account at <strong>resend.com</strong> → sign up with your alert
+        email above → API Keys → Create. The key is stored where the browser can
+        never read it back.</p>
+      </div>
+      <div class="row2">
+        <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+        <button class="btn btn-outline" onclick="sendTestEmail()" id="btn-test">Send test email</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Full carry inputs</div>
+      <div class="field">
+        <label>Annual interest rate</label>
+        <div class="input-wrap">
+          <input type="number" id="set-interest" step="0.1" class="sfx-in">
+          <span class="sfx">%</span>
+        </div>
+        <p class="hint">Your cost of money — operating note rate or opportunity cost.</p>
+      </div>
+      <div id="storage-fields"></div>
+      <p class="hint">Full carry = days between first notice days × (storage/day +
+      front price × rate ÷ 365). CBOT <strong>wheat</strong> uses CME's seasonal Variable
+      Storage Rate — check the current VSR and update wheat's rate here when it changes.</p>
+      <button class="btn btn-primary" onclick="saveCarryInputs()" style="margin-top:8px">Save carry inputs</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Data</div>
+      <div id="run-status" class="hint" style="margin-bottom:10px">—</div>
+      <button class="btn btn-outline" id="btn-run" onclick="runNow()">⟳ Fetch prices &amp; recalculate now</button>
+      <p class="hint">Runs automatically every day at 3:00 pm Central, after grain settlement.</p>
+    </div>
+  </div>
+
+</div>
+
+<div id="bnav">
+  <button class="nbtn active" data-sec="dash" onclick="nav('dash')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    <span>Today</span>
+  </button>
+  <button class="nbtn" data-sec="charts" onclick="nav('charts')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 8 11 13 14 21 5"/><polyline points="15 5 21 5 21 11"/></svg>
+    <span>Charts</span>
+  </button>
+  <button class="nbtn" data-sec="alerts" onclick="nav('alerts')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <span>Alerts</span>
+  </button>
+  <button class="nbtn" data-sec="settings" onclick="nav('settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span>Settings</span>
+  </button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   CONFIG — filled in at deploy time (see carry-monitor/README.md)
+   ============================================================ */
+const SUPABASE_URL      = "__SUPABASE_URL__";
+const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+
+const CONFIGURED = SUPABASE_URL.startsWith("https://");
+
+const MONTH_NAME = {F:'Jan',G:'Feb',H:'Mar',J:'Apr',K:'May',M:'Jun',N:'Jul',Q:'Aug',U:'Sep',V:'Oct',X:'Nov',Z:'Dec'};
+const COMMODITY_NAME = {ZC:'Corn',ZS:'Soybeans',ZW:'Wheat'};
+const COMMODITY_ICON = {ZC:'🌽',ZS:'🫘',ZW:'🌾'};
+
+let latestSpreads = [];   // rows for most recent quote_date
+let watches = [];
+let settings = null;
+let commodities = [];
+let chartMetric = 'pct';
+let historyCache = {};    // pairKey -> rows
+
+/* ---------- helpers ---------- */
+const el = id => document.getElementById(id);
+function toast(msg, ms=2600){ const t=el('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms); }
+
+function parseSymbol(sym){ // ZCH27 -> {commodity:'ZC', mc:'H', year:2027}
+  return { commodity:sym.slice(0,2), mc:sym.slice(2,3), year:2000+parseInt(sym.slice(3),10) };
+}
+function pairLabel(front, back, withCommodity=true){
+  const f=parseSymbol(front), b=parseSymbol(back);
+  const name = withCommodity ? COMMODITY_NAME[f.commodity]+' ' : '';
+  const fy = f.year===b.year ? '' : ' ’'+String(f.year).slice(2);
+  return `${name}${MONTH_NAME[f.mc]}${fy} → ${MONTH_NAME[b.mc]} ’${String(b.year).slice(2)}`;
+}
+const pairKey = s => s.front_symbol+'|'+s.back_symbol;
+function fmtDate(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]} ${+dd}, ${y}`; }
+function pctClass(p){ return p==null?'':'pct-'+(p>=80?'red':p>=60?'amber':p>=0?'green':'blue'); }
+
+/* ---------- REST ---------- */
+async function api(path, opts={}){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type':'application/json', ...(opts.headers||{}) }
+  });
+  if(!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+const fn = (action) => fetch(`${SUPABASE_URL}/functions/v1/carry-daily-update?action=${action}`, {
+  method:'POST', headers:{ Authorization:`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json' }, body:'{}'
+});
+
+/* ---------- load everything ---------- */
+async function loadAll(){
+  if(!CONFIGURED){ el('setup-banner').style.display='block'; el('dash-list').innerHTML='<div class="empty">Connect Supabase to begin (see setup banner).</div>'; return; }
+  try{
+    const latest = await api('carry_spreads?select=quote_date&order=quote_date.desc&limit=1');
+    const latestDate = latest[0]?.quote_date;
+    const [spreads, w, s, c, runs] = await Promise.all([
+      latestDate ? api(`carry_spreads?select=*&quote_date=eq.${latestDate}&order=commodity,front_fnd`) : [],
+      api('carry_watches?select=*&order=created_at'),
+      api('carry_settings?select=*&id=eq.1'),
+      api('carry_commodities?select=*&order=code'),
+      api('carry_run_log?select=*&order=run_at.desc&limit=1'),
+    ]);
+    latestSpreads=spreads; watches=w; settings=s[0]; commodities=c;
+    el('date-val').textContent = latestDate ? fmtDate(latestDate) : 'no data';
+    renderDash(runs[0]);
+    renderWatches();
+    renderSettings();
+    fillPairSelectors();
+    loadAlertLog();
+    loadKeyStatus();
+    if(el('sec-charts').classList.contains('active')) drawChart();
+  }catch(e){
+    el('dash-list').innerHTML = `<div class="banner banner-err"><strong>Couldn’t load data.</strong> ${e.message}</div>`;
+  }
+}
+
+/* ---------- dashboard ---------- */
+function renderDash(lastRun){
+  const box = el('dash-list');
+  if(!latestSpreads.length){
+    box.innerHTML = `<div class="empty">No spread data yet.<br>Go to Settings → “Fetch prices &amp; recalculate now”.</div>`;
+  } else {
+    const watchMap = new Map(watches.filter(w=>w.enabled).map(w=>[w.front_symbol+'|'+w.back_symbol,w]));
+    let html='', lastCommodity='';
+    for(const s of latestSpreads){
+      if(s.commodity!==lastCommodity){
+        lastCommodity=s.commodity;
+        html+=`<div class="commodity-hd">${COMMODITY_ICON[s.commodity]||''} ${COMMODITY_NAME[s.commodity]||s.commodity}</div>`;
+      }
+      const w = watchMap.get(pairKey(s));
+      const pct = s.pct_of_full_carry;
+      const pctTxt = pct==null?'—':pct.toFixed(1)+'%';
+      const width = pct==null?0:Math.max(0,Math.min(100,pct));
+      const hit = w && pct!=null && pct>=w.target_pct;
+      const barColor = pct==null?'#cbd5e1':pct<0?'var(--blue)':pct>=80?'var(--red)':pct>=60?'var(--amber)':'#16a34a';
+      html+=`<div class="spread-card" onclick="openChart('${s.front_symbol}','${s.back_symbol}')">
+        <div class="sc-top">
+          <div class="sc-pair">${pairLabel(s.front_symbol,s.back_symbol,false)}
+            ${w?`<span class="watch-tag ${hit?'hit':''}">${hit?'🔔 target hit':'watching '+w.target_pct+'%'}</span>`:''}
+          </div>
+          <div class="sc-pct ${pctClass(pct)}">${pctTxt}</div>
+        </div>
+        <div class="sc-bar">
+          <div class="sc-fill" style="width:${width}%;background:${barColor}"></div>
+          ${w?`<div class="sc-target-tick" style="left:${Math.min(100,Math.max(0,w.target_pct))}%"></div>`:''}
+        </div>
+        <div class="sc-meta">
+          <span>Spread ${s.spread_cents>=0?'+':''}${(+s.spread_cents).toFixed(2)}¢ · full carry ${(+s.full_carry_cents).toFixed(1)}¢ · ${s.days_between}d</span>
+          <span>tracks until ${fmtDate(s.front_fnd)}</span>
+        </div>
+      </div>`;
+    }
+    box.innerHTML=html;
+  }
+  const st = el('dash-status');
+  if(lastRun && !lastRun.ok){
+    st.innerHTML = `<div class="banner banner-err"><strong>Last data run failed.</strong> ${lastRun.message||''}</div>`;
+  } else if(latestSpreads.some(s=>s.pct_of_full_carry!=null && watches.some(w=>w.enabled && pairKey(s)===w.front_symbol+'|'+w.back_symbol && s.pct_of_full_carry>=w.target_pct))){
+    st.innerHTML = `<div class="banner banner-ok"><strong>🔔 A watched spread is at or above its target.</strong></div>`;
+  } else st.innerHTML='';
+}
+
+/* ---------- charts ---------- */
+function fillPairSelectors(){
+  const opts = latestSpreads.map(s=>`<option value="${pairKey(s)}">${pairLabel(s.front_symbol,s.back_symbol)}</option>`).join('');
+  const cur1=el('chart-pair').value, cur2=el('watch-pair').value;
+  el('chart-pair').innerHTML=opts; el('watch-pair').innerHTML=opts;
+  if([...el('chart-pair').options].some(o=>o.value===cur1)) el('chart-pair').value=cur1;
+  if([...el('watch-pair').options].some(o=>o.value===cur2)) el('watch-pair').value=cur2;
+}
+function openChart(f,b){ nav('charts'); el('chart-pair').value=f+'|'+b; drawChart(); }
+function setChartMetric(m){ chartMetric=m;
+  el('cm-pct').classList.toggle('active',m==='pct');
+  el('cm-spread').classList.toggle('active',m==='spread');
+  drawChart();
+}
+
+async function drawChart(){
+  const key = el('chart-pair').value;
+  if(!key){ return; }
+  const [f,b]=key.split('|');
+  let rows = historyCache[key];
+  if(!rows){
+    try{
+      rows = await api(`carry_spreads?select=quote_date,spread_cents,pct_of_full_carry&front_symbol=eq.${f}&back_symbol=eq.${b}&order=quote_date.asc&limit=800`);
+      historyCache[key]=rows;
+    }catch(e){ toast('Chart load failed'); return; }
+  }
+  const w = watches.find(x=>x.enabled && x.front_symbol===f && x.back_symbol===b);
+  const vals = rows.map(r=> chartMetric==='pct' ? (r.pct_of_full_carry==null?null:+r.pct_of_full_carry) : +r.spread_cents);
+  const unit = chartMetric==='pct'?'%':'¢';
+  const target = (chartMetric==='pct' && w) ? +w.target_pct : null;
+  renderLineChart(el('chart'), rows.map(r=>r.quote_date), vals, unit, target);
+  const nn = vals.filter(v=>v!=null);
+  el('cs-latest').textContent = nn.length? nn[nn.length-1].toFixed(1)+unit : '—';
+  el('cs-high').textContent   = nn.length? Math.max(...nn).toFixed(1)+unit : '—';
+  el('cs-low').textContent    = nn.length? Math.min(...nn).toFixed(1)+unit : '—';
+  el('chart-note').textContent = rows.length
+    ? `${rows.length} trading day${rows.length>1?'s':''} of history · history builds one point per day as the tool runs`
+    : 'No history yet for this spread — it appears after the next daily run.';
+}
+
+function renderLineChart(canvas, labels, vals, unit, target){
+  const dpr = window.devicePixelRatio||1;
+  const cssW = canvas.parentElement.clientWidth, cssH = 240;
+  canvas.width=cssW*dpr; canvas.height=cssH*dpr; canvas.style.height=cssH+'px';
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+  const pts = vals.map((v,i)=>({v,i})).filter(p=>p.v!=null);
+  if(pts.length===0){
+    ctx.fillStyle='#94a3b8'; ctx.font='12px -apple-system,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('No data yet — history builds daily', cssW/2, cssH/2);
+    return;
+  }
+  const padL=40,padR=10,padT=12,padB=22;
+  let lo=Math.min(...pts.map(p=>p.v)), hi=Math.max(...pts.map(p=>p.v));
+  if(target!=null){ lo=Math.min(lo,target); hi=Math.max(hi,target); }
+  if(hi-lo<1e-9){ hi+=1; lo-=1; }
+  const range=hi-lo; lo-=range*.08; hi+=range*.08;
+  const X=i=> pts.length===1 ? (padL+(cssW-padL-padR)/2) : padL+(cssW-padL-padR)*(i/(vals.length-1));
+  const Y=v=> padT+(cssH-padT-padB)*(1-(v-lo)/(hi-lo));
+  // gridlines
+  ctx.strokeStyle='#eef2f7'; ctx.fillStyle='#94a3b8'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='right';
+  for(let g=0; g<=4; g++){
+    const v=lo+(hi-lo)*g/4, y=Y(v);
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(cssW-padR,y); ctx.stroke();
+    ctx.fillText(v.toFixed(Math.abs(hi-lo)<10?1:0)+unit, padL-5, y+3);
+  }
+  // x labels: first, middle, last
+  ctx.textAlign='center';
+  const li=[0, Math.floor((labels.length-1)/2), labels.length-1].filter((v,i,a)=>a.indexOf(v)===i && labels.length>0);
+  for(const i of li){ ctx.fillText(labels[i]?.slice(5)||'', X(i), cssH-6); }
+  // zero line for spread mode
+  if(lo<0 && hi>0){ ctx.strokeStyle='#cbd5e1'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(padL,Y(0)); ctx.lineTo(cssW-padR,Y(0)); ctx.stroke(); ctx.setLineDash([]); }
+  // target line
+  if(target!=null){
+    ctx.strokeStyle='#dc2626'; ctx.setLineDash([5,4]); ctx.beginPath();
+    ctx.moveTo(padL,Y(target)); ctx.lineTo(cssW-padR,Y(target)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#dc2626'; ctx.textAlign='left'; ctx.fillText('target '+target+'%', padL+4, Y(target)-4);
+  }
+  // line + fill
+  ctx.beginPath();
+  pts.forEach((p,idx)=>{ const x=X(p.i),y=Y(p.v); idx?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.strokeStyle='#1e5a3c'; ctx.lineWidth=2; ctx.stroke();
+  const grad=ctx.createLinearGradient(0,padT,0,cssH-padB);
+  grad.addColorStop(0,'rgba(30,90,60,.18)'); grad.addColorStop(1,'rgba(30,90,60,0)');
+  ctx.lineTo(X(pts[pts.length-1].i),cssH-padB); ctx.lineTo(X(pts[0].i),cssH-padB); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+  // last point dot
+  const lp=pts[pts.length-1];
+  ctx.beginPath(); ctx.arc(X(lp.i),Y(lp.v),3.5,0,7); ctx.fillStyle='#1e5a3c'; ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+/* ---------- watches ---------- */
+function renderWatches(){
+  const box=el('watch-list');
+  if(!watches.length){ box.innerHTML='<div class="empty">No alerts set yet.</div>'; return; }
+  const spreadMap=new Map(latestSpreads.map(s=>[pairKey(s),s]));
+  box.innerHTML = watches.map(w=>{
+    const s=spreadMap.get(w.front_symbol+'|'+w.back_symbol);
+    const cur = s&&s.pct_of_full_carry!=null ? (+s.pct_of_full_carry).toFixed(1)+'%' : '—';
+    const hit = s&&s.pct_of_full_carry!=null && s.pct_of_full_carry>=w.target_pct;
+    return `<div class="watch-row">
+      <div class="watch-info">
+        <div class="watch-pair">${pairLabel(w.front_symbol,w.back_symbol)}
+          ${hit&&w.enabled?'<span class="watch-tag hit">🔔 at target</span>':''}</div>
+        <div class="watch-sub">target ${w.target_pct}% · ${w.frequency==='once'?'email once on hit':'email daily while above'} · now ${cur}${!s?' · front month in delivery — inactive':''}</div>
+      </div>
+      <button class="toggle ${w.enabled?'on':''}" onclick="toggleWatch(${w.id},${!w.enabled})" aria-label="enable"></button>
+      <button class="btn-danger-txt" onclick="deleteWatch(${w.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+async function addWatch(){
+  const key=el('watch-pair').value;
+  if(!key) return toast('No spread selected');
+  const [f,b]=key.split('|');
+  const target=parseFloat(el('watch-target').value);
+  if(isNaN(target)) return toast('Enter a target %');
+  try{
+    await api('carry_watches?on_conflict=front_symbol,back_symbol',{method:'POST',
+      headers:{Prefer:'return=minimal,resolution=merge-duplicates'},
+      body:JSON.stringify({commodity:parseSymbol(f).commodity,front_symbol:f,back_symbol:b,
+        target_pct:target,frequency:el('watch-freq').value,enabled:true,state:'below'})});
+    toast('Alert added ✓'); loadAll();
+  }catch(e){ toast('Failed: '+e.message); }
+}
+async function toggleWatch(id,on){
+  try{ await api(`carry_watches?id=eq.${id}`,{method:'PATCH',headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({enabled:on,...(on?{state:'below'}:{})})}); loadAll(); }
+  catch(e){ toast('Failed: '+e.message); }
+}
+async function deleteWatch(id){
+  try{ await api(`carry_watches?id=eq.${id}`,{method:'DELETE',headers:{Prefer:'return=minimal'}}); toast('Alert removed'); loadAll(); }
+  catch(e){ toast('Failed: '+e.message); }
+}
+async function loadAlertLog(){
+  try{
+    const rows=await api('carry_alert_log?select=*&order=sent_at.desc&limit=12');
+    el('alert-log').innerHTML = rows.length ? rows.map(r=>`
+      <div class="log-row ${r.success?'':'log-fail'}">
+        <div>${r.success?'✅':'❌'} ${r.subject||r.kind}</div>
+        <div class="log-time">${new Date(r.sent_at).toLocaleString()} → ${r.recipient||''}${r.error?' · '+r.error:''}</div>
+      </div>`).join('') : '<div class="empty">Nothing sent yet.</div>';
+  }catch(e){ /* non-fatal */ }
+}
+
+/* ---------- settings ---------- */
+function renderSettings(){
+  if(!settings) return;
+  el('set-email').value=settings.alert_email||'';
+  el('set-digest').value=settings.digest_frequency||'off';
+  el('set-interest').value=settings.interest_rate_pct;
+  el('storage-fields').innerHTML = commodities.map(c=>`
+    <div class="field">
+      <label>${COMMODITY_ICON[c.code]||''} ${c.name} storage rate</label>
+      <div class="input-wrap">
+        <input type="number" step="0.1" id="storage-${c.code}" value="${c.storage_cents_per_bu_month}" class="sfx-in">
+        <span class="sfx">¢/bu/mo</span>
+      </div>
+    </div>`).join('');
+}
+async function saveSettings(){
+  try{
+    await api('carry_settings?id=eq.1',{method:'PATCH',headers:{Prefer:'return=minimal'},
+      body:JSON.stringify({alert_email:el('set-email').value.trim(),
+        digest_frequency:el('set-digest').value, updated_at:new Date().toISOString()})});
+    const key=el('set-resend').value.trim();
+    if(key){
+      await api('rpc/carry_set_resend_key',{method:'POST',body:JSON.stringify({key})});
+      el('set-resend').value='';
+    }
+    toast('Settings saved ✓'); loadKeyStatus();
+  }catch(e){ toast('Save failed: '+e.message); }
+}
+async function saveCarryInputs(){
+  try{
+    await api('carry_settings?id=eq.1',{method:'PATCH',headers:{Prefer:'return=minimal'},
+      body:JSON.stringify({interest_rate_pct:parseFloat(el('set-interest').value)||0})});
+    for(const c of commodities){
+      const v=parseFloat(el('storage-'+c.code).value);
+      if(!isNaN(v) && v!==+c.storage_cents_per_bu_month){
+        await api(`carry_commodities?code=eq.${c.code}`,{method:'PATCH',headers:{Prefer:'return=minimal'},
+          body:JSON.stringify({storage_cents_per_bu_month:v,updated_at:new Date().toISOString()})});
+      }
+    }
+    toast('Carry inputs saved — applies from the next daily run');
+    historyCache={}; loadAll();
+  }catch(e){ toast('Save failed: '+e.message); }
+}
+async function loadKeyStatus(){
+  try{
+    const set=await api('rpc/carry_secret_status',{method:'POST',body:'{}'});
+    el('key-status').textContent = set ? '· key saved ✓' : '· not set yet';
+    el('btn-test').disabled = !set;
+  }catch(e){ /* ignore */ }
+}
+async function sendTestEmail(){
+  const b=el('btn-test'); b.innerHTML='<span class="spinner dark"></span> Sending…';
+  try{
+    const res=await (await fn('test-email')).json();
+    toast(res.ok?'Test email sent ✓ — check your inbox':'Failed: '+(res.error||'unknown'));
+  }catch(e){ toast('Failed: '+e.message); }
+  b.textContent='Send test email'; loadAlertLog();
+}
+async function runNow(){
+  const b=el('btn-run'); b.innerHTML='<span class="spinner dark"></span> Fetching ~40 contracts… (30–60s)'; b.disabled=true;
+  try{
+    const res=await (await fn('run')).json();
+    toast(res.ok?`Done ✓ ${res.contracts} contracts, ${res.spreads} spreads`:'Run failed: '+(res.error||res.message||''),4000);
+    historyCache={};
+  }catch(e){ toast('Run failed: '+e.message,4000); }
+  b.disabled=false; b.innerHTML='⟳ Fetch prices &amp; recalculate now';
+  loadAll();
+}
+
+/* ---------- nav ---------- */
+function nav(sec){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  el('sec-'+sec).classList.add('active');
+  document.querySelectorAll('.nbtn').forEach(b=>b.classList.toggle('active',b.dataset.sec===sec));
+  el('scroll').scrollTop=0;
+  if(sec==='charts') drawChart();
+}
+
+/* ---------- run-log status line ---------- */
+async function loadRunStatus(){
+  if(!CONFIGURED) return;
+  try{
+    const runs=await api('carry_run_log?select=*&order=run_at.desc&limit=1');
+    if(runs[0]) el('run-status').innerHTML =
+      `${runs[0].ok?'✅':'❌'} Last run ${new Date(runs[0].run_at).toLocaleString()} — ${runs[0].message||''}`;
+  }catch(e){ /* ignore */ }
+}
+
+loadAll(); loadRunStatus();
+window.addEventListener('resize',()=>{ if(el('sec-charts').classList.contains('active')) drawChart(); });
+</script>
+</body>
+</html>
