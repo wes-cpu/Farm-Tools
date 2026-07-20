@@ -111,6 +111,27 @@ async function fetchYahooPrice(
   return null;
 }
 
+// ---------- NY Fed SOFR (market interest benchmark) ----------
+/** Returns the 90-day average SOFR in percent from the NY Fed public
+ *  API, or null on failure. CME's financial-full-carry convention is
+ *  3-month SOFR + 200 bps on a 360-day count. */
+async function fetchSofr90(): Promise<{ pct: number; date: string } | null> {
+  try {
+    const res = await fetch(
+      "https://markets.newyorkfed.org/api/rates/secured/sofrai/last/1.json",
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const row = json?.refRates?.[0];
+    const pct = Number(row?.average90day);
+    if (!isFinite(pct) || pct <= 0) return null;
+    return { pct, date: String(row?.effectiveDate ?? "") };
+  } catch (_e) {
+    return null;
+  }
+}
+
 // ---------- Resend ----------
 async function sendEmail(
   apiKey: string,
@@ -179,12 +200,16 @@ interface Commodity {
   code: string;
   name: string;
   month_codes: string[];
-  storage_cents_per_bu_month: number;
+  storage_cents_per_bu_month: number;      // legacy
+  storage_cents_per_bu_day: number | null; // exchange premium charge
 }
 interface Settings {
   alert_email: string;
-  interest_rate_pct: number;
+  interest_rate_pct: number;               // legacy fallback
   digest_frequency: "off" | "daily" | "weekly";
+  interest_spread_bps: number;
+  sofr_90d_pct: number | null;
+  sofr_fetched_on: string | null;
 }
 interface WatchRow {
   id: number;
@@ -215,8 +240,10 @@ interface SpreadRow {
   back_price_cents: number;
   spread_cents: number;
   days_between: number;
-  storage_cents_month: number;
-  interest_rate_pct: number;
+  storage_cents_month: number;   // legacy display (day rate × 365/12)
+  storage_cents_day: number;     // exchange premium charge used
+  interest_rate_pct: number;     // combined rate used (SOFR90 + spread)
+  rate_note: string;
   full_carry_cents: number;
   pct_of_full_carry: number | null;
   front_fnd: string;
@@ -235,6 +262,23 @@ async function runDaily(): Promise<Record<string, unknown>> {
   ]);
   const settings = settingsRows[0];
   const resendKey = secretRows[0]?.resend_api_key ?? null;
+
+  // ---- 0. market interest rate: 3-month SOFR (NY Fed) + 200 bps, act/360
+  const sofr = await fetchSofr90();
+  let sofrPct: number | null = sofr?.pct ?? settings.sofr_90d_pct;
+  let rateNote: string;
+  if (sofr) {
+    rateNote = `SOFR90 ${sofr.pct.toFixed(2)}% + ${settings.interest_spread_bps}bp (NY Fed ${sofr.date})`;
+    await dbWrite("carry_settings?id=eq.1", "PATCH", {
+      sofr_90d_pct: sofr.pct, sofr_fetched_on: sofr.date,
+    });
+  } else if (sofrPct != null) {
+    rateNote = `SOFR90 ${Number(sofrPct).toFixed(2)}% + ${settings.interest_spread_bps}bp (NY Fed fetch failed — using last known ${settings.sofr_fetched_on ?? "value"})`;
+  } else {
+    sofrPct = settings.interest_rate_pct - 2; // legacy fallback, first run only
+    rateNote = `fallback rate ${settings.interest_rate_pct}% (SOFR unavailable)`;
+  }
+  const marketRatePct = Number(sofrPct) + settings.interest_spread_bps / 100;
 
   // ---- 1. enumerate + fetch contracts (FND in the future, ~3 yrs out)
   const horizon = new Date(today);
@@ -312,8 +356,9 @@ async function runDaily(): Promise<Record<string, unknown>> {
       if (f.quoteDate !== b.quoteDate) continue; // stale leg — skip pair
       const days = Math.round((b.fnd.getTime() - f.fnd.getTime()) / 86400000);
       if (days <= 0) continue;
-      const storagePerDay = c.storage_cents_per_bu_month * 12 / 365;
-      const interestPerDay = f.price * (settings.interest_rate_pct / 100) / 365;
+      // CME convention: exchange premium charge ¢/day + price × (SOFR90+200bp)/360
+      const storagePerDay = c.storage_cents_per_bu_day ?? (c.storage_cents_per_bu_month * 12 / 365);
+      const interestPerDay = f.price * (marketRatePct / 100) / 360;
       const fullCarry = days * (storagePerDay + interestPerDay);
       const spread = b.price - f.price;
       spreads.push({
@@ -325,8 +370,10 @@ async function runDaily(): Promise<Record<string, unknown>> {
         back_price_cents: b.price,
         spread_cents: spread,
         days_between: days,
-        storage_cents_month: c.storage_cents_per_bu_month,
-        interest_rate_pct: settings.interest_rate_pct,
+        storage_cents_month: storagePerDay * 365 / 12,
+        storage_cents_day: storagePerDay,
+        interest_rate_pct: marketRatePct,
+        rate_note: rateNote,
         full_carry_cents: fullCarry,
         pct_of_full_carry: fullCarry > 0 ? (spread / fullCarry) * 100 : null,
         front_fnd: isoDate(f.fnd),
@@ -380,7 +427,7 @@ async function runDaily(): Promise<Record<string, unknown>> {
            <tr><td style="padding:4px 8px;color:#64748b">Full carry (${s.days_between} days)</td><td style="padding:4px 8px;text-align:right">${s.full_carry_cents.toFixed(2)}¢/bu</td></tr>
            <tr><td style="padding:4px 8px;color:#64748b">Front (${s.front_symbol})</td><td style="padding:4px 8px;text-align:right">${s.front_price_cents.toFixed(2)}¢</td></tr>
            <tr><td style="padding:4px 8px;color:#64748b">Back (${s.back_symbol})</td><td style="padding:4px 8px;text-align:right">${s.back_price_cents.toFixed(2)}¢</td></tr>
-           <tr><td style="padding:4px 8px;color:#64748b">Inputs</td><td style="padding:4px 8px;text-align:right">${s.storage_cents_month}¢/mo storage, ${s.interest_rate_pct}% interest</td></tr>
+           <tr><td style="padding:4px 8px;color:#64748b">Market inputs (CME convention)</td><td style="padding:4px 8px;text-align:right">${s.storage_cents_day.toFixed(3)}¢/bu/day exchange storage · ${s.interest_rate_pct.toFixed(2)}% (${s.rate_note})</td></tr>
            <tr><td style="padding:4px 8px;color:#64748b">Tracking stops (front FND)</td><td style="padding:4px 8px;text-align:right">${s.front_fnd}</td></tr>
          </table>`,
       );

@@ -239,20 +239,20 @@ canvas{display:block;width:100%}
     </div>
 
     <div class="card">
-      <div class="card-title">Full carry inputs</div>
+      <div class="card-title">Market carry inputs — CME convention</div>
       <div class="field">
-        <label>Annual interest rate</label>
-        <div class="input-wrap">
-          <input type="number" id="set-interest" step="0.1" class="sfx-in">
-          <span class="sfx">%</span>
-        </div>
-        <p class="hint">Your cost of money — operating note rate or opportunity cost.</p>
+        <label>Interest (automatic)</label>
+        <div class="banner banner-ok" style="margin-bottom:0" id="rate-display">—</div>
+        <p class="hint">3-month SOFR from the New York Fed + 200 basis points on the front
+        price, 360-day count — the same benchmark CME uses in its financial
+        full carry calculation. Fetched fresh every daily run; nothing to enter.</p>
       </div>
       <div id="storage-fields"></div>
-      <p class="hint">Full carry = days between first notice days × (storage/day +
-      front price × rate ÷ 365). CBOT <strong>wheat</strong> uses CME's seasonal Variable
-      Storage Rate — check the current VSR and update wheat's rate here when it changes.</p>
-      <button class="btn btn-primary" onclick="saveCarryInputs()" style="margin-top:8px">Save carry inputs</button>
+      <p class="hint">Storage is the <strong>exchange premium charge</strong>, not a personal
+      cost: corn &amp; soybeans 26.5/100¢/bu/day (CBOT, eff. Jan 2025); Chicago wheat is
+      governed by CME's <strong>Variable Storage Rate</strong> and steps up/down 10/100¢/day
+      when CME announces a VSR change — update wheat's number here when that happens.</p>
+      <button class="btn btn-primary" onclick="saveCarryInputs()" style="margin-top:8px">Save storage rates</button>
     </div>
 
     <div class="card">
@@ -562,14 +562,18 @@ function renderSettings(){
   if(!settings) return;
   el('set-email').value=settings.alert_email||'';
   el('set-digest').value=settings.digest_frequency||'off';
-  el('set-interest').value=settings.interest_rate_pct;
+  const spread=(settings.interest_spread_bps??200)/100;
+  el('rate-display').innerHTML = settings.sofr_90d_pct!=null
+    ? `<strong>${(Number(settings.sofr_90d_pct)+spread).toFixed(2)}%</strong> — 3-mo SOFR ${Number(settings.sofr_90d_pct).toFixed(2)}% (NY Fed, ${settings.sofr_fetched_on||'—'}) + ${settings.interest_spread_bps??200} bps`
+    : 'Fetches automatically on the next daily run.';
   el('storage-fields').innerHTML = commodities.map(c=>`
     <div class="field">
-      <label>${COMMODITY_ICON[c.code]||''} ${c.name} storage rate</label>
+      <label>${COMMODITY_ICON[c.code]||''} ${c.name} — exchange premium charge</label>
       <div class="input-wrap">
-        <input type="number" step="0.1" id="storage-${c.code}" value="${c.storage_cents_per_bu_month}" class="sfx-in">
-        <span class="sfx">¢/bu/mo</span>
+        <input type="number" step="0.005" id="storage-${c.code}" value="${c.storage_cents_per_bu_day??''}" class="sfx-in">
+        <span class="sfx">¢/bu/day</span>
       </div>
+      ${c.storage_note?`<p class="hint">${c.storage_note}</p>`:''}
     </div>`).join('');
 }
 async function saveSettings(){
@@ -587,16 +591,14 @@ async function saveSettings(){
 }
 async function saveCarryInputs(){
   try{
-    await api('carry_settings?id=eq.1',{method:'PATCH',headers:{Prefer:'return=minimal'},
-      body:JSON.stringify({interest_rate_pct:parseFloat(el('set-interest').value)||0})});
     for(const c of commodities){
       const v=parseFloat(el('storage-'+c.code).value);
-      if(!isNaN(v) && v!==+c.storage_cents_per_bu_month){
+      if(!isNaN(v) && v!==+(c.storage_cents_per_bu_day??NaN)){
         await api(`carry_commodities?code=eq.${c.code}`,{method:'PATCH',headers:{Prefer:'return=minimal'},
-          body:JSON.stringify({storage_cents_per_bu_month:v,updated_at:new Date().toISOString()})});
+          body:JSON.stringify({storage_cents_per_bu_day:v,updated_at:new Date().toISOString()})});
       }
     }
-    toast('Carry inputs saved — applies from the next daily run');
+    toast('Exchange storage rates saved — applies from the next run');
     historyCache={}; loadAll();
   }catch(e){ toast('Save failed: '+e.message); }
 }

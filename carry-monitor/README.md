@@ -12,12 +12,17 @@ wheat (ZW) futures — automatically, once a day.
   (Dec→Mar, Mar→May, May→Jul, …) and expresses it as a % of full carry:
 
   ```
-  full carry (¢/bu) = days × ( storage ¢/day  +  front price × interest rate ÷ 365 )
+  full carry (¢/bu) = days × ( exchange storage ¢/day  +  front price × (SOFR3m + 200bp) ÷ 360 )
   % of full carry   = spread ÷ full carry × 100
   ```
 
-  where `days` = days between the two contracts' **first notice days**, and
-  storage/interest are editable on the Settings screen.
+  where `days` = days between the two contracts' **first notice days**.
+  The inputs are the **market's** (CME convention), not personal costs:
+  storage is the exchange premium charge (corn/soybeans 26.5/100 ¢/bu/day
+  per CBOT filing 24-443 eff. Jan 2025; Chicago wheat per CME's Variable
+  Storage Rate, currently 16.5/100), and interest is the 3-month SOFR
+  fetched daily from the NY Fed public API plus 200 basis points on a
+  360-day count — the same benchmark CME uses for VSR financial full carry.
 - Each day's spread is saved to Postgres, so the web page charts history over
   time.
 - A pair **stops being tracked when the front contract reaches first notice
@@ -88,8 +93,12 @@ restriction.
   delivery; exchange holidays aren't modeled, which can shift the cutoff by
   one day in rare cases.
 - **Wheat storage**: CBOT wheat uses CME's seasonal **Variable Storage Rate**.
-  The tool uses a flat ¢/bu/month you set per commodity — check the current
-  VSR and update wheat's rate on the Settings screen when CME changes it.
+  CME can't be scraped automatically (their site blocks bots), so when CME
+  announces a VSR change (≥80% of full carry → +10/100 ¢/day, ≤50% →
+  −10/100), update wheat's premium charge on the Settings screen.
+- **Interest rate source**: NY Fed 90-day average SOFR (public API) + 200 bps.
+  If the NY Fed fetch ever fails, the run falls back to the last known value
+  and says so in the per-day `rate_note`.
 - **Security model**: single-user tool. Market data is world-readable;
   settings/watches are writable by anyone holding the page's anon key (same
   model as the other Farm-Tools pages — don't share the page URL broadly).
