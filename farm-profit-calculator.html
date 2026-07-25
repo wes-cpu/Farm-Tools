@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Profit Planner">
+<meta name="theme-color" content="#1e5a3c">
+<title>Profit Planner</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
+  --slate:#1e293b;--slate-m:#64748b;--border:#e2e8f0;
+  --amber:#d97706;--amber-bg:#fffbeb;--amber-br:#fcd34d;
+  --red:#dc2626;--blue:#2563eb;
+  --white:#fff;--rad:12px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0fdf4;display:flex;flex-direction:column;color:var(--slate);overflow:hidden}
+#hdr{background:var(--green);color:white;flex-shrink:0;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-icon{background:rgba(255,255,255,.15);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#hdr-title{font-size:.95rem;font-weight:700}
+#hdr-sub{font-size:.68rem;color:var(--green-m);margin-top:1px}
+#status-pill{border-radius:999px;padding:5px 12px;text-align:right;flex-shrink:0;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25)}
+#status-label{font-size:.6rem;color:var(--green-m);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+#status-val{font-size:.9rem;font-weight:800;line-height:1.2}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;padding-bottom:calc(70px + var(--safe-b) + 8px)}
+#scroll::-webkit-scrollbar{display:none}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px}
+.hint{font-size:.68rem;color:#94a3b8;margin-top:3px}
+.input-wrap{position:relative}
+.pfx,.sfx{position:absolute;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.85rem;pointer-events:none}
+.pfx{left:10px}.sfx{right:10px}
+input[type=number],input[type=text]{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.95rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
+input.pfx-in{padding-left:24px}
+input.sfx-in{padding-right:34px}
+/* Reverse-math summary */
+.mathbox{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 13px}
+.math-row{display:flex;justify-content:space-between;align-items:baseline;font-size:.82rem;line-height:2}
+.math-lbl{color:var(--slate-m)}
+.math-val{font-weight:700;color:var(--slate);white-space:nowrap}
+.math-op{border-top:1px solid #e2e8f0;margin-top:4px;padding-top:4px}
+.verdict{border-radius:10px;padding:13px 14px;margin-top:10px;text-align:center}
+.verdict.over{background:var(--amber-bg);border:1px solid var(--amber-br)}
+.verdict.under{background:#ecfdf5;border:1px solid #a7f3d0}
+.verdict.short{background:#fef2f2;border:1px solid #fecaca}
+.verdict-lbl{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.verdict.over .verdict-lbl{color:var(--amber)}
+.verdict.under .verdict-lbl{color:var(--green)}
+.verdict.short .verdict-lbl{color:var(--red)}
+.verdict-val{font-size:1.55rem;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+.verdict.over .verdict-val{color:var(--amber)}
+.verdict.under .verdict-val{color:var(--green)}
+.verdict.short .verdict-val{color:var(--red)}
+.verdict-sub{font-size:.72rem;color:var(--slate-m);margin-top:4px}
+/* Expense rows */
+.exp-group-hd{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 8px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m)}
+.exp-group-total{font-weight:800;color:var(--slate)}
+.exp{border:1.5px solid var(--border);border-radius:11px;padding:11px;margin-bottom:9px;background:white;transition:border-color .2s,background .2s}
+.exp.cut{border-color:var(--amber-br);background:var(--amber-bg)}
+.exp.protected{border-left:4px solid var(--blue)}
+.exp-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.exp-name{flex:1;font-weight:600;padding:8px 9px;font-size:.9rem}
+.exp-del{background:none;border:none;color:#cbd5e1;cursor:pointer;padding:4px;flex-shrink:0;line-height:0}
+.exp-del:hover{color:var(--red)}
+.exp-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mini-lbl{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--slate-m);margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.type-seg{display:flex;background:#f1f5f9;border-radius:8px;padding:2px;gap:2px}
+.type-seg button{flex:1;background:none;border:none;padding:6px 4px;border-radius:6px;font-size:.72rem;font-weight:700;color:var(--slate-m);cursor:pointer;transition:.15s}
+.type-seg button.on-fixed{background:white;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.type-seg button.on-var{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.prio-wrap{display:flex;align-items:center;gap:9px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:999px;background:linear-gradient(90deg,var(--blue),#22c55e,var(--amber),var(--red));outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:white;border:2px solid var(--slate);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:white;border:2px solid var(--slate);cursor:pointer}
+.prio-badge{flex-shrink:0;width:30px;text-align:center;font-weight:800;font-size:1rem;color:var(--slate)}
+.prio-word{font-size:.6rem;color:var(--slate-m);text-align:center;margin-top:2px}
+.exp-result{margin-top:9px;padding-top:9px;border-top:1px dashed #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:.8rem}
+.exp-result .rl{color:var(--slate-m)}
+.exp-result .rv{font-weight:700}
+.exp-result .rv.cutv{color:var(--amber)}
+.exp-result .rv.okv{color:var(--green)}
+.add-btn{width:100%;padding:12px;background:white;border:1.5px dashed var(--border);border-radius:10px;font-size:.85rem;font-weight:700;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:10px}
+.add-btn:active{background:#f8fafc}
+.btn-row{display:flex;gap:8px}
+.reset-btn{flex:1;padding:13px;background:white;border:1.5px solid var(--border);border-radius:10px;font-size:.87rem;font-weight:600;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
+/* Summary tab */
+.big-num{font-size:2rem;font-weight:800;letter-spacing:-1px;line-height:1}
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.kpi{background:white;border:1px solid var(--border);border-radius:var(--rad);padding:13px}
+.kpi-lbl{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m);margin-bottom:4px}
+.kpi-val{font-size:1.35rem;font-weight:800;letter-spacing:-.5px}
+.kpi-sub{font-size:.66rem;color:#94a3b8;margin-top:2px}
+.be-row{display:flex;justify-content:space-between;align-items:baseline;font-size:.82rem;line-height:2;border-bottom:1px solid #f1f5f9;padding:1px 0}
+.be-row:last-child{border-bottom:none}
+.be-lbl{color:var(--slate-m)}
+.be-val{font-weight:700}
+.plan-row{display:grid;grid-template-columns:1fr auto auto;gap:4px 12px;font-size:.8rem;align-items:baseline;padding:5px 0;border-bottom:1px solid #f1f5f9}
+.plan-row.hd{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m);border-bottom:1.5px solid var(--border)}
+.plan-name{font-weight:600}
+.plan-num{text-align:right;font-weight:700;white-space:nowrap}
+.plan-cut{color:var(--amber)}
+.plan-ok{color:var(--slate-m)}
+.pill-mini{display:inline-block;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:5px;vertical-align:middle}
+.pill-fixed{background:#dbeafe;color:var(--blue)}
+.pill-var{background:#dcfce7;color:var(--green)}
+.note{font-size:.72rem;color:var(--slate-m);line-height:1.55;background:#f8fafc;border:1px solid #eef2f7;border-radius:9px;padding:10px 12px;margin-top:10px}
+/* Bottom nav */
+#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-b);box-shadow:0 -2px 12px rgba(0,0,0,.06);z-index:100}
+.nbtn{flex:1;background:none;border:none;cursor:pointer;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate-m);transition:color .12s;min-height:56px}
+.nbtn.active{color:var(--green)}
+.nbtn svg{width:20px;height:20px}
+.nbtn span{font-size:.68rem;font-weight:600}
+.sec{display:none}
+.sec.active{display:block}
+.method-tabs{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px;margin-bottom:10px}
+.method-tab{flex:1;background:none;border:none;padding:7px 4px;border-radius:6px;font-size:.72rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:.15s}
+.method-tab.active{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-top">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="hdr-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+        </svg>
+      </div>
+      <div>
+        <div id="hdr-title">Profit Planner</div>
+        <div id="hdr-sub">Set your profit, back-fill the budget</div>
+      </div>
+    </div>
+    <div id="status-pill">
+      <div id="status-label">Target</div>
+      <div id="status-val">—</div>
+    </div>
+  </div>
+</div>
+
+<div id="scroll">
+
+  <!-- ===================== BUDGET TAB ===================== -->
+  <div id="sec-budget" class="sec active">
+
+    <!-- Revenue & Goal -->
+    <div class="card">
+      <div class="card-title">1 · Revenue &amp; Profit Goal</div>
+      <div class="row2">
+        <div class="field">
+          <label>Yield / acre</label>
+          <div class="input-wrap">
+            <input type="number" id="yield" class="sfx-in" inputmode="decimal" step="1" value="200" oninput="calc()">
+            <span class="sfx">bu</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Price / bu</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="price" class="pfx-in" inputmode="decimal" step="0.01" value="4.50" oninput="calc()">
+          </div>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label>Target profit / acre <span style="color:var(--green);font-weight:800">◄ your goal</span></label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="target" class="pfx-in" inputmode="decimal" step="5" value="100" oninput="calc()">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Acres (for totals)</label>
+          <input type="number" id="acres" inputmode="decimal" step="1" value="1000" oninput="calc()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Reverse math -->
+    <div class="card">
+      <div class="card-title">2 · The Math, Backwards</div>
+      <div class="mathbox">
+        <div class="math-row"><span class="math-lbl">Revenue / acre</span><span class="math-val" id="m-rev">—</span></div>
+        <div class="math-row"><span class="math-lbl">− Target profit / acre</span><span class="math-val" id="m-target">—</span></div>
+        <div class="math-row math-op"><span class="math-lbl"><b>= Expense budget / acre</b></span><span class="math-val" id="m-budget" style="color:var(--green)">—</span></div>
+        <div class="math-row"><span class="math-lbl">Planned expenses / acre</span><span class="math-val" id="m-planned">—</span></div>
+      </div>
+      <div class="verdict" id="verdict">
+        <div class="verdict-lbl" id="v-lbl">—</div>
+        <div class="verdict-val" id="v-val">—</div>
+        <div class="verdict-sub" id="v-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Expenses -->
+    <div class="card">
+      <div class="card-title">
+        3 · Expenses &amp; Cut Priority
+      </div>
+      <div class="note" style="margin-top:0;margin-bottom:12px">
+        <b>Priority 1</b> = protected, never cut (e.g. that high-value land you must have).
+        <b>Priority 10</b> = first on the chopping block. When you're over budget, cuts come out of your
+        highest-priority items first, down to each line's <b>Min</b>.
+      </div>
+
+      <div class="exp-group-hd">
+        <span>◆ Fixed costs</span><span class="exp-group-total" id="fixed-total">—</span>
+      </div>
+      <div id="fixed-list"></div>
+
+      <div class="exp-group-hd" style="margin-top:14px">
+        <span>◆ Variable costs</span><span class="exp-group-total" id="var-total">—</span>
+      </div>
+      <div id="var-list"></div>
+
+      <button class="add-btn" onclick="addRow('fixed')">+ Add fixed cost</button>
+      <button class="add-btn" onclick="addRow('variable')" style="margin-bottom:0">+ Add variable cost</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="reset-btn" onclick="resetAll()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Reset to example
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== SUMMARY TAB ===================== -->
+  <div id="sec-summary" class="sec">
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-lbl">Target profit</div>
+        <div class="kpi-val" style="color:var(--green)" id="k-target">—</div>
+        <div class="kpi-sub" id="k-target-total">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-lbl">Profit as planned</div>
+        <div class="kpi-val" id="k-planned">—</div>
+        <div class="kpi-sub" id="k-planned-total">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Where You Stand</div>
+      <div class="verdict" id="verdict2" style="margin-top:0">
+        <div class="verdict-lbl" id="v2-lbl">—</div>
+        <div class="verdict-val" id="v2-val">—</div>
+        <div class="verdict-sub" id="v2-sub">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">The Plan — Suggested Cuts</div>
+      <div class="method-tabs">
+        <button class="method-tab active" id="mt-priority" onclick="setMethod('priority')">By priority (waterfall)</button>
+        <button class="method-tab" id="mt-spread" onclick="setMethod('spread')">Spread evenly</button>
+      </div>
+      <div class="plan-row hd">
+        <div>Line</div><div class="plan-num">Planned</div><div class="plan-num">→ Target</div>
+      </div>
+      <div id="plan-list"></div>
+      <div class="plan-row" style="border-bottom:none;border-top:1.5px solid var(--border);margin-top:2px;font-weight:800">
+        <div>Total expenses</div>
+        <div class="plan-num" id="plan-tot-planned">—</div>
+        <div class="plan-num" id="plan-tot-target">—</div>
+      </div>
+      <div class="note" id="plan-note">—</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Break-Even &amp; What-If</div>
+      <div class="be-row"><span class="be-lbl">Break-even price (profit = $0)</span><span class="be-val" id="be-price">—</span></div>
+      <div class="be-row"><span class="be-lbl">Break-even yield (profit = $0)</span><span class="be-val" id="be-yield">—</span></div>
+      <div class="be-row"><span class="be-lbl">Price needed to hit target</span><span class="be-val" id="be-price-t">—</span></div>
+      <div class="be-row"><span class="be-lbl">Yield needed to hit target</span><span class="be-val" id="be-yield-t">—</span></div>
+      <div class="be-row"><span class="be-lbl">Cost per bushel (planned)</span><span class="be-val" id="be-cpb">—</span></div>
+      <div class="note">
+        These use your <b>planned</b> expenses. They answer the other side of the question: if you'd rather not cut,
+        what price or yield gets you to your goal instead?
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav id="bnav">
+  <button class="nbtn active" id="nav-budget" onclick="showTab('budget')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    <span>Budget</span>
+  </button>
+  <button class="nbtn" id="nav-summary" onclick="showTab('summary')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    <span>Summary</span>
+  </button>
+</nav>
+
+<script>
+/* ---------- state ---------- */
+const PRIO_WORDS = ['','Protect','','','','Flexible','','','','','Cut 1st'];
+const DEFAULT = {
+  yield:200, price:4.50, target:100, acres:1000, method:'priority',
+  expenses:[
+    {name:'Land rent',        type:'fixed',    amount:250, prio:1,  min:0},
+    {name:'Equipment / depr', type:'fixed',    amount:60,  prio:2,  min:0},
+    {name:'Labor',            type:'fixed',    amount:40,  prio:2,  min:0},
+    {name:'Machinery repairs',type:'fixed',    amount:35,  prio:3,  min:0},
+    {name:'Insurance',        type:'fixed',    amount:25,  prio:2,  min:0},
+    {name:'Interest',         type:'fixed',    amount:30,  prio:3,  min:0},
+    {name:'Overhead / misc',  type:'fixed',    amount:20,  prio:4,  min:0},
+    {name:'Fertilizer',       type:'variable', amount:160, prio:8,  min:90},
+    {name:'Seed',             type:'variable', amount:120, prio:6,  min:80},
+    {name:'Chemical',         type:'variable', amount:75,  prio:7,  min:35},
+    {name:'Fuel / drying',    type:'variable', amount:30,  prio:5,  min:15},
+  ]
+};
+let S = load();
+
+function load(){
+  try{ const raw = localStorage.getItem('profitPlanner');
+    if(raw){ const p = JSON.parse(raw); if(p && p.expenses) return p; } }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT));
+}
+function save(){ try{ localStorage.setItem('profitPlanner', JSON.stringify(S)); }catch(e){} }
+
+/* ---------- helpers ---------- */
+function el(id){return document.getElementById(id);}
+function set(id,v){el(id).textContent=v;}
+function fmt(n,d=0){return (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function money(n,d=0){return (n<0?'-$':'$')+fmt(Math.abs(n),d);}
+function acresVal(){return Math.max(0, S.acres)||0;}
+
+/* ---------- allocation engines ----------
+   requiredCut = dollars/acre we must remove to hit target.
+   Priority 1 rows are never cut. Each row can only fall to its `min`. */
+function allocate(rows, requiredCut, method){
+  const cuts = rows.map(()=>0);
+  const cap = rows.map(r=> Math.max(0, r.amount - r.min));  // max cuttable
+  let remaining = requiredCut;
+
+  if(method === 'spread'){
+    // Weight = willingness (prio-1, so prio 1 => 0) times remaining capacity.
+    // Iterate so lines that hit their floor hand their share to the rest.
+    let active = rows.map((r,i)=> r.prio>1 && cap[i]>1e-9 ? i : -1).filter(i=>i>=0);
+    let guard = 0;
+    while(remaining>1e-6 && active.length && guard++<50){
+      const basis = active.map(i=> (rows[i].prio-1) * (cap[i]-cuts[i]));
+      const tot = basis.reduce((a,b)=>a+b,0);
+      if(tot<=1e-9) break;
+      let capped=false;
+      for(let k=0;k<active.length;k++){
+        const i=active[k];
+        let share = remaining * basis[k]/tot;
+        const room = cap[i]-cuts[i];
+        if(share>=room){ share=room; capped=true; }
+        cuts[i]+=share;
+      }
+      remaining = requiredCut - cuts.reduce((a,b)=>a+b,0);
+      active = active.filter(i=> cap[i]-cuts[i]>1e-9);
+      if(!capped) break;
+    }
+    return {cuts, shortfall:Math.max(0,remaining)};
+  }
+
+  // priority waterfall: highest prio number first, then next tier
+  for(let p=10; p>=2 && remaining>1e-9; p--){
+    const idx = rows.map((r,i)=>i).filter(i=> rows[i].prio===p && cap[i]-cuts[i]>1e-9);
+    if(!idx.length) continue;
+    const tierCap = idx.reduce((s,i)=> s+(cap[i]-cuts[i]), 0);
+    if(tierCap <= remaining+1e-9){
+      idx.forEach(i=> cuts[i]=cap[i]);
+      remaining -= tierCap;
+    }else{
+      idx.forEach(i=>{ cuts[i]+= (cap[i]-cuts[i])/tierCap * remaining; });
+      remaining = 0;
+    }
+  }
+  return {cuts, shortfall:Math.max(0,remaining)};
+}
+
+/* ---------- render expense rows ---------- */
+function renderRows(){
+  ['fixed','variable'].forEach(type=>{
+    const list = el(type==='fixed'?'fixed-list':'var-list');
+    list.innerHTML='';
+    S.expenses.forEach((r,i)=>{
+      if(r.type!==type) return;
+      const div=document.createElement('div');
+      div.className='exp';
+      div.id='exp-'+i;
+      div.innerHTML=`
+        <div class="exp-top">
+          <input type="text" class="exp-name" value="${escapeHtml(r.name)}" placeholder="Expense name"
+                 oninput="upd(${i},'name',this.value)">
+          <button class="exp-del" onclick="delRow(${i})" title="Remove">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          </button>
+        </div>
+        <div class="exp-grid">
+          <div>
+            <div class="mini-lbl">Amount / acre</div>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" class="pfx-in" inputmode="decimal" step="1" value="${r.amount}"
+                     oninput="upd(${i},'amount',this.value)">
+            </div>
+          </div>
+          <div>
+            <div class="mini-lbl">Min / acre (floor)</div>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" class="pfx-in" inputmode="decimal" step="1" value="${r.min}"
+                     oninput="upd(${i},'min',this.value)">
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:9px">
+          <div class="mini-lbl"><span>Type</span></div>
+          <div class="type-seg">
+            <button class="${r.type==='fixed'?'on-fixed':''}" onclick="upd(${i},'type','fixed')">Fixed</button>
+            <button class="${r.type==='variable'?'on-var':''}" onclick="upd(${i},'type','variable')">Variable</button>
+          </div>
+        </div>
+        <div style="margin-top:9px">
+          <div class="mini-lbl"><span>Cut priority</span><span id="pw-${i}" class="prio-word" style="margin:0"></span></div>
+          <div class="prio-wrap">
+            <input type="range" min="1" max="10" step="1" value="${r.prio}" oninput="upd(${i},'prio',this.value)">
+            <div><div class="prio-badge" id="pb-${i}">${r.prio}</div></div>
+          </div>
+        </div>
+        <div class="exp-result" id="er-${i}">
+          <span class="rl">Suggested this year</span>
+          <span class="rv" id="rv-${i}">—</span>
+        </div>`;
+      list.appendChild(div);
+    });
+  });
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ---------- update handlers ---------- */
+function upd(i,key,val){
+  if(key==='amount'||key==='min'){ S.expenses[i][key]=parseFloat(val)||0; }
+  else if(key==='prio'){ S.expenses[i].prio=parseInt(val)||1; }
+  else if(key==='type'){ S.expenses[i].type=val; save(); renderRows(); calc(); return; }
+  else { S.expenses[i][key]=val; }
+  save(); calc();
+}
+function addRow(type){
+  S.expenses.push({name:'', type, amount:0, prio: type==='fixed'?2:6, min:0});
+  save(); renderRows(); calc();
+}
+function delRow(i){ S.expenses.splice(i,1); save(); renderRows(); calc(); }
+
+/* ---------- main calc ---------- */
+function calc(){
+  S.yield  = parseFloat(el('yield').value)||0;
+  S.price  = parseFloat(el('price').value)||0;
+  S.target = parseFloat(el('target').value)||0;
+  S.acres  = parseFloat(el('acres').value)||0;
+  save();
+
+  const rev = S.yield * S.price;
+  const budget = rev - S.target;                 // allowed expenses/acre
+  const planned = S.expenses.reduce((s,r)=> s+(r.amount||0), 0);
+  const requiredCut = planned - budget;          // >0 => must cut
+  const A = acresVal();
+
+  // reverse math block
+  set('m-rev', money(rev,2)); set('m-target', '−'+money(S.target,2).replace('$','$'));
+  set('m-budget', money(budget,2)); set('m-planned', money(planned,2));
+
+  // group totals
+  const fixedTot = S.expenses.filter(r=>r.type==='fixed').reduce((s,r)=>s+(r.amount||0),0);
+  const varTot   = S.expenses.filter(r=>r.type==='variable').reduce((s,r)=>s+(r.amount||0),0);
+  set('fixed-total', money(fixedTot,0)+'/ac');
+  set('var-total',   money(varTot,0)+'/ac');
+
+  // priority words / badges
+  S.expenses.forEach((r,i)=>{
+    if(el('pb-'+i)) set('pb-'+i, r.prio);
+    if(el('pw-'+i)) set('pw-'+i, PRIO_WORDS[r.prio]||'');
+    const ex=el('exp-'+i);
+    if(ex) ex.classList.toggle('protected', r.prio===1);
+  });
+
+  // allocation
+  const {cuts, shortfall} = allocate(S.expenses, Math.max(0,requiredCut), S.method);
+
+  // per-row suggested
+  S.expenses.forEach((r,i)=>{
+    const cut = cuts[i]||0;
+    const suggested = r.amount - cut;
+    const rv=el('rv-'+i), ex=el('exp-'+i);
+    if(rv){
+      if(cut>0.005){
+        rv.textContent = money(suggested,0)+'  (cut '+money(cut,0)+', −'+fmt(r.amount>0?cut/r.amount*100:0,0)+'%)';
+        rv.className='rv cutv';
+      }else{
+        rv.textContent = money(r.amount,0)+'  (no cut)';
+        rv.className='rv okv';
+      }
+    }
+    if(ex) ex.classList.toggle('cut', cut>0.005);
+  });
+
+  // verdict (both tabs)
+  let vClass, vLbl, vVal, vSub;
+  if(shortfall>0.005){
+    vClass='short'; vLbl='Goal not reachable by cutting alone';
+    vVal='Short '+money(shortfall,2)+'/ac';
+    vSub='Every cuttable line is at its floor. Raise price/yield, protect less (lower a priority-1), or trim your target.';
+  }else if(requiredCut>0.005){
+    vClass='over'; vLbl='Over budget — cut to hit goal';
+    vVal='Cut '+money(requiredCut,2)+'/ac';
+    vSub='= '+money(requiredCut*A,0)+' across '+fmt(A,0)+' acres. Cuts applied below by priority.';
+  }else{
+    vClass='under'; vLbl='On track — room to spare';
+    vVal=money(-requiredCut,2)+'/ac to spare';
+    vSub='You can hit '+money(S.target,0)+'/ac profit and still have '+money(-requiredCut*A,0)+' of slack.';
+  }
+  [['verdict','v-lbl','v-val','v-sub'],['verdict2','v2-lbl','v2-val','v2-sub']].forEach(([v,l,va,su])=>{
+    el(v).className='verdict '+vClass; set(l,vLbl); set(va,vVal); set(su,vSub);
+  });
+
+  // status pill
+  const sv=el('status-val');
+  if(shortfall>0.005){ set('status-val','Short '+money(shortfall,0)); sv.style.color='#fecaca'; }
+  else if(requiredCut>0.005){ set('status-val','Cut '+money(requiredCut,0)); sv.style.color='#fde68a'; }
+  else { set('status-val','On track ✓'); sv.style.color='#bbf7d0'; }
+
+  /* ---------- summary tab ---------- */
+  const plannedProfit = rev - planned;
+  set('k-target', money(S.target,0)+'/ac');
+  set('k-target-total', money(S.target*A,0)+' total');
+  set('k-planned', money(plannedProfit,0)+'/ac');
+  el('k-planned').style.color = plannedProfit>=S.target? 'var(--green)' : (plannedProfit>=0? 'var(--amber)':'var(--red)');
+  set('k-planned-total', money(plannedProfit*A,0)+' total');
+
+  // plan list
+  const pl=el('plan-list'); pl.innerHTML='';
+  S.expenses.forEach((r,i)=>{
+    const cut=cuts[i]||0; const suggested=r.amount-cut;
+    const row=document.createElement('div'); row.className='plan-row';
+    row.innerHTML=`<div class="plan-name">${escapeHtml(r.name||'—')}
+        <span class="pill-mini ${r.type==='fixed'?'pill-fixed':'pill-var'}">${r.type==='fixed'?'F':'V'}·p${r.prio}</span></div>
+      <div class="plan-num plan-ok">${money(r.amount,0)}</div>
+      <div class="plan-num ${cut>0.005?'plan-cut':'plan-ok'}">${money(suggested,0)}</div>`;
+    pl.appendChild(row);
+  });
+  const suggestedTotal = planned - cuts.reduce((a,b)=>a+b,0);
+  set('plan-tot-planned', money(planned,0));
+  set('plan-tot-target', money(suggestedTotal,0));
+
+  if(shortfall>0.005){
+    set('plan-note','Even after cutting every flexible line to its floor, you are still '+money(shortfall,2)+'/ac short of a '+money(S.target,0)+'/ac profit. Something protected has to give, or revenue has to rise.');
+  }else if(requiredCut>0.005){
+    const cutLines=S.expenses.filter((r,i)=>cuts[i]>0.005).map(r=>r.name).filter(Boolean);
+    set('plan-note','Trimming '+money(requiredCut,2)+'/ac — starting with your highest-priority lines'+(cutLines.length?' ('+cutLines.join(', ')+')':'')+' — lands you exactly on a '+money(S.target,0)+'/ac profit.');
+  }else{
+    set('plan-note','No cuts needed. As planned you clear your '+money(S.target,0)+'/ac target with '+money(-requiredCut,2)+'/ac to spare.');
+  }
+
+  // break-even
+  set('be-price', S.yield>0? '$'+fmt(planned/S.yield,2)+'/bu' : '—');
+  set('be-yield', S.price>0? fmt(planned/S.price,0)+' bu/ac' : '—');
+  set('be-price-t', S.yield>0? '$'+fmt((planned+S.target)/S.yield,2)+'/bu' : '—');
+  set('be-yield-t', S.price>0? fmt((planned+S.target)/S.price,0)+' bu/ac' : '—');
+  set('be-cpb', S.yield>0? '$'+fmt(planned/S.yield,2)+'/bu' : '—');
+}
+
+/* ---------- nav & method ---------- */
+function showTab(tab){
+  ['budget','summary'].forEach(s=>{
+    el('sec-'+s).classList.toggle('active',s===tab);
+    el('nav-'+s).classList.toggle('active',s===tab);
+  });
+  el('scroll').scrollTop=0;
+}
+function setMethod(m){
+  S.method=m; save();
+  el('mt-priority').classList.toggle('active',m==='priority');
+  el('mt-spread').classList.toggle('active',m==='spread');
+  calc();
+}
+function resetAll(){
+  if(!confirm('Reset all numbers back to the example farm?')) return;
+  S=JSON.parse(JSON.stringify(DEFAULT)); save();
+  el('yield').value=S.yield; el('price').value=S.price;
+  el('target').value=S.target; el('acres').value=S.acres;
+  setMethod(S.method); renderRows(); calc();
+}
+
+/* ---------- init ---------- */
+el('yield').value=S.yield; el('price').value=S.price;
+el('target').value=S.target; el('acres').value=S.acres;
+el('mt-priority').classList.toggle('active',S.method!=='spread');
+el('mt-spread').classList.toggle('active',S.method==='spread');
+renderRows();
+calc();
+</script>
+</body>
+</html>
