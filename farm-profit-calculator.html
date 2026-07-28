@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Profit Planner">
+<meta name="theme-color" content="#1e5a3c">
+<title>Profit Planner</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
+  --slate:#1e293b;--slate-m:#64748b;--border:#e2e8f0;
+  --amber:#d97706;--amber-bg:#fffbeb;--amber-br:#fcd34d;
+  --red:#dc2626;--blue:#2563eb;--purple:#7c3aed;
+  --white:#fff;--rad:12px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0fdf4;display:flex;flex-direction:column;color:var(--slate);overflow:hidden}
+#hdr{background:var(--green);color:white;flex-shrink:0;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-icon{background:rgba(255,255,255,.15);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#hdr-title{font-size:.95rem;font-weight:700}
+#hdr-sub{font-size:.68rem;color:var(--green-m);margin-top:1px}
+#status-pill{border-radius:999px;padding:5px 12px;text-align:right;flex-shrink:0;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25)}
+#status-label{font-size:.6rem;color:var(--green-m);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+#status-val{font-size:.9rem;font-weight:800;line-height:1.2}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;padding-bottom:calc(70px + var(--safe-b) + 8px)}
+#scroll::-webkit-scrollbar{display:none}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px}
+.hint{font-size:.68rem;color:#94a3b8;margin-top:3px}
+.input-wrap{position:relative}
+.pfx,.sfx{position:absolute;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.85rem;pointer-events:none}
+.pfx{left:10px}.sfx{right:10px}
+input[type=number],input[type=text]{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.95rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
+input.pfx-in{padding-left:24px}
+input.sfx-in{padding-right:34px}
+/* Scenario switch */
+.scn-bar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.scn-seg{flex:1;display:flex;background:#dbeafe;border-radius:9px;padding:3px;gap:3px}
+.scn-seg button{flex:1;background:none;border:none;padding:9px 4px;border-radius:7px;font-size:.8rem;font-weight:700;color:#64748b;cursor:pointer;transition:.15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scn-seg button.on{background:white;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.copy-btn{flex-shrink:0;background:white;border:1.5px solid var(--border);border-radius:9px;padding:9px 11px;font-size:.72rem;font-weight:700;color:var(--slate-m);cursor:pointer}
+/* Reverse-math summary */
+.mathbox{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 13px}
+.math-row{display:flex;justify-content:space-between;align-items:baseline;font-size:.82rem;line-height:2}
+.math-lbl{color:var(--slate-m)}
+.math-val{font-weight:700;color:var(--slate);white-space:nowrap}
+.math-op{border-top:1px solid #e2e8f0;margin-top:4px;padding-top:4px}
+.verdict{border-radius:10px;padding:13px 14px;margin-top:10px;text-align:center}
+.verdict.over{background:var(--amber-bg);border:1px solid var(--amber-br)}
+.verdict.under{background:#ecfdf5;border:1px solid #a7f3d0}
+.verdict.short{background:#fef2f2;border:1px solid #fecaca}
+.verdict-lbl{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.verdict.over .verdict-lbl{color:var(--amber)}
+.verdict.under .verdict-lbl{color:var(--green)}
+.verdict.short .verdict-lbl{color:var(--red)}
+.verdict-val{font-size:1.55rem;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+.verdict.over .verdict-val{color:var(--amber)}
+.verdict.under .verdict-val{color:var(--green)}
+.verdict.short .verdict-val{color:var(--red)}
+.verdict-sub{font-size:.72rem;color:var(--slate-m);margin-top:4px}
+/* Lease */
+.type-seg{display:flex;background:#f1f5f9;border-radius:8px;padding:2px;gap:2px}
+.type-seg button{flex:1;background:none;border:none;padding:9px 4px;border-radius:6px;font-size:.78rem;font-weight:700;color:var(--slate-m);cursor:pointer;transition:.15s}
+.type-seg button.on-blue{background:white;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.type-seg button.on-purple{background:white;color:var(--purple);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.effrent{background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-radius:10px;padding:13px 14px;margin-top:10px}
+.effrent-lbl{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--purple);margin-bottom:2px}
+.effrent-val{font-size:1.5rem;font-weight:800;letter-spacing:-.5px;color:var(--purple)}
+.effrent-sub{font-size:.72rem;color:var(--slate-m);margin-top:3px}
+.effrent .math-row{font-size:.78rem;line-height:1.9}
+/* Expense rows */
+.exp-group-hd{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 8px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m)}
+.exp-group-total{font-weight:800;color:var(--slate)}
+.exp{border:1.5px solid var(--border);border-radius:11px;padding:11px;margin-bottom:9px;background:white;transition:border-color .2s,background .2s}
+.exp.cut{border-color:var(--amber-br);background:var(--amber-bg)}
+.exp.protected{border-left:4px solid var(--blue)}
+.exp-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.exp-name{flex:1;font-weight:600;padding:8px 9px;font-size:.9rem}
+.exp-del{background:none;border:none;color:#cbd5e1;cursor:pointer;padding:4px;flex-shrink:0;line-height:0}
+.exp-del:hover{color:var(--red)}
+.exp-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mini-lbl{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--slate-m);margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.seg-sm{display:flex;background:#f1f5f9;border-radius:8px;padding:2px;gap:2px}
+.seg-sm button{flex:1;background:none;border:none;padding:6px 4px;border-radius:6px;font-size:.72rem;font-weight:700;color:var(--slate-m);cursor:pointer;transition:.15s}
+.seg-sm button.on-fixed{background:white;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg-sm button.on-var{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.prio-wrap{display:flex;align-items:center;gap:9px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:999px;background:linear-gradient(90deg,var(--blue),#22c55e,var(--amber),var(--red));outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:white;border:2px solid var(--slate);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:white;border:2px solid var(--slate);cursor:pointer}
+.prio-badge{flex-shrink:0;width:30px;text-align:center;font-weight:800;font-size:1rem;color:var(--slate)}
+.prio-word{font-size:.6rem;color:var(--slate-m);text-align:center;margin-top:2px}
+.ll-share{margin-top:9px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:9px;padding:9px}
+.exp-result{margin-top:9px;padding-top:9px;border-top:1px dashed #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:.8rem}
+.exp-result .rl{color:var(--slate-m)}
+.exp-result .rv{font-weight:700}
+.exp-result .rv.cutv{color:var(--amber)}
+.exp-result .rv.okv{color:var(--green)}
+.add-btn{width:100%;padding:12px;background:white;border:1.5px dashed var(--border);border-radius:10px;font-size:.85rem;font-weight:700;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:10px}
+.add-btn:active{background:#f8fafc}
+.btn-row{display:flex;gap:8px}
+.reset-btn{flex:1;padding:13px;background:white;border:1.5px solid var(--border);border-radius:10px;font-size:.87rem;font-weight:600;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
+/* Summary tab */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.kpi{background:white;border:1px solid var(--border);border-radius:var(--rad);padding:13px}
+.kpi-lbl{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m);margin-bottom:4px}
+.kpi-val{font-size:1.35rem;font-weight:800;letter-spacing:-.5px}
+.kpi-sub{font-size:.66rem;color:#94a3b8;margin-top:2px}
+.be-row{display:flex;justify-content:space-between;align-items:baseline;font-size:.82rem;line-height:2;border-bottom:1px solid #f1f5f9;padding:1px 0}
+.be-row:last-child{border-bottom:none}
+.be-lbl{color:var(--slate-m)}
+.be-val{font-weight:700}
+.plan-row{display:grid;grid-template-columns:1fr auto auto;gap:4px 12px;font-size:.8rem;align-items:baseline;padding:5px 0;border-bottom:1px solid #f1f5f9}
+.plan-row.hd{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m);border-bottom:1.5px solid var(--border)}
+.plan-name{font-weight:600}
+.plan-num{text-align:right;font-weight:700;white-space:nowrap}
+.plan-cut{color:var(--amber)}
+.plan-ok{color:var(--slate-m)}
+.pill-mini{display:inline-block;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:5px;vertical-align:middle}
+.pill-fixed{background:#dbeafe;color:var(--blue)}
+.pill-var{background:#dcfce7;color:var(--green)}
+.note{font-size:.72rem;color:var(--slate-m);line-height:1.55;background:#f8fafc;border:1px solid #eef2f7;border-radius:9px;padding:10px 12px;margin-top:10px}
+/* Compare tab */
+.cmp-row{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:6px 8px;align-items:center;font-size:.8rem;padding:8px 0;border-bottom:1px solid #f1f5f9}
+.cmp-row.hd{position:sticky;top:0;background:white;border-bottom:2px solid var(--border);padding-top:2px;z-index:2}
+.cmp-metric{color:var(--slate-m);font-weight:600;font-size:.76rem}
+.cmp-val{text-align:right;font-weight:800;white-space:nowrap;padding:5px 7px;border-radius:7px}
+.cmp-val.win{background:#ecfdf5;color:var(--green)}
+.cmp-name{font-weight:800;text-align:right;font-size:.82rem}
+.cmp-name.a{color:var(--blue)}.cmp-name.b{color:var(--purple)}
+.cmp-sub{font-size:.62rem;color:#94a3b8;font-weight:600;display:block;margin-top:1px}
+.winner-banner{background:linear-gradient(135deg,var(--green),var(--green2));color:white;border-radius:var(--rad);padding:14px 16px;text-align:center;margin-bottom:10px}
+.winner-banner .wl{font-size:.7rem;color:var(--green-m);font-weight:600}
+.winner-banner .wv{font-size:1.3rem;font-weight:800;margin-top:2px}
+.winner-banner .ws{font-size:.72rem;color:var(--green-m);margin-top:4px}
+/* Bottom nav */
+#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-b);box-shadow:0 -2px 12px rgba(0,0,0,.06);z-index:100}
+.nbtn{flex:1;background:none;border:none;cursor:pointer;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate-m);transition:color .12s;min-height:56px}
+.nbtn.active{color:var(--green)}
+.nbtn svg{width:20px;height:20px}
+.nbtn span{font-size:.68rem;font-weight:600}
+.sec{display:none}
+.sec.active{display:block}
+.method-tabs{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px;margin-bottom:10px}
+.method-tab{flex:1;background:none;border:none;padding:7px 4px;border-radius:6px;font-size:.72rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:.15s}
+.method-tab.active{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-top">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="hdr-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+        </svg>
+      </div>
+      <div>
+        <div id="hdr-title">Profit Planner</div>
+        <div id="hdr-sub">Set your profit, back-fill the budget</div>
+      </div>
+    </div>
+    <div id="status-pill">
+      <div id="status-label">Target</div>
+      <div id="status-val">—</div>
+    </div>
+  </div>
+</div>
+
+<div id="scroll">
+
+  <!-- ===================== BUDGET TAB ===================== -->
+  <div id="sec-budget" class="sec active">
+
+    <div class="scn-bar">
+      <div class="scn-seg">
+        <button id="scn-0" class="on" onclick="setScenario(0)">A</button>
+        <button id="scn-1" onclick="setScenario(1)">B</button>
+      </div>
+      <button class="copy-btn" id="copy-btn" onclick="copyScenario()">Copy A→B</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Scenario name</div>
+      <input type="text" id="scn-name" placeholder="e.g. Home place — cash rent" oninput="updScn('name',this.value)">
+    </div>
+
+    <!-- Revenue & Goal -->
+    <div class="card">
+      <div class="card-title">1 · Revenue &amp; Profit Goal</div>
+      <div class="row2">
+        <div class="field">
+          <label>Yield / acre</label>
+          <div class="input-wrap">
+            <input type="number" id="yield" class="sfx-in" inputmode="decimal" step="1" oninput="updScn('yield',this.value)">
+            <span class="sfx">bu</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Price / bu</label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="price" class="pfx-in" inputmode="decimal" step="0.01" oninput="updScn('price',this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label>Target profit / acre <span style="color:var(--green);font-weight:800">◄ your goal</span></label>
+          <div class="input-wrap"><span class="pfx">$</span>
+            <input type="number" id="target" class="pfx-in" inputmode="decimal" step="5" oninput="updScn('target',this.value)">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Acres (for totals)</label>
+          <input type="number" id="acres" inputmode="decimal" step="1" oninput="updScn('acres',this.value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Lease -->
+    <div class="card">
+      <div class="card-title">2 · Lease Type</div>
+      <div class="type-seg" style="margin-bottom:10px">
+        <button id="lt-cash" onclick="setLease('cash')">Cash rent</button>
+        <button id="lt-share" onclick="setLease('share')">Crop share</button>
+      </div>
+
+      <div id="lease-cash" class="field" style="margin-bottom:0">
+        <label>Cash rent / acre</label>
+        <div class="input-wrap"><span class="pfx">$</span>
+          <input type="number" id="cashRent" class="pfx-in" inputmode="decimal" step="5" oninput="updLease('cashRent',this.value)">
+        </div>
+        <div class="hint">Paid regardless of yield. Counts as a fixed cost that the cut engine won't touch.</div>
+      </div>
+
+      <div id="lease-share" style="display:none">
+        <div class="field">
+          <label>Landlord's share of the crop</label>
+          <div class="input-wrap">
+            <input type="number" id="cropSharePct" class="sfx-in" inputmode="decimal" step="1" min="0" max="100" oninput="updLease('cropSharePct',this.value)">
+            <span class="sfx">%</span>
+          </div>
+          <div class="hint">e.g. 50 for a 50/50 lease, 25 for a 1/4 share. You keep the rest of the crop.</div>
+        </div>
+        <div class="note" style="margin-top:0">
+          Set <b>which inputs the landlord shares in</b> — and their % — on each expense line below (the purple box appears when crop share is on).
+        </div>
+        <div class="effrent" id="effrent-box">
+          <div class="effrent-lbl">Effective cash rent / acre</div>
+          <div class="effrent-val" id="effrent-val">—</div>
+          <div class="math-row"><span class="math-lbl">Landlord's crop (<span id="er-Lpct">50</span>% of <span id="er-gross">$900</span>)</span><span class="math-val" id="er-cropval">—</span></div>
+          <div class="math-row"><span class="math-lbl">− Landlord pays toward inputs</span><span class="math-val" id="er-llcontrib">—</span></div>
+          <div class="math-row math-op"><span class="math-lbl"><b>= Effective cash rent</b></span><span class="math-val" id="er-eff" style="color:var(--purple)">—</span></div>
+          <div class="effrent-sub" id="effrent-sub">What this share deal really costs you vs. paying cash.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reverse math -->
+    <div class="card">
+      <div class="card-title">3 · The Math, Backwards <span style="font-weight:600;text-transform:none;letter-spacing:0;color:#94a3b8">(your share)</span></div>
+      <div class="mathbox">
+        <div class="math-row"><span class="math-lbl">Gross crop / acre</span><span class="math-val" id="m-gross">—</span></div>
+        <div class="math-row" id="m-share-row"><span class="math-lbl">− Landlord crop share</span><span class="math-val" id="m-llshare">—</span></div>
+        <div class="math-row"><span class="math-lbl"><b>Your revenue / acre</b></span><span class="math-val" id="m-rev">—</span></div>
+        <div class="math-row"><span class="math-lbl">− Target profit / acre</span><span class="math-val" id="m-target">—</span></div>
+        <div class="math-row math-op"><span class="math-lbl"><b>= Expense budget / acre</b></span><span class="math-val" id="m-budget" style="color:var(--green)">—</span></div>
+        <div class="math-row"><span class="math-lbl">Your planned expenses / acre</span><span class="math-val" id="m-planned">—</span></div>
+      </div>
+      <div class="verdict" id="verdict">
+        <div class="verdict-lbl" id="v-lbl">—</div>
+        <div class="verdict-val" id="v-val">—</div>
+        <div class="verdict-sub" id="v-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Expenses -->
+    <div class="card">
+      <div class="card-title">4 · Expenses &amp; Cut Priority</div>
+      <div class="note" style="margin-top:0;margin-bottom:12px">
+        <b>Priority 1</b> = protected, never cut. <b>Priority 10</b> = first on the chopping block.
+        Over budget? Cuts come out of your highest-priority items first, down to each line's <b>Min</b> floor.
+        Amounts are the <b>full</b> input cost; if the landlord shares an input, you only pay your part.
+      </div>
+
+      <div class="exp-group-hd"><span>◆ Fixed costs</span><span class="exp-group-total" id="fixed-total">—</span></div>
+      <div id="fixed-list"></div>
+
+      <div class="exp-group-hd" style="margin-top:14px"><span>◆ Variable costs</span><span class="exp-group-total" id="var-total">—</span></div>
+      <div id="var-list"></div>
+
+      <button class="add-btn" onclick="addRow('fixed')">+ Add fixed cost</button>
+      <button class="add-btn" onclick="addRow('variable')" style="margin-bottom:0">+ Add variable cost</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="reset-btn" onclick="resetAll()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Reset to example
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== SUMMARY TAB ===================== -->
+  <div id="sec-summary" class="sec">
+    <div class="card-title" style="padding-left:2px" id="sum-scn-name">—</div>
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-lbl">Target profit</div>
+        <div class="kpi-val" style="color:var(--green)" id="k-target">—</div>
+        <div class="kpi-sub" id="k-target-total">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-lbl">Profit as planned</div>
+        <div class="kpi-val" id="k-planned">—</div>
+        <div class="kpi-sub" id="k-planned-total">—</div>
+      </div>
+    </div>
+
+    <div class="card" id="sum-lease-card">
+      <div class="card-title">Lease</div>
+      <div id="sum-lease-body"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Where You Stand</div>
+      <div class="verdict" id="verdict2" style="margin-top:0">
+        <div class="verdict-lbl" id="v2-lbl">—</div>
+        <div class="verdict-val" id="v2-val">—</div>
+        <div class="verdict-sub" id="v2-sub">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">The Plan — Suggested Cuts</div>
+      <div class="method-tabs">
+        <button class="method-tab active" id="mt-priority" onclick="setMethod('priority')">By priority (waterfall)</button>
+        <button class="method-tab" id="mt-spread" onclick="setMethod('spread')">Spread evenly</button>
+      </div>
+      <div class="plan-row hd"><div>Line</div><div class="plan-num">Planned</div><div class="plan-num">→ Target</div></div>
+      <div id="plan-list"></div>
+      <div class="plan-row" style="border-bottom:none;border-top:1.5px solid var(--border);margin-top:2px;font-weight:800">
+        <div>Total (your share)</div>
+        <div class="plan-num" id="plan-tot-planned">—</div>
+        <div class="plan-num" id="plan-tot-target">—</div>
+      </div>
+      <div class="note" id="plan-note">—</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Break-Even &amp; What-If</div>
+      <div class="be-row"><span class="be-lbl">Break-even price (profit = $0)</span><span class="be-val" id="be-price">—</span></div>
+      <div class="be-row"><span class="be-lbl">Break-even yield (profit = $0)</span><span class="be-val" id="be-yield">—</span></div>
+      <div class="be-row"><span class="be-lbl">Price needed to hit target</span><span class="be-val" id="be-price-t">—</span></div>
+      <div class="be-row"><span class="be-lbl">Yield needed to hit target</span><span class="be-val" id="be-yield-t">—</span></div>
+      <div class="note">
+        Break-evens are on your <b>share</b> of the crop and your <b>share</b> of the costs, using planned expenses.
+        They answer the other side: if you'd rather not cut, what price or yield gets you there?
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== COMPARE TAB ===================== -->
+  <div id="sec-compare" class="sec">
+    <div class="winner-banner" id="cmp-banner">
+      <div class="wl">Better deal</div>
+      <div class="wv" id="cmp-winner">—</div>
+      <div class="ws" id="cmp-winner-sub">—</div>
+    </div>
+    <div class="card">
+      <div class="cmp-row hd">
+        <div class="cmp-metric" style="font-size:.62rem">Metric · per acre</div>
+        <div class="cmp-name a" id="cmp-name-a">A</div>
+        <div class="cmp-name b" id="cmp-name-b">B</div>
+      </div>
+      <div id="cmp-body"></div>
+      <div class="note">Green = the better number for that row. Totals use each scenario's own acreage. Effective cash rent lets you compare a share lease head-to-head against a cash lease.</div>
+    </div>
+  </div>
+</div>
+
+<nav id="bnav">
+  <button class="nbtn active" id="nav-budget" onclick="showTab('budget')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    <span>Budget</span>
+  </button>
+  <button class="nbtn" id="nav-summary" onclick="showTab('summary')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    <span>Summary</span>
+  </button>
+  <button class="nbtn" id="nav-compare" onclick="showTab('compare')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+    <span>Compare</span>
+  </button>
+</nav>
+
+<script>
+/* ================= state ================= */
+const PRIO_WORDS = ['','Protect','','','','Flexible','','','','','Cut 1st'];
+function baseExpenses(shares){ // shares: optional {name:pct}
+  const s = shares||{};
+  return [
+    {name:'Equipment / depr', type:'fixed',    amount:60,  prio:2, min:0,  llShare:s['Equipment / depr']||0},
+    {name:'Labor',            type:'fixed',    amount:40,  prio:2, min:0,  llShare:s['Labor']||0},
+    {name:'Machinery repairs',type:'fixed',    amount:35,  prio:3, min:0,  llShare:s['Machinery repairs']||0},
+    {name:'Insurance',        type:'fixed',    amount:25,  prio:2, min:0,  llShare:s['Insurance']||0},
+    {name:'Interest',         type:'fixed',    amount:30,  prio:3, min:0,  llShare:s['Interest']||0},
+    {name:'Overhead / misc',  type:'fixed',    amount:20,  prio:4, min:0,  llShare:s['Overhead / misc']||0},
+    {name:'Fertilizer',       type:'variable', amount:160, prio:8, min:90, llShare:s['Fertilizer']||0},
+    {name:'Seed',             type:'variable', amount:120, prio:6, min:80, llShare:s['Seed']||0},
+    {name:'Chemical',         type:'variable', amount:75,  prio:7, min:35, llShare:s['Chemical']||0},
+    {name:'Fuel / drying',    type:'variable', amount:30,  prio:5, min:15, llShare:s['Fuel / drying']||0},
+  ];
+}
+const DEFAULT = {
+  method:'priority', active:0,
+  scenarios:[
+    {name:'Home place — cash rent', yield:200, price:4.50, target:100, acres:500,
+     lease:{type:'cash', cashRent:250, cropSharePct:50},
+     expenses:baseExpenses()},
+    {name:'North 40 — 50/50 share', yield:200, price:4.50, target:100, acres:500,
+     lease:{type:'share', cashRent:250, cropSharePct:50},
+     expenses:baseExpenses({Fertilizer:50, Seed:50, Chemical:50})},
+  ]
+};
+let S = load();
+function load(){
+  try{ const raw=localStorage.getItem('profitPlanner2');
+    if(raw){ const p=JSON.parse(raw); if(p&&p.scenarios&&p.scenarios.length===2) return p; } }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT));
+}
+function save(){ try{ localStorage.setItem('profitPlanner2', JSON.stringify(S)); }catch(e){} }
+function AS(){ return S.scenarios[S.active]; }   // active scenario
+
+/* ================= helpers ================= */
+function el(id){return document.getElementById(id);}
+function set(id,v){const e=el(id); if(e) e.textContent=v;}
+function fmt(n,d=0){return (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function money(n,d=0){return (n<0?'-$':'$')+fmt(Math.abs(n),d);}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ================= cut allocation ================= */
+function allocate(rows, requiredCut, method){
+  const cuts=rows.map(()=>0);
+  const cap=rows.map(r=>Math.max(0,r.amount-r.min));
+  let remaining=requiredCut;
+  if(method==='spread'){
+    let active=rows.map((r,i)=> r.prio>1 && cap[i]>1e-9 ? i : -1).filter(i=>i>=0); let guard=0;
+    while(remaining>1e-6 && active.length && guard++<50){
+      const basis=active.map(i=>(rows[i].prio-1)*(cap[i]-cuts[i]));
+      const tot=basis.reduce((a,b)=>a+b,0); if(tot<=1e-9) break; let capped=false;
+      for(let k=0;k<active.length;k++){const i=active[k];let sh=remaining*basis[k]/tot;const room=cap[i]-cuts[i];if(sh>=room){sh=room;capped=true;}cuts[i]+=sh;}
+      remaining=requiredCut-cuts.reduce((a,b)=>a+b,0); active=active.filter(i=>cap[i]-cuts[i]>1e-9); if(!capped) break;
+    }
+    return {cuts,shortfall:Math.max(0,remaining)};
+  }
+  for(let p=10;p>=2 && remaining>1e-9;p--){
+    const idx=rows.map((r,i)=>i).filter(i=>rows[i].prio===p && cap[i]-cuts[i]>1e-9);
+    if(!idx.length) continue;
+    const tierCap=idx.reduce((s,i)=>s+(cap[i]-cuts[i]),0);
+    if(tierCap<=remaining+1e-9){ idx.forEach(i=>cuts[i]=cap[i]); remaining-=tierCap; }
+    else{ idx.forEach(i=>cuts[i]+=(cap[i]-cuts[i])/tierCap*remaining); remaining=0; }
+  }
+  return {cuts,shortfall:Math.max(0,remaining)};
+}
+
+/* ================= per-scenario compute ================= */
+function computeScenario(sc, method){
+  const y=+sc.yield||0, pr=+sc.price||0, tgt=+sc.target||0, ac=Math.max(0,+sc.acres||0);
+  const gross=y*pr;
+  const isShare = sc.lease.type==='share';
+  const Lpct = isShare ? (+sc.lease.cropSharePct||0)/100 : 0;
+  const cashRent = !isShare ? (+sc.lease.cashRent||0) : 0;
+  const operatorGross = gross*(1-Lpct);
+
+  const rows = sc.expenses.map(e=>{
+    const s = isShare ? Math.min(1,Math.max(0,(+e.llShare||0)/100)) : 0;
+    return {name:e.name,type:e.type,amount:+e.amount||0,min:+e.min||0,prio:+e.prio||1,share:s,
+            netAmount:(+e.amount||0)*(1-s), netMin:(+e.min||0)*(1-s)};
+  });
+  const inputNet = rows.reduce((a,r)=>a+r.netAmount,0);
+  const operatorExpenses = inputNet + cashRent;
+  const budget = operatorGross - tgt;
+  const requiredCut = operatorExpenses - budget;   // operator net $/ac
+
+  const allocRows = rows.map(r=>({amount:r.netAmount,min:r.netMin,prio:r.prio}));
+  const {cuts:netCuts, shortfall} = allocate(allocRows, Math.max(0,requiredCut), method);
+  const lineCuts = rows.map((r,i)=>{
+    const nc=netCuts[i]||0;
+    const fullCut = r.share<1 ? nc/(1-r.share) : 0;
+    return {netCut:nc, fullCut, suggestedFull:r.amount-fullCut};
+  });
+  const totalNetCut = netCuts.reduce((a,b)=>a+b,0);
+
+  const operatorProfit = operatorGross - operatorExpenses;
+  const landlordCropVal = gross*Lpct;
+  const landlordContribution = rows.reduce((a,r)=>a+r.amount*r.share,0);
+  const effectiveRent = isShare ? (landlordCropVal - landlordContribution) : cashRent;
+
+  const dP=(1-Lpct)*y, dY=(1-Lpct)*pr;
+  return {sc,y,pr,tgt,ac,gross,isShare,Lpct,cashRent,operatorGross,rows,inputNet,operatorExpenses,
+    budget,requiredCut,netCuts,shortfall,lineCuts,totalNetCut,operatorProfit,
+    landlordCropVal,landlordContribution,effectiveRent,
+    bePrice:dP>0?operatorExpenses/dP:NaN, beYield:dY>0?operatorExpenses/dY:NaN,
+    bePriceT:dP>0?(operatorExpenses+tgt)/dP:NaN, beYieldT:dY>0?(operatorExpenses+tgt)/dY:NaN};
+}
+
+/* ================= render expense rows ================= */
+function renderRows(){
+  const sc=AS(); const isShare = sc.lease.type==='share';
+  ['fixed','variable'].forEach(type=>{
+    const list=el(type==='fixed'?'fixed-list':'var-list'); list.innerHTML='';
+    sc.expenses.forEach((r,i)=>{
+      if(r.type!==type) return;
+      const div=document.createElement('div'); div.className='exp'; div.id='exp-'+i;
+      div.innerHTML=`
+        <div class="exp-top">
+          <input type="text" class="exp-name" value="${escapeHtml(r.name)}" placeholder="Expense name" oninput="upd(${i},'name',this.value)">
+          <button class="exp-del" onclick="delRow(${i})" title="Remove">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          </button>
+        </div>
+        <div class="exp-grid">
+          <div><div class="mini-lbl">Amount / acre</div>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" class="pfx-in" inputmode="decimal" step="1" value="${r.amount}" oninput="upd(${i},'amount',this.value)"></div></div>
+          <div><div class="mini-lbl">Min / acre (floor)</div>
+            <div class="input-wrap"><span class="pfx">$</span>
+              <input type="number" class="pfx-in" inputmode="decimal" step="1" value="${r.min}" oninput="upd(${i},'min',this.value)"></div></div>
+        </div>
+        <div style="margin-top:9px"><div class="mini-lbl"><span>Type</span></div>
+          <div class="seg-sm">
+            <button class="${r.type==='fixed'?'on-fixed':''}" onclick="upd(${i},'type','fixed')">Fixed</button>
+            <button class="${r.type==='variable'?'on-var':''}" onclick="upd(${i},'type','variable')">Variable</button>
+          </div></div>
+        <div style="margin-top:9px"><div class="mini-lbl"><span>Cut priority</span><span id="pw-${i}" class="prio-word" style="margin:0"></span></div>
+          <div class="prio-wrap">
+            <input type="range" min="1" max="10" step="1" value="${r.prio}" oninput="upd(${i},'prio',this.value)">
+            <div><div class="prio-badge" id="pb-${i}">${r.prio}</div></div>
+          </div></div>
+        ${isShare?`
+        <div class="ll-share">
+          <div class="mini-lbl" style="color:var(--purple)"><span>Landlord's share of this input</span><span id="lls-${i}" style="color:var(--purple);font-weight:800">${r.llShare||0}%</span></div>
+          <div class="prio-wrap">
+            <input type="range" min="0" max="100" step="5" value="${r.llShare||0}" oninput="upd(${i},'llShare',this.value)">
+          </div>
+          <div class="hint" id="llh-${i}"></div>
+        </div>`:''}
+        <div class="exp-result" id="er-${i}"><span class="rl">Suggested this year</span><span class="rv" id="rv-${i}">—</span></div>`;
+      list.appendChild(div);
+    });
+  });
+}
+
+/* ================= update handlers ================= */
+function upd(i,key,val){
+  const sc=AS();
+  if(key==='amount'||key==='min') sc.expenses[i][key]=parseFloat(val)||0;
+  else if(key==='prio') sc.expenses[i].prio=parseInt(val)||1;
+  else if(key==='llShare') sc.expenses[i].llShare=parseFloat(val)||0;
+  else if(key==='type'){ sc.expenses[i].type=val; save(); renderRows(); calc(); return; }
+  else sc.expenses[i][key]=val;
+  save(); calc();
+}
+function addRow(type){ AS().expenses.push({name:'',type,amount:0,prio:type==='fixed'?2:6,min:0,llShare:0}); save(); renderRows(); calc(); }
+function delRow(i){ AS().expenses.splice(i,1); save(); renderRows(); calc(); }
+function updScn(key,val){ const sc=AS(); sc[key]= (key==='name')?val:(parseFloat(val)||0); save(); if(key==='name'){ set('scn-'+S.active, S.active===0?'A':'B'); } calc(); }
+function updLease(key,val){ AS().lease[key]=parseFloat(val)||0; save(); calc(); }
+function setLease(type){ AS().lease.type=type; save(); syncLeaseUI(); renderRows(); calc(); }
+
+/* ================= scenario switch ================= */
+function setScenario(idx){
+  S.active=idx; save();
+  el('scn-0').classList.toggle('on',idx===0);
+  el('scn-1').classList.toggle('on',idx===1);
+  loadScnInputs(); syncLeaseUI(); renderRows(); calc();
+  el('scroll').scrollTop=0;
+}
+function copyScenario(){
+  if(!confirm('Copy Scenario A over Scenario B? This overwrites B.')) return;
+  S.scenarios[1]=JSON.parse(JSON.stringify(S.scenarios[0]));
+  S.scenarios[1].name=(S.scenarios[0].name||'Scenario')+' (copy)';
+  save(); if(S.active===1){ loadScnInputs(); syncLeaseUI(); renderRows(); } calc();
+}
+function loadScnInputs(){
+  const sc=AS();
+  el('scn-name').value=sc.name||'';
+  el('yield').value=sc.yield; el('price').value=sc.price;
+  el('target').value=sc.target; el('acres').value=sc.acres;
+  el('cashRent').value=sc.lease.cashRent; el('cropSharePct').value=sc.lease.cropSharePct;
+}
+function syncLeaseUI(){
+  const t=AS().lease.type;
+  el('lt-cash').classList.toggle('on-blue',t==='cash');
+  el('lt-share').classList.toggle('on-purple',t==='share');
+  el('lease-cash').style.display = t==='cash'?'':'none';
+  el('lease-share').style.display = t==='share'?'':'none';
+}
+
+/* ================= main calc ================= */
+function calc(){
+  const R=computeScenario(AS(), S.method);
+  const A=R.ac;
+
+  /* lease UI: effective rent box */
+  if(R.isShare){
+    set('effrent-val', money(R.effectiveRent,0)+'/ac');
+    set('er-Lpct', fmt(R.Lpct*100,0)); set('er-gross', money(R.gross,0));
+    set('er-cropval', money(R.landlordCropVal,0));
+    set('er-llcontrib','−'+money(R.landlordContribution,0));
+    set('er-eff', money(R.effectiveRent,0));
+    set('effrent-sub', R.gross>0? 'That’s '+fmt(R.effectiveRent/R.gross*100,1)+'% of your gross crop — compare it to a cash rent offer.' : '');
+  }
+
+  /* reverse math */
+  set('m-gross', money(R.gross,2));
+  el('m-share-row').style.display = R.isShare?'':'none';
+  if(R.isShare) set('m-llshare','−'+money(R.landlordCropVal,2));
+  set('m-rev', money(R.operatorGross,2));
+  set('m-target','−'+money(R.tgt,2));
+  set('m-budget', money(R.budget,2));
+  set('m-planned', money(R.operatorExpenses,2));
+
+  /* group totals (full amounts) */
+  const fixedTot=R.rows.filter(r=>r.type==='fixed').reduce((s,r)=>s+r.amount,0);
+  const varTot=R.rows.filter(r=>r.type==='variable').reduce((s,r)=>s+r.amount,0);
+  set('fixed-total', money(fixedTot,0)+'/ac');
+  set('var-total', money(varTot,0)+'/ac');
+
+  /* per-row UI */
+  R.rows.forEach((r,i)=>{
+    if(el('pb-'+i)) set('pb-'+i, r.prio);
+    if(el('pw-'+i)) set('pw-'+i, PRIO_WORDS[r.prio]||'');
+    if(el('lls-'+i)) set('lls-'+i,(AS().expenses[i].llShare||0)+'%');
+    if(el('llh-'+i)) set('llh-'+i, r.share>0? 'You pay '+money(r.amount*(1-r.share),0)+'/ac · landlord pays '+money(r.amount*r.share,0)+'/ac' : 'You pay it all.');
+    const ex=el('exp-'+i); if(ex) ex.classList.toggle('protected', r.prio===1);
+    const lc=R.lineCuts[i]; const rv=el('rv-'+i);
+    if(rv){
+      if(lc.fullCut>0.005){
+        rv.textContent=money(lc.suggestedFull,0)+'  (cut '+money(lc.fullCut,0)+', −'+fmt(r.amount>0?lc.fullCut/r.amount*100:0,0)+'%)';
+        rv.className='rv cutv';
+      }else{ rv.textContent=money(r.amount,0)+'  (no cut)'; rv.className='rv okv'; }
+    }
+    if(ex) ex.classList.toggle('cut', lc.fullCut>0.005);
+  });
+
+  /* verdict */
+  let vClass,vLbl,vVal,vSub;
+  if(R.shortfall>0.005){
+    vClass='short'; vLbl='Goal not reachable by cutting alone';
+    vVal='Short '+money(R.shortfall,2)+'/ac';
+    vSub='Every cuttable line is at its floor. Raise price/yield, renegotiate the lease, protect less, or trim your target.';
+  }else if(R.requiredCut>0.005){
+    vClass='over'; vLbl='Over budget — cut to hit goal';
+    vVal='Cut '+money(R.requiredCut,2)+'/ac';
+    vSub='= '+money(R.requiredCut*A,0)+' across '+fmt(A,0)+' acres. Cuts applied below by priority.';
+  }else{
+    vClass='under'; vLbl='On track — room to spare';
+    vVal=money(-R.requiredCut,2)+'/ac to spare';
+    vSub='You can hit '+money(R.tgt,0)+'/ac and still have '+money(-R.requiredCut*A,0)+' of slack.';
+  }
+  [['verdict','v-lbl','v-val','v-sub'],['verdict2','v2-lbl','v2-val','v2-sub']].forEach(([v,l,va,su])=>{
+    el(v).className='verdict '+vClass; set(l,vLbl); set(va,vVal); set(su,vSub);
+  });
+
+  /* status pill */
+  const sv=el('status-val');
+  if(R.shortfall>0.005){ set('status-val','Short '+money(R.shortfall,0)); sv.style.color='#fecaca'; }
+  else if(R.requiredCut>0.005){ set('status-val','Cut '+money(R.requiredCut,0)); sv.style.color='#fde68a'; }
+  else { set('status-val','On track ✓'); sv.style.color='#bbf7d0'; }
+
+  /* summary tab */
+  set('sum-scn-name', AS().name||'Scenario');
+  set('k-target', money(R.tgt,0)+'/ac'); set('k-target-total', money(R.tgt*A,0)+' total');
+  set('k-planned', money(R.operatorProfit,0)+'/ac');
+  el('k-planned').style.color=R.operatorProfit>=R.tgt?'var(--green)':(R.operatorProfit>=0?'var(--amber)':'var(--red)');
+  set('k-planned-total', money(R.operatorProfit*A,0)+' total');
+
+  /* summary lease body */
+  let lb='';
+  if(R.isShare){
+    lb=`<div class="be-row"><span class="be-lbl">Type</span><span class="be-val" style="color:var(--purple)">Crop share — landlord ${fmt(R.Lpct*100,0)}%</span></div>
+        <div class="be-row"><span class="be-lbl">Landlord's crop value</span><span class="be-val">${money(R.landlordCropVal,0)}/ac</span></div>
+        <div class="be-row"><span class="be-lbl">Landlord pays toward inputs</span><span class="be-val">${money(R.landlordContribution,0)}/ac</span></div>
+        <div class="be-row"><span class="be-lbl"><b>Effective cash rent</b></span><span class="be-val" style="color:var(--purple)">${money(R.effectiveRent,0)}/ac</span></div>
+        <div class="be-row"><span class="be-lbl">As % of gross crop</span><span class="be-val">${R.gross>0?fmt(R.effectiveRent/R.gross*100,1)+'%':'—'}</span></div>`;
+  }else{
+    lb=`<div class="be-row"><span class="be-lbl">Type</span><span class="be-val" style="color:var(--blue)">Cash rent</span></div>
+        <div class="be-row"><span class="be-lbl">Cash rent</span><span class="be-val">${money(R.cashRent,0)}/ac</span></div>
+        <div class="be-row"><span class="be-lbl">As % of gross crop</span><span class="be-val">${R.gross>0?fmt(R.cashRent/R.gross*100,1)+'%':'—'}</span></div>`;
+  }
+  el('sum-lease-body').innerHTML=lb;
+
+  /* plan list */
+  const pl=el('plan-list'); pl.innerHTML='';
+  R.rows.forEach((r,i)=>{
+    const lc=R.lineCuts[i]; const cut=lc.fullCut;
+    const row=document.createElement('div'); row.className='plan-row';
+    row.innerHTML=`<div class="plan-name">${escapeHtml(r.name||'—')}
+        <span class="pill-mini ${r.type==='fixed'?'pill-fixed':'pill-var'}">${r.type==='fixed'?'F':'V'}·p${r.prio}${r.share>0?'·LL'+fmt(r.share*100,0):''}</span></div>
+      <div class="plan-num plan-ok">${money(r.amount,0)}</div>
+      <div class="plan-num ${cut>0.005?'plan-cut':'plan-ok'}">${money(lc.suggestedFull,0)}</div>`;
+    pl.appendChild(row);
+  });
+  set('plan-tot-planned', money(R.operatorExpenses,0));
+  set('plan-tot-target', money(R.operatorExpenses - R.totalNetCut,0));
+
+  if(R.shortfall>0.005){
+    set('plan-note','Even cutting every flexible line to its floor, you’re still '+money(R.shortfall,2)+'/ac short of '+money(R.tgt,0)+'/ac. The lease or revenue has to change.');
+  }else if(R.requiredCut>0.005){
+    const names=R.rows.filter((r,i)=>R.lineCuts[i].fullCut>0.005).map(r=>r.name).filter(Boolean);
+    set('plan-note','Trimming '+money(R.requiredCut,2)+'/ac of your cost — starting with '+(names.length?names.join(', '):'your highest-priority lines')+' — lands you on '+money(R.tgt,0)+'/ac profit. (Full-input targets shown; you only save your share on shared inputs.)');
+  }else{
+    set('plan-note','No cuts needed — you clear '+money(R.tgt,0)+'/ac with '+money(-R.requiredCut,2)+'/ac to spare.');
+  }
+
+  /* break-even */
+  set('be-price', isFinite(R.bePrice)?'$'+fmt(R.bePrice,2)+'/bu':'—');
+  set('be-yield', isFinite(R.beYield)?fmt(R.beYield,0)+' bu/ac':'—');
+  set('be-price-t', isFinite(R.bePriceT)?'$'+fmt(R.bePriceT,2)+'/bu':'—');
+  set('be-yield-t', isFinite(R.beYieldT)?fmt(R.beYieldT,0)+' bu/ac':'—');
+
+  renderCompare();
+}
+
+/* ================= compare tab ================= */
+function renderCompare(){
+  const A=computeScenario(S.scenarios[0], S.method);
+  const B=computeScenario(S.scenarios[1], S.method);
+  set('cmp-name-a', S.scenarios[0].name||'A');
+  set('cmp-name-b', S.scenarios[1].name||'B');
+
+  const profitAfterA = A.shortfall>0.005 ? A.operatorProfit : A.tgt;   // if reachable, cuts land on target
+  const profitAfterB = B.shortfall>0.005 ? B.operatorProfit : B.tgt;
+
+  // metric: [label, aVal, bVal, aNum, bNum, higherBetter, sub]
+  const rows=[
+    ['Lease', A.isShare?'Share '+fmt(A.Lpct*100,0)+'%':'Cash', B.isShare?'Share '+fmt(B.Lpct*100,0)+'%':'Cash', null,null,null,''],
+    ['Effective cash rent', money(A.effectiveRent,0), money(B.effectiveRent,0), A.effectiveRent, B.effectiveRent, false,'lower is cheaper land'],
+    ['Your revenue / ac', money(A.operatorGross,0), money(B.operatorGross,0), A.operatorGross, B.operatorGross, true,''],
+    ['Your expenses / ac', money(A.operatorExpenses,0), money(B.operatorExpenses,0), A.operatorExpenses, B.operatorExpenses, false,'your share'],
+    ['Profit as planned / ac', money(A.operatorProfit,0), money(B.operatorProfit,0), A.operatorProfit, B.operatorProfit, true,''],
+    ['To hit target: cut / ac', A.shortfall>0.005?'can’t':money(Math.max(0,A.requiredCut),0), B.shortfall>0.005?'can’t':money(Math.max(0,B.requiredCut),0), A.shortfall>0.005?1e9:Math.max(0,A.requiredCut), B.shortfall>0.005?1e9:Math.max(0,B.requiredCut), false,'less to cut is better'],
+    ['Break-even price', isFinite(A.bePrice)?'$'+fmt(A.bePrice,2):'—', isFinite(B.bePrice)?'$'+fmt(B.bePrice,2):'—', A.bePrice, B.bePrice, false,'per bushel'],
+    ['Profit as planned — total', money(A.operatorProfit*A.ac,0), money(B.operatorProfit*B.ac,0), A.operatorProfit*A.ac, B.operatorProfit*B.ac, true,'× each scenario’s acres'],
+  ];
+  const body=el('cmp-body'); body.innerHTML='';
+  rows.forEach(([lbl,av,bv,an,bn,hi,sub])=>{
+    let aw=false,bw=false;
+    if(an!==null && bn!==null && isFinite(an) && isFinite(bn) && Math.abs(an-bn)>1e-6){
+      if(hi){ aw=an>bn; bw=bn>an; } else { aw=an<bn; bw=bn<an; }
+    }
+    const div=document.createElement('div'); div.className='cmp-row';
+    div.innerHTML=`<div class="cmp-metric">${lbl}${sub?`<span class="cmp-sub">${sub}</span>`:''}</div>
+      <div class="cmp-val ${aw?'win':''}">${av}</div>
+      <div class="cmp-val ${bw?'win':''}">${bv}</div>`;
+    body.appendChild(div);
+  });
+
+  // banner: better profit-as-planned per acre (the headline)
+  const banner=el('cmp-banner');
+  if(Math.abs(A.operatorProfit-B.operatorProfit)<1e-6){
+    set('cmp-winner','Dead even'); set('cmp-winner-sub','Both plan to the same profit per acre.');
+  }else{
+    const aWin=A.operatorProfit>B.operatorProfit;
+    const w=aWin?S.scenarios[0]:S.scenarios[1], l=aWin?B:A, wR=aWin?A:B;
+    set('cmp-winner',(w.name||(aWin?'A':'B')));
+    set('cmp-winner-sub','+'+money(Math.abs(A.operatorProfit-B.operatorProfit),0)+'/ac more profit as planned  ·  effective rent '+money(wR.effectiveRent,0)+'/ac');
+  }
+}
+
+/* ================= nav & method ================= */
+function showTab(tab){
+  ['budget','summary','compare'].forEach(s=>{
+    el('sec-'+s).classList.toggle('active',s===tab);
+    el('nav-'+s).classList.toggle('active',s===tab);
+  });
+  el('scroll').scrollTop=0;
+}
+function setMethod(m){
+  S.method=m; save();
+  el('mt-priority').classList.toggle('active',m==='priority');
+  el('mt-spread').classList.toggle('active',m==='spread');
+  calc();
+}
+function resetAll(){
+  if(!confirm('Reset BOTH scenarios back to the example farm?')) return;
+  S=JSON.parse(JSON.stringify(DEFAULT)); save();
+  setScenario(0); setMethod('priority');
+}
+
+/* ================= init ================= */
+el('scn-0').classList.toggle('on',S.active===0);
+el('scn-1').classList.toggle('on',S.active===1);
+el('mt-priority').classList.toggle('active',S.method!=='spread');
+el('mt-spread').classList.toggle('active',S.method==='spread');
+loadScnInputs(); syncLeaseUI(); renderRows(); calc();
+</script>
+</body>
+</html>
