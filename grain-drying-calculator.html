@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grain Drying">
+<meta name="theme-color" content="#1e5a3c">
+<link rel="manifest" href="manifest.json">
+<title>Natural-Air Grain Drying</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
+  --slate:#1e293b;--slate-m:#64748b;--border:#e2e8f0;
+  --white:#fff;--rad:12px;
+  --amber:#d97706;--red:#dc2626;--blue:#2563eb;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0fdf4;display:flex;flex-direction:column;color:var(--slate);overflow:hidden}
+#hdr{background:var(--green);color:white;flex-shrink:0;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-icon{background:rgba(255,255,255,.15);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#hdr-title{font-size:.95rem;font-weight:700}
+#hdr-sub{font-size:.68rem;color:var(--green-m);margin-top:1px}
+#hdr-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:5px 12px;text-align:right;flex-shrink:0}
+#hdr-pill-label{font-size:.6rem;color:var(--green-m);font-weight:600}
+#hdr-pill-val{font-size:.9rem;font-weight:800;line-height:1.2}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;padding-bottom:calc(70px + var(--safe-b) + 8px)}
+#scroll::-webkit-scrollbar{display:none}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px}
+.hint{font-size:.68rem;color:#94a3b8;margin-top:3px;line-height:1.4}
+.input-wrap{position:relative}
+.pfx,.sfx{position:absolute;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.82rem;pointer-events:none}
+.pfx{left:10px}.sfx{right:10px}
+input[type=number],input[type=text],select{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.95rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+input:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
+input.pfx-in{padding-left:24px}
+input.sfx-in{padding-right:44px}
+/* grain selector */
+.grain-tabs{display:flex;gap:7px;margin-bottom:10px}
+.grain-tab{flex:1;background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:9px 4px;font-size:.8rem;font-weight:700;color:var(--slate-m);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s}
+.grain-tab .g-ico{font-size:1.15rem;line-height:1}
+.grain-tab.active{border-color:var(--green);background:#f0fdf4;color:var(--green);box-shadow:0 1px 4px rgba(30,90,60,.12)}
+.mode-tabs{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px;margin-bottom:12px}
+.mode-tab{flex:1;background:none;border:none;padding:7px 4px;border-radius:6px;font-size:.75rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:background .15s,color .15s}
+.mode-tab.active{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.seg{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px}
+.seg button{flex:1;background:none;border:none;padding:7px 4px;border-radius:6px;font-size:.75rem;font-weight:600;color:var(--slate-m);cursor:pointer}
+.seg button.active{background:white;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.pill-note{font-size:.72rem;color:var(--slate-m);background:#f8fafc;border:1px solid #eef2f7;border-radius:8px;padding:8px 10px;margin-top:8px;line-height:1.5}
+.reset-btn{width:100%;padding:13px;background:white;border:1.5px solid var(--border);border-radius:10px;font-size:.87rem;font-weight:600;color:var(--slate-m);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:4px}
+details.adv{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);margin-bottom:10px;overflow:hidden}
+details.adv>summary{list-style:none;cursor:pointer;padding:13px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--slate-m);display:flex;align-items:center;gap:7px}
+details.adv>summary::-webkit-details-marker{display:none}
+details.adv>summary .chev{margin-left:auto;transition:transform .2s}
+details.adv[open]>summary .chev{transform:rotate(90deg)}
+.adv-body{padding:0 14px 14px}
+/* results */
+.hero{border-radius:var(--rad);padding:16px;text-align:center;margin-bottom:10px;color:white}
+.hero-good{background:linear-gradient(135deg,var(--green),var(--green2))}
+.hero-warn{background:linear-gradient(135deg,#d97706,#b45309)}
+.hero-bad{background:linear-gradient(135deg,#dc2626,#991b1b)}
+.hero-label{font-size:.72rem;opacity:.85;font-weight:600;margin-bottom:2px}
+.hero-val{font-size:2rem;font-weight:800;letter-spacing:-.5px;line-height:1.05}
+.hero-sub{font-size:.78rem;opacity:.9;margin-top:5px;line-height:1.4}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.stat{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:12px}
+.stat-label{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-m)}
+.stat-val{font-size:1.35rem;font-weight:800;letter-spacing:-.4px;margin-top:2px}
+.stat-sub{font-size:.68rem;color:var(--slate-m);margin-top:1px}
+.verdict-chip{display:inline-block;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle}
+.vc-good{background:#dcfce7;color:#15803d}
+.vc-warn{background:#fef3c7;color:#b45309}
+.vc-bad{background:#fee2e2;color:#b91c1c}
+table.emc{width:100%;border-collapse:collapse;font-size:.8rem}
+table.emc th,table.emc td{padding:7px 6px;text-align:center;border-bottom:1px solid #f1f5f9}
+table.emc th{font-size:.64rem;text-transform:uppercase;letter-spacing:.04em;color:var(--slate-m);font-weight:700}
+table.emc td:first-child,table.emc th:first-child{text-align:left;font-weight:600}
+table.emc td.rh{font-weight:800;color:var(--green)}
+table.emc tr.now td{background:#f0fdf4}
+table.emc td.rh.dim{color:#94a3b8;font-weight:600}
+.bd{display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:.8rem;align-items:baseline}
+.bd .l{color:var(--slate-m)}
+.bd .v{font-weight:700;text-align:right;white-space:nowrap}
+.bd .sec-h{grid-column:1/-1;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--slate-m);border-top:1px solid #f1f5f9;padding-top:8px;margin-top:4px}
+.bd .tot{border-top:1px solid #e2e8f0;padding-top:6px;margin-top:2px;font-weight:800}
+.warn{display:flex;gap:9px;align-items:flex-start;border-radius:10px;padding:11px 12px;margin-bottom:9px;font-size:.78rem;line-height:1.5}
+.warn svg{flex-shrink:0;margin-top:1px}
+.warn-red{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.warn-amber{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.warn-blue{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.warn-green{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-b);box-shadow:0 -2px 12px rgba(0,0,0,.06);z-index:100}
+.nbtn{flex:1;background:none;border:none;cursor:pointer;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate-m);transition:color .12s;min-height:56px}
+.nbtn:active{opacity:.7}
+.nbtn.active{color:var(--green)}
+.nbtn svg{width:20px;height:20px}
+.nbtn span{font-size:.68rem;font-weight:600}
+.sec{display:none}
+.sec.active{display:block}
+.info-line{font-size:.72rem;color:var(--slate-m);line-height:1.55;margin-top:6px}
+.disclaim{font-size:.68rem;color:#94a3b8;line-height:1.55;text-align:center;margin-top:14px;padding:0 6px}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-top">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="hdr-icon">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+          <path d="M12 6c0-2.5 2-4 4.5-3.5C18 3 18.5 5 17 7c-1 1.3-3 1.5-5-1z"/>
+          <path d="M12 12c2.5 0 4 2 3.5 4.5C15 18 13 18.5 11 17c-1.3-1-1.5-3 1-5z"/>
+          <path d="M12 12c0 2.5-2 4-4.5 3.5C6 15 5.5 13 7 11c1-1.3 3-1.5 5 1z"/>
+        </svg>
+      </div>
+      <div>
+        <div id="hdr-title">Natural-Air Drying</div>
+        <div id="hdr-sub">Dry with ambient air — no heater</div>
+      </div>
+    </div>
+    <div id="hdr-pill">
+      <div id="hdr-pill-label">Airflow</div>
+      <div id="hdr-pill-val">—</div>
+    </div>
+  </div>
+</div>
+
+<div id="scroll">
+
+  <!-- ============ PLAN TAB ============ -->
+  <div id="sec-plan" class="sec active">
+
+    <div class="grain-tabs" id="grain-tabs">
+      <button class="grain-tab active" data-grain="wheat" onclick="setGrain('wheat')"><span class="g-ico">🌾</span>HRW Wheat</button>
+      <button class="grain-tab" data-grain="corn" onclick="setGrain('corn')"><span class="g-ico">🌽</span>Corn</button>
+      <button class="grain-tab" data-grain="soybeans" onclick="setGrain('soybeans')"><span class="g-ico">🫘</span>Soybeans</button>
+    </div>
+
+    <!-- Moisture -->
+    <div class="card">
+      <div class="card-title">Grain Moisture</div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label>Current moisture</label>
+          <div class="input-wrap">
+            <input type="number" id="mi" class="sfx-in" inputmode="decimal" step="0.1" value="16" oninput="calc()">
+            <span class="sfx">% wet</span>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Target moisture</label>
+          <div class="input-wrap">
+            <input type="number" id="mf" class="sfx-in" inputmode="decimal" step="0.1" value="13.5" oninput="calc()">
+            <span class="sfx">% wet</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint" id="moist-hint"></div>
+    </div>
+
+    <!-- Bin -->
+    <div class="card">
+      <div class="card-title">Bin & Grain Depth</div>
+      <div class="seg" id="shape-seg" style="margin-bottom:12px">
+        <button class="active" data-shape="round" onclick="setShape('round')">Round bin</button>
+        <button data-shape="flat" onclick="setShape('flat')">Flat / rectangular</button>
+      </div>
+
+      <div id="shape-round">
+        <div class="row2">
+          <div class="field" style="margin-bottom:0">
+            <label>Bin diameter</label>
+            <div class="input-wrap"><input type="number" id="dia" class="sfx-in" inputmode="decimal" step="1" value="24" oninput="calc()"><span class="sfx">ft</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Grain depth</label>
+            <div class="input-wrap"><input type="number" id="depth" class="sfx-in" inputmode="decimal" step="1" value="16" oninput="calc()"><span class="sfx">ft</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="shape-flat" style="display:none">
+        <div class="row3">
+          <div class="field" style="margin-bottom:0">
+            <label>Width</label>
+            <div class="input-wrap"><input type="number" id="width" class="sfx-in" inputmode="decimal" step="1" value="30" oninput="calc()"><span class="sfx">ft</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Length</label>
+            <div class="input-wrap"><input type="number" id="length" class="sfx-in" inputmode="decimal" step="1" value="60" oninput="calc()"><span class="sfx">ft</span></div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Depth</label>
+            <div class="input-wrap"><input type="number" id="depthf" class="sfx-in" inputmode="decimal" step="1" value="12" oninput="calc()"><span class="sfx">ft</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="hint" id="bin-hint" style="margin-top:8px"></div>
+    </div>
+
+    <!-- Fan -->
+    <div class="card">
+      <div class="card-title">Fan</div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="ftab-hp" onclick="setFanMode('hp')">Estimate from HP</button>
+        <button class="mode-tab" id="ftab-cfm" onclick="setFanMode('cfm')">I know my CFM</button>
+      </div>
+
+      <!-- HP mode -->
+      <div id="fan-hp">
+        <div class="row2">
+          <div class="field" style="margin-bottom:10px">
+            <label>Motor horsepower</label>
+            <div class="input-wrap"><input type="number" id="hp" class="sfx-in" inputmode="decimal" step="0.5" value="7.5" oninput="calc()"><span class="sfx">HP</span></div>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Fan type</label>
+            <select id="fantype" onchange="calc()">
+              <option value="0.30">Low-speed axial (aeration)</option>
+              <option value="0.50" selected>Vane-axial (in-line)</option>
+              <option value="0.60">Centrifugal</option>
+            </select>
+          </div>
+        </div>
+        <div class="pill-note">
+          You don't need to know CFM — it's estimated from your fan's horsepower working against the air resistance of your grain column. For best accuracy, open <b>Advanced</b> below and enter one point from your fan's performance chart.
+        </div>
+      </div>
+
+      <!-- Known CFM mode -->
+      <div id="fan-cfm" style="display:none">
+        <div class="field" style="margin-bottom:0">
+          <label>Fan airflow (free-air or rated CFM)</label>
+          <div class="input-wrap"><input type="number" id="cfm-known" class="sfx-in" inputmode="decimal" step="100" placeholder="e.g. 8000" oninput="calc()"><span class="sfx">CFM</span></div>
+          <div class="hint">Enter the CFM from your fan's nameplate/manufacturer chart. The tool still computes the static pressure your bin creates and the resulting cfm/bushel.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weather -->
+    <div class="card">
+      <div class="card-title">Typical Drying-Season Air</div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label>Avg air temp</label>
+          <div class="input-wrap"><input type="number" id="airt" class="sfx-in" inputmode="decimal" step="1" value="55" oninput="calc()"><span class="sfx">°F</span></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Avg humidity</label>
+          <div class="input-wrap"><input type="number" id="airrh" class="sfx-in" inputmode="decimal" step="1" value="65" oninput="calc()"><span class="sfx">% RH</span></div>
+        </div>
+      </div>
+      <div class="hint">Average temperature & humidity of the air <b>during the hours you'll actually run the fan</b>. Running only in drier hours (see the humidity table on Results) dries faster.</div>
+    </div>
+
+    <!-- Advanced -->
+    <details class="adv">
+      <summary>Advanced settings
+        <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </summary>
+      <div class="adv-body">
+        <div class="row2">
+          <div class="field">
+            <label>Test weight</label>
+            <div class="input-wrap"><input type="number" id="testwt" class="sfx-in" inputmode="decimal" step="0.5" value="60" oninput="calc()"><span class="sfx">lb/bu</span></div>
+          </div>
+          <div class="field">
+            <label>Fan run hours / day</label>
+            <div class="input-wrap"><input type="number" id="hrsday" class="sfx-in" inputmode="decimal" step="1" value="16" oninput="calc()"><span class="sfx">hr</span></div>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field" style="margin-bottom:0">
+            <label>Drying efficiency</label>
+            <div class="input-wrap"><input type="number" id="effic" class="sfx-in" inputmode="decimal" step="5" value="65" oninput="calc()"><span class="sfx">%</span></div>
+            <div class="hint">How close exhaust air gets to fully "loaded." 55–70% is typical for a deep bed.</div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Elevation</label>
+            <div class="input-wrap"><input type="number" id="elev" class="sfx-in" inputmode="decimal" step="100" value="1000" oninput="calc()"><span class="sfx">ft</span></div>
+          </div>
+        </div>
+        <div class="field" style="margin:10px 0 0">
+          <label>Calibrate fan (from manufacturer chart) — optional</label>
+          <div class="row2">
+            <div class="input-wrap"><input type="number" id="cal-cfm" class="sfx-in" inputmode="decimal" step="100" placeholder="CFM" oninput="calc()"><span class="sfx">CFM</span></div>
+            <div class="input-wrap"><input type="number" id="cal-sp" class="sfx-in" inputmode="decimal" step="0.1" placeholder="at static press." oninput="calc()"><span class="sfx">in</span></div>
+          </div>
+          <div class="hint">If you know your fan delivers, say, 6,000 CFM at 3 inches of static pressure, enter it here (HP mode only). It tunes the estimate to your exact fan.</div>
+        </div>
+      </div>
+    </details>
+
+    <button class="reset-btn" onclick="resetAll()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Reset to defaults
+    </button>
+
+    <div class="disclaim">
+      Estimates for planning only. Grain drying depends on real weather, grain condition, and bin airflow uniformity.
+      Always confirm moisture with a tester before selling or long-term storage.
+    </div>
+  </div>
+
+  <!-- ============ RESULTS TAB ============ -->
+  <div id="sec-results" class="sec">
+
+    <div id="warnings"></div>
+
+    <!-- Fan-hours hero -->
+    <div class="hero hero-good" id="hero">
+      <div class="hero-label">Estimated fan run time</div>
+      <div class="hero-val" id="hero-val">—</div>
+      <div class="hero-sub" id="hero-sub"></div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Delivered airflow</div>
+        <div class="stat-val" id="st-cfm">—</div>
+        <div class="stat-sub" id="st-cfm-sub">CFM at operating pressure</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Airflow rate<span class="verdict-chip" id="cfmbu-chip"></span></div>
+        <div class="stat-val" id="st-cfmbu">—</div>
+        <div class="stat-sub" id="st-cfmbu-sub">cfm / bushel</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Static pressure</div>
+        <div class="stat-val" id="st-sp">—</div>
+        <div class="stat-sub">inches of water</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Water to remove</div>
+        <div class="stat-val" id="st-water">—</div>
+        <div class="stat-sub" id="st-water-sub">total pounds</div>
+      </div>
+    </div>
+
+    <!-- When to run -->
+    <div class="card">
+      <div class="card-title">When To Run — Max Humidity</div>
+      <div class="info-line" id="run-headline" style="margin-top:0;margin-bottom:9px"></div>
+      <table class="emc" id="emc-table">
+        <thead><tr><th>Air temp</th><th>Run at or below</th><th>Air this dry pulls to</th></tr></thead>
+        <tbody id="emc-body"></tbody>
+      </table>
+      <div class="info-line">
+        Above these humidity levels the air is too damp — running the fan would <b>add</b> moisture instead of removing it.
+        Wire a humidistat to your fan set near your target row, or run by hand when the air is dry.
+      </div>
+    </div>
+
+    <!-- Breakdown -->
+    <div class="card">
+      <div class="card-title">The Math</div>
+      <div class="bd" id="breakdown"></div>
+    </div>
+
+    <div class="disclaim" id="res-disclaim"></div>
+  </div>
+</div>
+
+<nav id="bnav">
+  <button class="nbtn active" id="nav-plan" onclick="showTab('plan')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    <span>Plan</span>
+  </button>
+  <button class="nbtn" id="nav-results" onclick="showTab('results')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span>Results</span>
+  </button>
+</nav>
+
+<script>
+/* ================= Grain data =================
+   EMC: Modified Henderson (ASAE D245),  1-RH = exp(-K*(Tc+C)*Mdb^N)
+        Tc in °C, Mdb in % dry basis.  Validated against published EMC anchors.
+   Airflow resistance: ASAE D272 / Shedd–Hukill,  dP/L = a*Q^2 / ln(1+b*Q)
+        dP/L in Pa/m, Q = face velocity in m/s.  'pack' = filled-bin packing factor.
+   Corn coeffs reproduce "16 ft, 1 cfm/bu -> ~2.4 in H2O" with pack 1.5. */
+const GRAINS = {
+  wheat:    {name:'HRW Wheat', emoji:'🌾', testwt:60, target:13.5, startMoist:16, maxMoist:18, cfmMin:0.75, cfmGood:1.0, startTemp:50, airT:55, airRH:55,
+             K:2.3007e-5, N:2.2857, C:55.815,  a:2.700e4, b:8.770, pack:1.4},
+  corn:     {name:'Corn', emoji:'🌽', testwt:56, target:15, startMoist:20, maxMoist:21, cfmMin:1.0, cfmGood:1.25, startTemp:40, airT:50, airRH:62,
+             K:8.6541e-5, N:1.8634, C:49.810,  a:2.070e4, b:30.40, pack:1.5},
+  soybeans: {name:'Soybeans', emoji:'🫘', testwt:60, target:13, startMoist:15, maxMoist:16, cfmMin:1.0, cfmGood:1.0, startTemp:40, airT:50, airRH:60,
+             K:3.0530e-4, N:1.2164, C:134.136, a:1.020e4, b:16.00, pack:1.35}
+};
+let grain = 'wheat';
+let shape = 'round';
+let fanMode = 'hp';
+
+const BU_PER_FT3 = 0.8036;      // 1 bushel = 1.2445 ft^3
+const IN_H2O_PA  = 248.84;      // Pa per inch of water
+const MS_PER_CFMFT2 = 0.00508;  // m/s per (cfm/ft^2)
+const AIR_HP_K   = 6356;        // CFM*inH2O per HP
+
+/* ---- helpers ---- */
+function v(id){return parseFloat(document.getElementById(id).value)||0;}
+function el(id){return document.getElementById(id);}
+function set(id,t){el(id).textContent=t;}
+function show(id,vis){el(id).style.display=vis?'':'none';}
+function fmt(n,d=0){return (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+/* ---- psychrometrics (English units, sea-level adjustable) ---- */
+function pAtm(elevFt){return 14.696*Math.pow(1-6.8754e-6*elevFt,5.2559);}   // psia
+function pSat(Tf){                                                          // sat. vapor pressure over water, psia
+  const Tc=(Tf-32)/1.8;
+  const kPa=0.61078*Math.exp(17.269*Tc/(Tc+237.3));
+  return kPa*0.1450377;
+}
+function wRatio(pw,P){return 0.62198*pw/(P-pw);}                            // humidity ratio, lb/lb dry air
+function wFromRH(Tf,rh,P){let pw=rh*pSat(Tf); if(pw>P*0.9999)pw=P*0.9999; return wRatio(pw,P);}
+function wSat(Tf,P){let pw=pSat(Tf); if(pw>P*0.9999)pw=P*0.9999; return wRatio(pw,P);}
+function humidVol(Tf,w,P){                                                  // ft^3 per lb dry air
+  return 53.35*(Tf+459.67)*(1+1.6078*w)/(P*144);
+}
+function wetBulb(Tf,rh,P){                                                  // °F, iterative
+  const w=wFromRH(Tf,rh,P);
+  let lo=Tf-45, hi=Tf;
+  for(let i=0;i<50;i++){
+    const t=(lo+hi)/2, ws=wSat(t,P);
+    const wp=((1093-0.556*t)*ws-0.240*(Tf-t))/(1093+0.444*Tf-t);
+    if(wp>w) hi=t; else lo=t;
+  }
+  return (lo+hi)/2;
+}
+
+/* ---- EMC (modified Henderson) ---- */
+function emcDB(g,Tf,rh){                                                    // % dry basis
+  const G=GRAINS[g], Tc=(Tf-32)/1.8;
+  rh=Math.min(Math.max(rh,0.005),0.995);
+  return Math.pow(-Math.log(1-rh)/(G.K*(Tc+G.C)), 1/G.N);
+}
+function rhForEMC(g,Tf,Mdb){                                                // fraction RH that holds grain at Mdb (%db)
+  const G=GRAINS[g], Tc=(Tf-32)/1.8;
+  return 1-Math.exp(-G.K*(Tc+G.C)*Math.pow(Mdb,G.N));
+}
+const wb2db = m => 100*m/(100-m);       // wet basis % -> dry basis %
+const db2wb = m => 100*m/(100+m);       // dry basis % -> wet basis %
+
+/* ---- bin geometry ---- */
+function binGeom(){
+  if(shape==='round'){
+    const d=v('dia'), depth=v('depth');
+    const area=Math.PI/4*d*d;
+    return {area, depth, bushels:area*depth*BU_PER_FT3};
+  } else {
+    const w=v('width'), l=v('length'), depth=v('depthf');
+    const area=w*l;
+    return {area, depth, bushels:area*depth*BU_PER_FT3};
+  }
+}
+
+/* ---- static pressure of grain column (in H2O) at a given airflow ---- */
+function staticPressure(g,cfm,geom){
+  const G=GRAINS[g];
+  if(geom.area<=0||cfm<=0||geom.depth<=0) return 0;
+  const Q=(cfm/geom.area)*MS_PER_CFMFT2;             // face velocity, m/s
+  const dpdl=G.a*Q*Q/Math.log(1+G.b*Q);             // Pa/m (loose grain)
+  const Lm=geom.depth*0.3048;
+  return G.pack*dpdl*Lm/IN_H2O_PA;                   // in H2O, packed
+}
+
+/* ---- fan operating point (HP mode): where fan curve meets grain curve ---- */
+function solveOperatingCFM(g,geom,hp,eta){
+  // fan CFM available at a static pressure SP:  cfm = hp*6356*eta/SP
+  // grain SP rises with cfm.  Find cfm where the two agree (bisection).
+  const fanAt = sp => sp>0 ? hp*AIR_HP_K*eta/sp : 1e9;
+  let lo=1, hi=300000;
+  for(let i=0;i<60;i++){
+    const mid=(lo+hi)/2;
+    const sp=staticPressure(g,mid,geom);
+    const avail=fanAt(sp);
+    if(avail>mid) lo=mid; else hi=mid;
+  }
+  return (lo+hi)/2;
+}
+
+/* ================= main calc ================= */
+function calc(){
+  const G=GRAINS[grain];
+  const P=pAtm(v('elev'));
+  const geom=binGeom();
+  const bu=geom.bushels;
+  const Mi=v('mi'), Mf=v('mf');
+  const testwt=v('testwt')||G.testwt;
+
+  set('bin-hint', fmt(bu)+' bushels · '+fmt(geom.area)+' ft² floor · '+fmt(geom.depth,0)+' ft deep');
+
+  /* --- fan / airflow --- */
+  let cfm=0, sp=0, eta=parseFloat(el('fantype').value);
+  if(fanMode==='hp'){
+    const hp=v('hp');
+    // optional calibration overrides efficiency so the model passes through the rated point
+    const calCfm=v('cal-cfm'), calSp=v('cal-sp');
+    if(calCfm>0 && calSp>0 && hp>0) eta=Math.min(0.85, calCfm*calSp/(hp*AIR_HP_K));
+    cfm=solveOperatingCFM(grain,geom,hp,eta);
+    sp=staticPressure(grain,cfm,geom);
+  } else {
+    cfm=v('cfm-known');
+    sp=staticPressure(grain,cfm,geom);
+  }
+  const cfmbu = bu>0 ? cfm/bu : 0;
+
+  /* --- water to remove --- */
+  const waterPerBu = Mf<Mi ? testwt*(Mi-Mf)/(100-Mf) : 0;
+  const waterLbs = waterPerBu*bu;
+
+  /* --- drying rate via psychrometric mass balance --- */
+  const airT=v('airt'), airRH=v('airrh')/100, effic=Math.max(0.05,v('effic')/100);
+  const w_in=wFromRH(airT,airRH,P);
+  const twb=wetBulb(airT,airRH,P);
+  const dwMax=Math.max(0, wSat(twb,P)-w_in);          // max water pickup per lb dry air
+  const dwEff=dwMax*effic;
+  const vol=humidVol(airT,w_in,P);
+  const dryAirLbHr = vol>0 ? cfm*60/vol : 0;
+  const removalLbHr = dryAirLbHr*dwEff;
+  let hours = removalLbHr>0 ? waterLbs/removalLbHr : Infinity;
+
+  // Can the average air even reach target?  (air EMC vs target)
+  const airEmcWB = db2wb(emcDB(grain,airT,airRH));
+  const airTooWet = airEmcWB >= Mf-0.05 && Mf<Mi;
+
+  /* ===== header pill ===== */
+  let pillClass = cfmbu>=G.cfmGood?'good':(cfmbu>=G.cfmMin?'warn':'bad');
+  set('hdr-pill-val', (cfmbu>0?fmt(cfmbu,2):'—')+' cfm/bu');
+
+  /* ===== hero ===== */
+  const hero=el('hero');
+  if(Mf>=Mi){
+    hero.className='hero hero-warn';
+    set('hero-val','—');
+    set('hero-sub','Set a target moisture below your current moisture to estimate drying time.');
+  } else if(!isFinite(hours)||cfm<=0){
+    hero.className='hero hero-warn';
+    set('hero-val','—');
+    set('hero-sub','Enter a fan and bin to estimate fan hours.');
+  } else if(airTooWet){
+    hero.className='hero hero-bad';
+    set('hero-val','Air too humid');
+    set('hero-sub','At '+fmt(airT,0)+'°F / '+fmt(airRH*100,0)+'% RH the air only dries '+G.name.toLowerCase()+' to about '+fmt(airEmcWB,1)+'%. Run only in drier air (see table) to reach '+fmt(Mf,1)+'%.');
+  } else {
+    const days=hours/24, calDays = v('hrsday')>0 ? hours/v('hrsday') : days;
+    hero.className = 'hero '+(cfmbu>=G.cfmMin?'hero-good':'hero-warn');
+    set('hero-val', fmt(hours,0)+' fan-hours');
+    set('hero-sub','≈ '+fmt(days,1)+' days running non-stop, or about '+fmt(calDays,0)+' days at '+fmt(v('hrsday'),0)+' hr/day. Removes '+fmt(Mi-Mf,1)+' points of moisture.');
+  }
+
+  /* ===== stat tiles ===== */
+  set('st-cfm', cfm>0?fmt(cfm):'—');
+  set('st-cfm-sub', fanMode==='hp'?'CFM at '+fmt(sp,1)+' in pressure':'at '+fmt(sp,1)+' in pressure');
+  set('st-cfmbu', cfmbu>0?fmt(cfmbu,2):'—');
+  const chip=el('cfmbu-chip');
+  chip.textContent = cfmbu>=G.cfmGood?'Good':(cfmbu>=G.cfmMin?'OK':'Low');
+  chip.className='verdict-chip '+(cfmbu>=G.cfmGood?'vc-good':(cfmbu>=G.cfmMin?'vc-warn':'vc-bad'));
+  set('st-cfmbu-sub','need ≥ '+fmt(G.cfmMin,2)+' to dry');
+  set('st-sp', cfm>0?fmt(sp,1):'—');
+  set('st-water', waterLbs>0?fmt(waterLbs):'—');
+  set('st-water-sub', waterPerBu>0?fmt(waterPerBu,1)+' lb/bu · '+fmt(waterLbs/8.34,0)+' gal':'—');
+
+  /* ===== when-to-run table ===== */
+  const MfDB=wb2db(Mf);
+  const temps=[35,45,55,65,75,85];
+  let rows='';
+  temps.forEach(T=>{
+    let rh=rhForEMC(grain,T,MfDB)*100;
+    const cls = Math.round(T/10)*10===Math.round(airT/10)*10 ? ' class="now"':'';
+    let rhTxt = rh>=99?'any humidity':fmt(rh,0)+'% RH';
+    // what a "just-dry-enough" reading actually pulls to at this temp is Mf by construction; show a hair drier target too
+    rows+='<tr'+cls+'><td>'+T+'°F</td><td class="rh'+(rh>=99?' dim':'')+'">'+rhTxt+'</td><td>'+fmt(Mf,1)+'%</td></tr>';
+  });
+  el('emc-body').innerHTML=rows;
+  set('run-headline','To dry '+G.name+' to '+fmt(Mf,1)+'%, run the fan whenever the outside air is at or below the humidity shown for that temperature:');
+
+  /* ===== warnings ===== */
+  let warns='';
+  const wrap=(cls,txt)=>{return '<div class="warn '+cls+'"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div>'+txt+'</div></div>';};
+  if(Mi>G.maxMoist){
+    warns+=wrap('warn-red','<b>'+fmt(Mi,1)+'% is above the natural-air limit for '+G.name.toLowerCase()+' (~'+G.maxMoist+'%).</b> Wetter grain can spoil before it dries with unheated air. Consider a heater, higher airflow, or drying in stages.');
+  }
+  if(cfmbu>0 && cfmbu<G.cfmMin){
+    warns+=wrap('warn-amber','<b>Airflow is low ('+fmt(cfmbu,2)+' cfm/bu).</b> '+G.name+' needs at least '+fmt(G.cfmMin,2)+' cfm/bu for natural-air drying. Drying will be slow and the top may spoil first. Fill the bin shallower or use a bigger fan.');
+  }
+  if(sp>6 && cfm>0){
+    warns+=wrap('warn-amber','<b>Static pressure is high ('+fmt(sp,1)+' in).</b> Deep grain chokes airflow. Most farm fans run efficiently under ~4–5 in — reducing grain depth helps a lot.');
+  }
+  if(airTooWet){
+    warns+=wrap('warn-red','At your average '+fmt(airT,0)+'°F / '+fmt(airRH*100,0)+'% air, '+G.name.toLowerCase()+' only equalizes near <b>'+fmt(airEmcWB,1)+'%</b> — it won\'t reach '+fmt(Mf,1)+'%. Run the fan only when humidity is below the table values.');
+  }
+  if(airT<G.startTemp && Mf<Mi && !airTooWet){
+    warns+=wrap('warn-blue','Air averaging '+fmt(airT,0)+'°F is on the cool side for '+G.name.toLowerCase()+'. Drying still works but slows down; most guides start '+G.name.toLowerCase()+' fans around '+G.startTemp+'°F+.');
+  }
+  if(!warns && Mf<Mi && cfmbu>=G.cfmMin && !airTooWet){
+    warns='<div class="warn warn-green"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg><div>Airflow and moisture are in the workable range for natural-air drying. Run the fan in dry air (table below) and check moisture as you go.</div></div>';
+  }
+  el('warnings').innerHTML=warns;
+
+  /* ===== breakdown ===== */
+  let bd='';
+  const line=(l,val)=>{bd+='<div class="l">'+l+'</div><div class="v">'+val+'</div>';};
+  const sech=t=>{bd+='<div class="sec-h">'+t+'</div>';};
+  sech('Bin');
+  line('Grain', G.name);
+  line('Capacity', fmt(bu)+' bu');
+  line('Grain depth', fmt(geom.depth,0)+' ft');
+  sech('Airflow');
+  line('Delivered air', fmt(cfm)+' CFM');
+  line('Static pressure', fmt(sp,2)+' in H₂O');
+  if(fanMode==='hp') line('Fan static efficiency', fmt(eta*100,0)+'%'+(v('cal-cfm')>0&&v('cal-sp')>0?' (calibrated)':''));
+  line('Airflow rate', fmt(cfmbu,2)+' cfm/bu');
+  sech('Water');
+  line('Moisture removed', fmt(Mi,1)+'% → '+fmt(Mf,1)+'% ('+fmt(Mi-Mf,1)+' pts)');
+  line('Water per bushel', fmt(waterPerBu,2)+' lb');
+  line('Total water', fmt(waterLbs)+' lb ('+fmt(waterLbs/8.34,0)+' gal)');
+  sech('Drying air (avg '+fmt(airT,0)+'°F / '+fmt(airRH*100,0)+'% RH)');
+  line('Wet-bulb temp', fmt(twb,1)+' °F');
+  line('Water each lb of air can hold', fmt(dwMax*7000,1)+' grains');
+  line('Used at '+fmt(effic*100,0)+'% efficiency', fmt(dwEff*7000,1)+' grains/lb');
+  line('Dry air moved', fmt(dryAirLbHr)+' lb/hr');
+  line('Water removed', fmt(removalLbHr,1)+' lb/hr');
+  bd+='<div class="l tot">Fan run-time</div><div class="v tot">'+(isFinite(hours)&&hours>0?fmt(hours,0)+' hr':'—')+'</div>';
+  el('breakdown').innerHTML=bd;
+
+  set('res-disclaim','EMC from the modified Henderson equation (ASAE D245); airflow resistance from the Shedd/Hukill curve (ASAE D272) with a '+G.pack+'× filled-bin packing factor. Real results vary with weather swings, fines, and how level the grain is. Verify with a moisture tester.');
+
+  /* moisture hint on plan tab */
+  set('moist-hint','Typical target for '+G.name+' is '+fmt(G.target,1)+'%. Natural-air limit ≈ '+G.maxMoist+'% starting moisture.');
+}
+
+/* ================= UI ================= */
+function setGrain(g){
+  grain=g;
+  document.querySelectorAll('.grain-tab').forEach(b=>b.classList.toggle('active',b.dataset.grain===g));
+  const G=GRAINS[g];
+  el('mf').value=G.target;
+  el('mi').value=G.startMoist;
+  el('testwt').value=G.testwt;
+  el('airt').value=G.airT;
+  el('airrh').value=G.airRH;
+  calc();
+}
+function setShape(s){
+  shape=s;
+  document.querySelectorAll('#shape-seg button').forEach(b=>b.classList.toggle('active',b.dataset.shape===s));
+  show('shape-round',s==='round'); show('shape-flat',s==='flat');
+  calc();
+}
+function setFanMode(m){
+  fanMode=m;
+  el('ftab-hp').classList.toggle('active',m==='hp');
+  el('ftab-cfm').classList.toggle('active',m==='cfm');
+  show('fan-hp',m==='hp'); show('fan-cfm',m==='cfm');
+  calc();
+}
+function showTab(tab){
+  ['plan','results'].forEach(s=>{
+    el('sec-'+s).classList.toggle('active',s===tab);
+    el('nav-'+s).classList.toggle('active',s===tab);
+  });
+  el('scroll').scrollTop=0;
+}
+function resetAll(){
+  shape='round'; setShape('round');
+  fanMode='hp'; setFanMode('hp');
+  el('hp').value='7.5'; el('fantype').value='0.50';
+  el('cfm-known').value='';
+  el('dia').value='24'; el('depth').value='16';
+  el('width').value='30'; el('length').value='60'; el('depthf').value='12';
+  el('airt').value='55'; el('airrh').value='65';
+  el('hrsday').value='16'; el('effic').value='65'; el('elev').value='1000';
+  el('cal-cfm').value=''; el('cal-sp').value='';
+  el('mi').value='16';
+  setGrain('wheat');       // sets mf/target etc. and calcs
+  showTab('plan');
+}
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+setGrain('wheat');   // populate grain defaults, then calc()
+</script>
+</body>
+</html>
