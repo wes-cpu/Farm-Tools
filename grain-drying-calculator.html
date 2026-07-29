@@ -47,8 +47,9 @@ input:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,
 input.pfx-in{padding-left:24px}
 input.sfx-in{padding-right:44px}
 /* grain selector */
-.grain-tabs{display:flex;gap:7px;margin-bottom:10px}
-.grain-tab{flex:1;background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:9px 4px;font-size:.8rem;font-weight:700;color:var(--slate-m);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s}
+.grain-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+@media(min-width:520px){.grain-tabs{grid-template-columns:repeat(4,1fr)}}
+.grain-tab{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:9px 4px;font-size:.8rem;font-weight:700;color:var(--slate-m);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s}
 .grain-tab .g-ico{font-size:1.15rem;line-height:1}
 .grain-tab.active{border-color:var(--green);background:#f0fdf4;color:var(--green);box-shadow:0 1px 4px rgba(30,90,60,.12)}
 .mode-tabs{display:flex;background:#f1f5f9;border-radius:8px;padding:3px;gap:2px;margin-bottom:12px}
@@ -144,6 +145,7 @@ table.emc td.rh.dim{color:#94a3b8;font-weight:600}
 
     <div class="grain-tabs" id="grain-tabs">
       <button class="grain-tab active" data-grain="wheat" onclick="setGrain('wheat')"><span class="g-ico">🌾</span>HRW Wheat</button>
+      <button class="grain-tab" data-grain="srw" onclick="setGrain('srw')"><span class="g-ico">🌾</span>SRW Wheat</button>
       <button class="grain-tab" data-grain="corn" onclick="setGrain('corn')"><span class="g-ico">🌽</span>Corn</button>
       <button class="grain-tab" data-grain="soybeans" onclick="setGrain('soybeans')"><span class="g-ico">🫘</span>Soybeans</button>
     </div>
@@ -394,6 +396,8 @@ table.emc td.rh.dim{color:#94a3b8;font-weight:600}
 const GRAINS = {
   wheat:    {name:'HRW Wheat', emoji:'🌾', testwt:60, target:13.5, startMoist:16, maxMoist:18, cfmMin:0.75, cfmGood:1.0, startTemp:50, airT:55, airRH:55,
              K:2.3007e-5, N:2.2857, C:55.815,  a:2.700e4, b:8.770, pack:1.4},
+  srw:      {name:'SRW Wheat', emoji:'🌾', testwt:60, target:13.5, startMoist:16, maxMoist:18, cfmMin:0.75, cfmGood:1.0, startTemp:50, airT:55, airRH:60,
+             K:1.2299e-5, N:2.5558, C:64.346,  a:2.700e4, b:8.770, pack:1.4},
   corn:     {name:'Corn', emoji:'🌽', testwt:56, target:15, startMoist:20, maxMoist:21, cfmMin:1.0, cfmGood:1.25, startTemp:40, airT:50, airRH:62,
              K:8.6541e-5, N:1.8634, C:49.810,  a:2.070e4, b:30.40, pack:1.5},
   soybeans: {name:'Soybeans', emoji:'🫘', testwt:60, target:13, startMoist:15, maxMoist:16, cfmMin:1.0, cfmGood:1.0, startTemp:40, airT:50, airRH:60,
