@@ -1,4 +1,4 @@
-const CACHE = 'farm-tools-v1';
+const CACHE = 'farm-tools-v3';
 const FILES = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const FILES = [
   './commodity-carry-monitor.html',
   './commodity-options-analyzer.html',
   './elevator-compare.html',
+  './grain-drying-calculator.html',
 ];
 
 self.addEventListener('install', e => {
