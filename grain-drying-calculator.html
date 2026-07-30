@@ -373,6 +373,92 @@ table.emc td.rh.dim{color:#94a3b8;font-weight:600}
 
     <div class="disclaim" id="res-disclaim"></div>
   </div>
+
+  <!-- ============ COST TAB ============ -->
+  <div id="sec-cost" class="sec">
+
+    <div class="card">
+      <div class="card-title">Cost & Elevator Inputs</div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:10px">
+          <label>Electricity rate</label>
+          <div class="input-wrap"><span class="pfx">$</span><input type="number" id="kwhcost" class="pfx-in sfx-in" inputmode="decimal" step="0.01" value="0.14" oninput="calc()"><span class="sfx">/kWh</span></div>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Grain price</label>
+          <div class="input-wrap"><span class="pfx">$</span><input type="number" id="gprice" class="pfx-in sfx-in" inputmode="decimal" step="0.05" value="4.30" oninput="calc()"><span class="sfx">/bu</span></div>
+        </div>
+      </div>
+      <div class="row3">
+        <div class="field" style="margin-bottom:0">
+          <label>Elevator base</label>
+          <div class="input-wrap"><input type="number" id="basem" class="sfx-in" inputmode="decimal" step="0.5" value="15" oninput="calc()"><span class="sfx">%</span></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Shrink</label>
+          <div class="input-wrap"><input type="number" id="shrinkf" class="sfx-in" inputmode="decimal" step="0.01" value="1.18" oninput="calc()"><span class="sfx">%/pt</span></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Dry charge</label>
+          <div class="input-wrap"><span class="pfx">$</span><input type="number" id="drychg" class="pfx-in sfx-in" inputmode="decimal" step="0.005" value="0.05" oninput="calc()"><span class="sfx">/pt</span></div>
+        </div>
+      </div>
+      <details class="adv" style="margin-top:12px;margin-bottom:0">
+        <summary>Fan power draw
+          <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </summary>
+        <div class="adv-body">
+          <div class="field" style="margin-bottom:0">
+            <label>Override fan power (optional)</label>
+            <div class="input-wrap"><input type="number" id="fankw" class="sfx-in" inputmode="decimal" step="0.1" placeholder="auto-estimated" oninput="calc()"><span class="sfx">kW</span></div>
+            <div class="hint" id="fankw-hint"></div>
+          </div>
+        </div>
+      </details>
+      <div class="hint" style="margin-top:10px">Base moisture, shrink and drying charge come from your elevator's discount schedule — they vary, so enter your own. Shrink is often 1.18–1.4 %/pt; drying charges run about 3–6¢ per point per bushel.</div>
+    </div>
+
+    <div class="hero hero-good" id="opt-hero">
+      <div class="hero-label">Cheapest moisture to deliver at</div>
+      <div class="hero-val" id="opt-val">—</div>
+      <div class="hero-sub" id="opt-sub"></div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Your drying cost</div>
+        <div class="stat-val" id="c-farmpt">—</div>
+        <div class="stat-sub">per bushel per point</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Elevator charge<span class="verdict-chip" id="c-chip"></span></div>
+        <div class="stat-val" id="c-elevpt">—</div>
+        <div class="stat-sub">shrink + dry, per point</div>
+      </div>
+    </div>
+
+    <div id="cost-warn"></div>
+
+    <div class="card">
+      <div class="card-title">Dry On-Farm vs. Deliver Wet</div>
+      <div class="bd" id="cost-bd"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Best Moisture To Stop At</div>
+      <div class="info-line" id="opt-headline" style="margin-top:0;margin-bottom:9px"></div>
+      <table class="emc" id="opt-table">
+        <thead><tr><th>Deliver at</th><th>Fan power</th><th>Elevator</th><th>Total</th></tr></thead>
+        <tbody id="opt-body"></tbody>
+      </table>
+      <div class="info-line" id="opt-note" style="margin-top:9px"></div>
+    </div>
+
+    <div class="disclaim">
+      Cost estimates for planning. Electricity = fan power draw × run-hours × your rate; elevator figures use your base moisture, shrink factor and drying charge.
+      Fan power is estimated from the airflow and pressure your fan is working against (override it if you know your metered draw). Confirm your elevator's exact discount schedule.
+    </div>
+  </div>
 </div>
 
 <nav id="bnav">
@@ -384,6 +470,10 @@ table.emc td.rh.dim{color:#94a3b8;font-weight:600}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
     <span>Results</span>
   </button>
+  <button class="nbtn" id="nav-cost" onclick="showTab('cost')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    <span>Cost</span>
+  </button>
 </nav>
 
 <script>
@@ -394,13 +484,13 @@ table.emc td.rh.dim{color:#94a3b8;font-weight:600}
         dP/L in Pa/m, Q = face velocity in m/s.  'pack' = filled-bin packing factor.
    Corn coeffs reproduce "16 ft, 1 cfm/bu -> ~2.4 in H2O" with pack 1.5. */
 const GRAINS = {
-  wheat:    {name:'HRW Wheat', emoji:'🌾', testwt:60, target:13.5, startMoist:16, maxMoist:18, cfmMin:0.75, cfmGood:1.0, startTemp:50, airT:55, airRH:55,
+  wheat:    {name:'HRW Wheat', emoji:'🌾', testwt:60, target:13.5, base:13.5, price:5.50, startMoist:16, maxMoist:18, cfmMin:0.75, cfmGood:1.0, startTemp:50, airT:55, airRH:55,
              K:2.3007e-5, N:2.2857, C:55.815,  a:2.700e4, b:8.770, pack:1.4},
-  srw:      {name:'SRW Wheat', emoji:'🌾', testwt:60, target:13.5, startMoist:16, maxMoist:18, cfmMin:0.75, cfmGood:1.0, startTemp:50, airT:55, airRH:60,
+  srw:      {name:'SRW Wheat', emoji:'🌾', testwt:60, target:13.5, base:13.5, price:5.30, startMoist:16, maxMoist:18, cfmMin:0.75, cfmGood:1.0, startTemp:50, airT:55, airRH:60,
              K:1.2299e-5, N:2.5558, C:64.346,  a:2.700e4, b:8.770, pack:1.4},
-  corn:     {name:'Corn', emoji:'🌽', testwt:56, target:15, startMoist:20, maxMoist:21, cfmMin:1.0, cfmGood:1.25, startTemp:40, airT:50, airRH:62,
+  corn:     {name:'Corn', emoji:'🌽', testwt:56, target:15, base:15, price:4.30, startMoist:20, maxMoist:21, cfmMin:1.0, cfmGood:1.25, startTemp:40, airT:50, airRH:62,
              K:8.6541e-5, N:1.8634, C:49.810,  a:2.070e4, b:30.40, pack:1.5},
-  soybeans: {name:'Soybeans', emoji:'🫘', testwt:60, target:13, startMoist:15, maxMoist:16, cfmMin:1.0, cfmGood:1.0, startTemp:40, airT:50, airRH:60,
+  soybeans: {name:'Soybeans', emoji:'🫘', testwt:60, target:13, base:13, price:11.00, startMoist:15, maxMoist:16, cfmMin:1.0, cfmGood:1.0, startTemp:40, airT:50, airRH:60,
              K:3.0530e-4, N:1.2164, C:134.136, a:1.020e4, b:16.00, pack:1.35}
 };
 let grain = 'wheat';
@@ -613,6 +703,131 @@ function calc(){
   }
   el('warnings').innerHTML=warns;
 
+  /* ===== cost & elevator economics ===== */
+  const rate=v('kwhcost'), price=v('gprice'), base=v('basem');
+  const shrinkF=v('shrinkf'), dryChg=v('drychg');
+  const MOTOR_EFF=0.90;
+  // shaft HP at the actual operating point (reduces to the entered HP in HP mode)
+  const shaftHP = (cfm>0 && sp>0 && eta>0) ? cfm*sp/(AIR_HP_K*eta) : 0;
+  let fanKW = shaftHP*0.746/MOTOR_EFF;
+  const kwOv=v('fankw'); if(kwOv>0) fanKW=kwOv;
+
+  const elecHours = isFinite(hours)?hours:0;
+  const kwhTot = fanKW*elecHours;
+  const elecTot = kwhTot*rate;                          // $ to reach the chosen target Mf
+  const elecPerBu = bu>0?elecTot/bu:0;
+
+  set('fankw-hint','Auto-estimate: '+fmt(fanKW,1)+' kW ('+fmt(shaftHP,1)+' shaft HP ÷ '+fmt(MOTOR_EFF*100,0)+'% motor). Enter your metered draw to override.');
+
+  // electricity $ to dry from Mi down to an arbitrary moisture Mx (removal rate is ~constant)
+  function elecTo(Mx){
+    if(Mx>=Mi || removalLbHr<=0 || fanKW<=0) return 0;
+    const water=testwt*(Mi-Mx)/(100-Mx)*bu;
+    return fanKW*(water/removalLbHr)*rate;
+  }
+  // elevator $ at delivered moisture Mx, relative to the base moisture
+  const physPerPt = base<100 ? 1/(100-base) : 0;        // wet-weight fraction lost per pt below base
+  function elevCost(Mx){
+    if(Mx>base) return bu*(Mx-base)*(price*shrinkF/100 + dryChg);  // shrink value + drying charge
+    if(Mx<base) return bu*(base-Mx)*price*physPerPt;              // over-dry: sellable weight given away
+    return 0;
+  }
+  const totalCost = Mx => elecTo(Mx)+elevCost(Mx);
+
+  // per-point comparison over the wet range down to base
+  const ptsToBase=Math.max(0, Mi-base);
+  const farmPerPt = ptsToBase>0 ? (elecTo(base)/Math.max(bu,1e-9))/ptsToBase : 0;
+  const elevPerPt = price*shrinkF/100 + dryChg;
+  const dryAtHome = farmPerPt>0 && farmPerPt<=elevPerPt;
+
+  // cheapest delivery moisture: search from current moisture down past base
+  const loM=Math.max(base-3, 8);
+  let best={Mx:Mi, t:totalCost(Mi)};
+  for(let Mx=Mi; Mx>=loM-1e-9; Mx-=0.5){
+    const t=totalCost(Mx);
+    if(t < best.t-1e-6){ best={Mx, t}; }
+  }
+  const bestMx=Math.round(best.Mx*2)/2;
+  const costable = bu>0 && fanKW>0 && isFinite(hours) && Mi>base;
+
+  /* optimum hero */
+  const oh=el('opt-hero');
+  if(!costable){
+    oh.className='hero hero-warn';
+    set('opt-val','—');
+    set('opt-sub', (Mi<=base && bu>0)
+      ? 'Your grain is already at or below the elevator base ('+fmt(base,1)+'%). No drying needed to dodge discounts.'
+      : 'Set your fan, bin and moisture on the Plan tab, plus your rate and elevator terms above, to price it out.');
+  } else if(bestMx>=Mi-0.25){
+    oh.className='hero hero-warn';
+    set('opt-val','Deliver wet');
+    set('opt-sub','At $'+fmt(rate,2)+'/kWh your power costs more per point ($'+fmt(farmPerPt,3)+') than the elevator charges ($'+fmt(elevPerPt,3)+'). Cheapest on price is to deliver at '+fmt(Mi,1)+'% and let them dry it.');
+  } else {
+    oh.className='hero hero-good';
+    const saveVsWet = elevCost(Mi) - best.t;
+    set('opt-val', fmt(bestMx,1)+'%');
+    set('opt-sub','Cheapest overall'+(saveVsWet>0?' — about $'+fmt(saveVsWet,0)+' less than delivering wet':'')+'. Past '+fmt(base,1)+'% you spend power and give away weight for no elevator credit.');
+  }
+
+  /* per-point stat tiles */
+  set('c-farmpt', farmPerPt>0?'$'+fmt(farmPerPt,3):'—');
+  set('c-elevpt', '$'+fmt(elevPerPt,3));
+  const cChip=el('c-chip');
+  cChip.textContent = dryAtHome?'Dry at home':'Deliver wet';
+  cChip.className='verdict-chip '+(dryAtHome?'vc-good':'vc-warn');
+
+  /* cost warnings */
+  let cw='';
+  const cwrap=(cls,txt)=>'<div class="warn '+cls+'"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg><div>'+txt+'</div></div>';
+  if(costable && Mf<base-0.05){
+    cw+=cwrap('warn-amber','Your target ('+fmt(Mf,1)+'%) is below the elevator base ('+fmt(base,1)+'%). For grain you\'re <b>selling</b>, every point under base gives away about $'+fmt(price*physPerPt,3)+'/bu of weight plus the power to remove it. Only dry this low for <b>storage</b>.');
+  }
+  if(costable && !dryAtHome){
+    cw+=cwrap('warn-blue','At today\'s rate your fan costs more per point than the elevator\'s discount. Running fans still protects stored grain, but purely on price it\'s cheaper to deliver wetter.');
+  }
+  el('cost-warn').innerHTML=cw;
+
+  /* dry-on-farm vs deliver-wet breakdown */
+  let cb='';
+  const cline=(l,val)=>{cb+='<div class="l">'+l+'</div><div class="v">'+val+'</div>';};
+  const csech=t=>{cb+='<div class="sec-h">'+t+'</div>';};
+  const ctot=(l,val)=>{cb+='<div class="l tot">'+l+'</div><div class="v tot">'+val+'</div>';};
+  if(costable){
+    const dryTotal=elecTot+elevCost(Mf), wetTotal=elevCost(Mi), diff=wetTotal-dryTotal;
+    csech('Dry on-farm to '+fmt(Mf,1)+'%');
+    cline('Electricity ('+fmt(kwhTot)+' kWh)', '$'+fmt(elecTot,2));
+    cline('Elevator dock still owed', Mf>base?'$'+fmt(elevCost(Mf),2):'$0');
+    ctot('Your total', '$'+fmt(dryTotal,2));
+    csech('Deliver wet at '+fmt(Mi,1)+'% (no fan)');
+    cline('Electricity','$0');
+    cline('Elevator shrink + dry charge','$'+fmt(wetTotal,2));
+    ctot('Their total','$'+fmt(wetTotal,2));
+    csech('Bottom line');
+    ctot(diff>=0?'Drying to '+fmt(Mf,1)+'% saves':'Drying to '+fmt(Mf,1)+'% costs extra', '$'+fmt(Math.abs(diff),2));
+    cb+='<div class="l" style="grid-column:1/-1;color:#94a3b8;font-size:.72rem;margin-top:4px">On '+fmt(bu)+' bu · $'+fmt(elecPerBu,3)+'/bu power · '+fmt(Mi-Mf,1)+' pts removed</div>';
+  } else {
+    cb='<div class="l" style="grid-column:1/-1;color:#94a3b8">Enter your fan, bin and moisture on the Plan tab, plus your rate and elevator terms above.</div>';
+  }
+  el('cost-bd').innerHTML=cb;
+
+  /* best-moisture table */
+  let orows='';
+  if(costable){
+    let ms=[Mi, base+2, base+1, base, base-1];
+    ms=[...new Set(ms.map(x=>Math.round(x*2)/2))].filter(x=>x<=Mi+1e-9 && x>=base-1-1e-9).sort((x,y)=>y-x);
+    ms.forEach(Mx=>{
+      const e=elecTo(Mx), ev=elevCost(Mx), t=e+ev, isBest=Math.abs(Mx-bestMx)<0.25;
+      const tag = Mx>=Mi-1e-9?' (as-is)':(Math.abs(Mx-base)<1e-9?' · base':'');
+      orows+='<tr'+(isBest?' class="now"':'')+'><td>'+fmt(Mx,1)+'%'+tag+'</td><td>$'+fmt(e,0)+'</td><td>$'+fmt(ev,0)+'</td><td class="rh">$'+fmt(t,0)+'</td></tr>';
+    });
+    set('opt-headline','What each delivery moisture costs you all-in — fan power to dry there, plus whatever the elevator still charges. Lowest total is highlighted.');
+    set('opt-note','Rule of thumb: keep drying while your power cost per point ($'+fmt(farmPerPt,3)+') stays under the elevator\'s charge per point ($'+fmt(elevPerPt,3)+'), and stop at the base ('+fmt(base,1)+'%). Storing instead of selling now? Dry to a safe storage moisture (~'+fmt(G.target,1)+'%) regardless — spoilage costs far more than power.');
+  } else {
+    orows='<tr><td colspan="4" style="color:#94a3b8;text-align:center;padding:12px">—</td></tr>';
+    set('opt-headline',''); set('opt-note','');
+  }
+  el('opt-body').innerHTML=orows;
+
   /* ===== breakdown ===== */
   let bd='';
   const line=(l,val)=>{bd+='<div class="l">'+l+'</div><div class="v">'+val+'</div>';};
@@ -636,6 +851,9 @@ function calc(){
   line('Used at '+fmt(effic*100,0)+'% efficiency', fmt(dwEff*7000,1)+' grains/lb');
   line('Dry air moved', fmt(dryAirLbHr)+' lb/hr');
   line('Water removed', fmt(removalLbHr,1)+' lb/hr');
+  sech('Cost');
+  line('Fan power draw', fanKW>0?fmt(fanKW,1)+' kW':'—');
+  line('Electricity to target', elecTot>0?'$'+fmt(elecTot,0)+' ($'+fmt(elecPerBu,3)+'/bu)':'—');
   bd+='<div class="l tot">Fan run-time</div><div class="v tot">'+(isFinite(hours)&&hours>0?fmt(hours,0)+' hr':'—')+'</div>';
   el('breakdown').innerHTML=bd;
 
@@ -655,6 +873,8 @@ function setGrain(g){
   el('testwt').value=G.testwt;
   el('airt').value=G.airT;
   el('airrh').value=G.airRH;
+  el('gprice').value=G.price.toFixed(2);
+  el('basem').value=G.base;
   calc();
 }
 function setShape(s){
@@ -671,7 +891,7 @@ function setFanMode(m){
   calc();
 }
 function showTab(tab){
-  ['plan','results'].forEach(s=>{
+  ['plan','results','cost'].forEach(s=>{
     el('sec-'+s).classList.toggle('active',s===tab);
     el('nav-'+s).classList.toggle('active',s===tab);
   });
@@ -687,8 +907,9 @@ function resetAll(){
   el('airt').value='55'; el('airrh').value='65';
   el('hrsday').value='16'; el('effic').value='65'; el('elev').value='1000';
   el('cal-cfm').value=''; el('cal-sp').value='';
+  el('kwhcost').value='0.14'; el('shrinkf').value='1.18'; el('drychg').value='0.05'; el('fankw').value='';
   el('mi').value='16';
-  setGrain('wheat');       // sets mf/target etc. and calcs
+  setGrain('wheat');       // sets mf/target, price, base etc. and calcs
   showTab('plan');
 }
 
