@@ -433,7 +433,14 @@ async function drawChart(){
   let rows = historyCache[key];
   if(!rows){
     try{
-      rows = await api(`carry_spreads?select=quote_date,spread_cents,pct_of_full_carry&front_symbol=eq.${f}&back_symbol=eq.${b}&order=quote_date.asc&limit=800`);
+      // page through the full history — a spread monitored for its whole
+      // listed life can exceed the API's 1000-row-per-request cap
+      rows=[]; const PAGE=1000;
+      for(let off=0;;off+=PAGE){
+        const page = await api(`carry_spreads?select=quote_date,spread_cents,pct_of_full_carry&front_symbol=eq.${f}&back_symbol=eq.${b}&order=quote_date.asc&limit=${PAGE}&offset=${off}`);
+        rows.push(...page);
+        if(page.length<PAGE) break;
+      }
       historyCache[key]=rows;
     }catch(e){ toast('Chart load failed'); return; }
   }
