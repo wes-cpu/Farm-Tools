@@ -454,7 +454,7 @@ async function drawChart(){
   el('cs-high').textContent   = nn.length? Math.max(...nn).toFixed(1)+unit : '—';
   el('cs-low').textContent    = nn.length? Math.min(...nn).toFixed(1)+unit : '—';
   el('chart-note').textContent = rows.length
-    ? `${rows.length} trading day${rows.length>1?'s':''} of history · history builds one point per day as the tool runs`
+    ? `Monitoring since ${fmtDate(rows[0].quote_date)} — ${rows.length} daily close${rows.length>1?'s':''} recorded so far. A new point is added after each trading day until the front contract's first notice day.`
     : 'No history yet for this spread — it appears after the next daily run.';
 }
 
