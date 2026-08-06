@@ -1,4 +1,4 @@
-const CACHE = 'farm-tools-v4';
+const CACHE = 'farm-tools-v5';
 const FILES = [
   './',
   './index.html',
@@ -31,16 +31,19 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Cache-first, then network; newly fetched pages are cached for offline use.
+// Same-origin static files only: network-first so updates show up, cache
+// fallback so the tools still open offline. Cross-origin requests (live
+// market data from Supabase, etc.) are never intercepted or cached —
+// caching those froze the carry monitor at stale data.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== location.origin) return;
   e.respondWith(
-    caches.match(e.request).then(cached =>
-      cached || fetch(e.request).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
-        return res;
-      }).catch(() => cached)
-    )
+    fetch(e.request).then(res => {
+      const copy = res.clone();
+      caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+      return res;
+    }).catch(() => caches.match(e.request))
   );
 });

@@ -326,6 +326,7 @@ function pctClass(p){ return p==null?'':'pct-'+(p>=80?'red':p>=60?'amber':p>=0?'
 /* ---------- REST ---------- */
 async function api(path, opts={}){
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    cache:'no-store',
     ...opts,
     headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}`,
       'Content-Type':'application/json', ...(opts.headers||{}) }
