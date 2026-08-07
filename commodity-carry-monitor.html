@@ -228,11 +228,26 @@ canvas{display:block;width:100%}
     </div>
 
     <div class="card">
+      <div class="card-title">Expected local basis by month</div>
+      <div class="field">
+        <label>Commodity</label>
+        <select id="basis-commodity" onchange="renderBasisInputs()"></select>
+      </div>
+      <div id="basis-grid"></div>
+      <button class="btn btn-primary" onclick="saveBasis()">Save basis</button>
+      <p class="hint">Your bias on local basis (¢ vs futures, e.g. −35) for each calendar
+      month. Holding gain = basis in the target month minus basis this month. Leave a
+      month blank if you have no opinion — the math falls back to futures-only there.
+      Saved to the database, so entries made on the computer show on your phone.</p>
+    </div>
+
+    <div class="card">
       <div class="card-title">Sell-first ranking</div>
       <div id="sell-ranking"><div class="empty">Loading…</div></div>
-      <p class="hint">Net carry = what the futures market pays you to hold (spread)
-      minus what holding costs you, to each crop's best target month. Most negative
-      = sell first. Futures spreads only — local basis gain is on top of this.</p>
+      <p class="hint">Net carry = futures spread + your expected basis gain − what
+      holding costs you, to each crop's best target month. Ranked worst first =
+      sell first to protect cash flow. Crops without basis entries rank on
+      futures spread alone.</p>
     </div>
 
     <div class="card">
@@ -344,6 +359,7 @@ let watches = [];
 let settings = null;
 let commodities = [];
 let myCosts = [];         // personal storage cost per commodity
+let basisRows = [];       // expected local basis by (commodity, calendar month)
 let chartMetric = 'pct';
 let historyCache = {};    // pairKey -> rows
 
@@ -386,15 +402,16 @@ async function loadAll(){
   try{
     const latest = await api('carry_spreads?select=quote_date&order=quote_date.desc&limit=1');
     const latestDate = latest[0]?.quote_date;
-    const [spreads, w, s, c, runs, mc] = await Promise.all([
+    const [spreads, w, s, c, runs, mc, bs] = await Promise.all([
       latestDate ? api(`carry_spreads?select=*&quote_date=eq.${latestDate}&order=commodity,front_fnd`) : [],
       api('carry_watches?select=*&order=created_at'),
       api('carry_settings?select=*&id=eq.1'),
       api('carry_commodities?select=*&order=code'),
       api('carry_run_log?select=*&order=run_at.desc&limit=1'),
       api('carry_my_costs?select=*&order=commodity'),
+      api('carry_basis?select=*'),
     ]);
-    latestSpreads=spreads; watches=w; settings=s[0]; commodities=c; myCosts=mc;
+    latestSpreads=spreads; watches=w; settings=s[0]; commodities=c; myCosts=mc; basisRows=bs;
     el('date-val').textContent = latestDate ? fmtDate(latestDate) : 'no data';
     renderDash(runs[0]);
     renderWatches();
@@ -682,6 +699,11 @@ async function runNow(){
 /* ---------- store or sell ---------- */
 /** Chain the consecutive spreads for one commodity into cumulative
  *  hold-to-month economics vs the user's own carry cost. */
+function basisFor(code, monthNum){
+  const r = basisRows.find(b=>b.commodity===code && b.month===monthNum);
+  return r && r.basis_cents!=null ? +r.basis_cents : null;
+}
+
 function holdChain(code){
   const rows = latestSpreads.filter(s=>s.commodity===code)
     .sort((a,b)=>a.front_fnd<b.front_fnd?-1:1);
@@ -690,6 +712,8 @@ function holdChain(code){
   const myRate = +(settings.my_interest_rate_pct ?? 7.5);
   const frontPrice = +rows[0].front_price_cents;
   const costPerDay = myStorage*12/365 + frontPrice*(myRate/100)/365;
+  const nowMonth = new Date().getMonth()+1;
+  const basisNow = basisFor(code, nowMonth);
   let cumSpread=0, cumDays=0;
   const steps=[];
   for(const r of rows){
@@ -698,16 +722,23 @@ function holdChain(code){
     cumSpread += +r.spread_cents;
     cumDays   += +r.days_between;
     const myCost = cumDays*costPerDay;
+    const dest = parseSymbol(r.back_symbol);
+    const destMonth = {F:1,G:2,H:3,J:4,K:5,M:6,N:7,Q:8,U:9,V:10,X:11,Z:12}[dest.mc];
+    const basisDest = basisFor(code, destMonth);
+    const basisKnown = basisNow!=null && basisDest!=null;
+    const basisGain = basisKnown ? basisDest - basisNow : 0;
+    const totalPays = cumSpread + basisGain;
     steps.push({
       backSymbol: r.back_symbol,
-      dest: parseSymbol(r.back_symbol),
-      cumSpread, cumDays, myCost,
-      net: cumSpread-myCost,
-      coverage: myCost>0 ? cumSpread/myCost*100 : null,
+      dest, cumSpread, cumDays, myCost, basisGain, basisKnown,
+      totalPays,
+      net: totalPays-myCost,
+      coverage: myCost>0 ? totalPays/myCost*100 : null,
     });
   }
   const best = steps.reduce((a,b)=> b.net>a.net ? b : a, steps[0]);
-  return { code, frontPrice, myStorage, myRate, steps, best,
+  const anyBasis = steps.some(s=>s.basisKnown);
+  return { code, frontPrice, myStorage, myRate, steps, best, anyBasis, basisNow,
            frontSymbol: rows[0].front_symbol };
 }
 
@@ -741,9 +772,12 @@ function renderSell(){
     const sell = ch.best.net<=0;
     const marginal = !sell && perMo < 1;
     const badge = sell ? '🔴 SELL FIRST' : marginal ? '🟡 MARGINAL' : '🟢 STORE';
+    const paysBits = ch.best.basisKnown
+      ? `spread ${ch.best.cumSpread.toFixed(1)}¢ + basis ${fmtNet(ch.best.basisGain)}`
+      : `spread ${ch.best.cumSpread.toFixed(1)}¢ (no basis entered)`;
     const verdict = sell
-      ? `Market never covers your carry — best case ${fmtNet(ch.best.net)} holding to ${destLabel(ch.best.dest)}.`
-      : `Best hold: to ${destLabel(ch.best.dest)} — market pays ${ch.best.cumSpread.toFixed(1)}¢, costs you ${ch.best.myCost.toFixed(1)}¢, net ${fmtNet(ch.best.net)} (${fmtNet(perMo)}/mo).`;
+      ? `Nothing covers your carry — best case ${fmtNet(ch.best.net)} to ${destLabel(ch.best.dest)} (${paysBits}).`
+      : `Best hold: to ${destLabel(ch.best.dest)} — pays ${ch.best.totalPays.toFixed(1)}¢ (${paysBits}), costs you ${ch.best.myCost.toFixed(1)}¢, net ${fmtNet(ch.best.net)} (${fmtNet(perMo)}/mo).`;
     return `<div class="watch-row" style="align-items:flex-start">
       <div style="font-size:1.1rem;padding-top:2px">${i+1}.</div>
       <div class="watch-info">
@@ -754,12 +788,50 @@ function renderSell(){
     </div>`;
   }).join('');
 
-  // detail selector
-  const sel=el('sell-commodity');
-  const cur=sel.value;
-  sel.innerHTML = chains.map(ch=>`<option value="${ch.code}">${COMMODITY_NAME[ch.code]}</option>`).join('');
-  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  // selectors
+  for(const id of ['sell-commodity','basis-commodity']){
+    const sel=el(id), cur=sel.value;
+    sel.innerHTML = commodities.map(c=>`<option value="${c.code}">${c.name}</option>`).join('');
+    if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  }
+  renderBasisInputs();
   renderSellDetail();
+}
+
+const MONTH_FULL=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function renderBasisInputs(){
+  const code=el('basis-commodity').value;
+  if(!code) return;
+  const nowMonth=new Date().getMonth()+1;
+  el('basis-grid').innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">`+
+    MONTH_FULL.map((name,i)=>{
+      const m=i+1;
+      const v=basisFor(code,m);
+      return `<div>
+        <label style="font-size:.68rem${m===nowMonth?';color:var(--green)':''}">${name}${m===nowMonth?' •':''}</label>
+        <input type="number" step="1" id="basis-${m}" value="${v!=null?v:''}" placeholder="—"
+          style="padding:8px 6px;font-size:.85rem;text-align:center">
+      </div>`;
+    }).join('')+`</div>`;
+}
+async function saveBasis(){
+  const code=el('basis-commodity').value;
+  if(!code) return;
+  try{
+    const rows=[];
+    for(let m=1;m<=12;m++){
+      const raw=el('basis-'+m).value.trim();
+      rows.push({commodity:code, month:m,
+        basis_cents: raw==='' ? null : parseFloat(raw),
+        updated_at:new Date().toISOString()});
+    }
+    await api('carry_basis?on_conflict=commodity,month',{method:'POST',
+      headers:{Prefer:'return=minimal,resolution=merge-duplicates'},
+      body:JSON.stringify(rows)});
+    toast(`${COMMODITY_NAME[code]} basis saved ✓ — syncs to all your devices`);
+    basisRows = await api('carry_basis?select=*');
+    renderSell();
+  }catch(e){ toast('Save failed: '+e.message); }
 }
 
 function renderSellDetail(){
@@ -768,18 +840,22 @@ function renderSellDetail(){
   if(!ch){ el('sell-detail').innerHTML='<div class="empty">No data.</div>'; return; }
   const rowsHtml = ch.steps.map(st=>{
     const best = st===ch.best && st.net>0;
+    const in90 = st.cumDays<=90;
     return `<div class="log-row" style="${best?'background:#f0fdf4;border-radius:8px;padding-left:6px':''}">
       <div style="display:flex;justify-content:space-between;font-weight:600">
-        <span>Hold to ${destLabel(st.dest)} (${st.cumDays}d)${best?' ⭐':''}</span>
+        <span>Hold to ${destLabel(st.dest)} (${st.cumDays}d)${in90?' <span class="watch-tag">≤90d</span>':''}${best?' ⭐':''}</span>
         <span class="${st.net>=0?'pct-green':'pct-red'}">${fmtNet(st.net)}/bu</span>
       </div>
-      <div class="log-time">market pays ${st.cumSpread.toFixed(1)}¢ · costs you ${st.myCost.toFixed(1)}¢ · covers ${st.coverage!=null?st.coverage.toFixed(0)+'%':'—'} of your carry</div>
+      <div class="log-time">spread ${st.cumSpread.toFixed(1)}¢ ${st.basisKnown?`· basis ${fmtNet(st.basisGain)}`:'· basis —'} · costs you ${st.myCost.toFixed(1)}¢ · covers ${st.coverage!=null?st.coverage.toFixed(0)+'%':'—'} of your carry</div>
     </div>`;
   }).join('');
   el('sell-detail').innerHTML = `
     <p class="hint" style="margin-bottom:8px">From ${destLabel(parseSymbol(ch.frontSymbol))} futures at
-    ${ch.frontPrice.toFixed(2)}¢ · your cost: ${ch.myStorage}¢/mo storage + ${ch.myRate}% interest</p>
-    ${rowsHtml}`;
+    ${ch.frontPrice.toFixed(2)}¢ · your cost: ${ch.myStorage}¢/mo storage + ${ch.myRate}% interest
+    ${ch.basisNow!=null?`· basis today ${fmtNet(ch.basisNow)}`:'· no basis entered for the current month'}</p>
+    ${rowsHtml}
+    <p class="hint" style="margin-top:8px">≤90d marks holds inside your first 90 days — where storage
+    typically earns most of its value. Past the ⭐ month, every extra day erodes the net.</p>`;
 }
 
 async function saveMyCosts(){
