@@ -209,6 +209,42 @@ canvas{display:block;width:100%}
     </div>
   </div>
 
+  <!-- ================= STORE OR SELL ================= -->
+  <div id="sec-sell" class="sec">
+    <div class="card">
+      <div class="card-title">Your actual carry cost</div>
+      <div class="field">
+        <label>Your interest rate</label>
+        <div class="input-wrap">
+          <input type="number" id="my-interest" step="0.1" class="sfx-in">
+          <span class="sfx">%</span>
+        </div>
+      </div>
+      <div id="my-storage-rest"></div>
+      <button class="btn btn-primary" onclick="saveMyCosts()">Save my costs</button>
+      <p class="hint">Your real numbers — operating note rate and what storage actually
+      costs you per bushel per month (include shrink/quality risk if you want).
+      These never change the market % of full carry — they're only compared against it.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Sell-first ranking</div>
+      <div id="sell-ranking"><div class="empty">Loading…</div></div>
+      <p class="hint">Net carry = what the futures market pays you to hold (spread)
+      minus what holding costs you, to each crop's best target month. Most negative
+      = sell first. Futures spreads only — local basis gain is on top of this.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Hold-to-month detail</div>
+      <div class="field">
+        <label>Commodity</label>
+        <select id="sell-commodity" onchange="renderSellDetail()"></select>
+      </div>
+      <div id="sell-detail"></div>
+    </div>
+  </div>
+
   <!-- ================= SETTINGS ================= -->
   <div id="sec-settings" class="sec">
     <div class="card">
@@ -278,6 +314,10 @@ canvas{display:block;width:100%}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span>Alerts</span>
   </button>
+  <button class="nbtn" data-sec="sell" onclick="nav('sell')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7l7-4 7 4"/><path d="M3 13l2-6 2 6a3 3 0 0 1-4 0"/><path d="M17 13l2-6 2 6a3 3 0 0 1-4 0"/></svg>
+    <span>Sell?</span>
+  </button>
   <button class="nbtn" data-sec="settings" onclick="nav('settings')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     <span>Settings</span>
@@ -303,6 +343,7 @@ let latestSpreads = [];   // rows for most recent quote_date
 let watches = [];
 let settings = null;
 let commodities = [];
+let myCosts = [];         // personal storage cost per commodity
 let chartMetric = 'pct';
 let historyCache = {};    // pairKey -> rows
 
@@ -345,18 +386,20 @@ async function loadAll(){
   try{
     const latest = await api('carry_spreads?select=quote_date&order=quote_date.desc&limit=1');
     const latestDate = latest[0]?.quote_date;
-    const [spreads, w, s, c, runs] = await Promise.all([
+    const [spreads, w, s, c, runs, mc] = await Promise.all([
       latestDate ? api(`carry_spreads?select=*&quote_date=eq.${latestDate}&order=commodity,front_fnd`) : [],
       api('carry_watches?select=*&order=created_at'),
       api('carry_settings?select=*&id=eq.1'),
       api('carry_commodities?select=*&order=code'),
       api('carry_run_log?select=*&order=run_at.desc&limit=1'),
+      api('carry_my_costs?select=*&order=commodity'),
     ]);
-    latestSpreads=spreads; watches=w; settings=s[0]; commodities=c;
+    latestSpreads=spreads; watches=w; settings=s[0]; commodities=c; myCosts=mc;
     el('date-val').textContent = latestDate ? fmtDate(latestDate) : 'no data';
     renderDash(runs[0]);
     renderWatches();
     renderSettings();
+    renderSell();
     fillPairSelectors();
     loadAlertLog();
     loadKeyStatus();
@@ -634,6 +677,125 @@ async function runNow(){
   }catch(e){ toast('Run failed: '+e.message,4000); }
   b.disabled=false; b.innerHTML='⟳ Fetch prices &amp; recalculate now';
   loadAll();
+}
+
+/* ---------- store or sell ---------- */
+/** Chain the consecutive spreads for one commodity into cumulative
+ *  hold-to-month economics vs the user's own carry cost. */
+function holdChain(code){
+  const rows = latestSpreads.filter(s=>s.commodity===code)
+    .sort((a,b)=>a.front_fnd<b.front_fnd?-1:1);
+  if(!rows.length || !settings) return null;
+  const myStorage = +(myCosts.find(m=>m.commodity===code)?.storage_cents_month ?? 4);
+  const myRate = +(settings.my_interest_rate_pct ?? 7.5);
+  const frontPrice = +rows[0].front_price_cents;
+  const costPerDay = myStorage*12/365 + frontPrice*(myRate/100)/365;
+  let cumSpread=0, cumDays=0;
+  const steps=[];
+  for(const r of rows){
+    // only chain while pairs are truly consecutive
+    if(steps.length && steps[steps.length-1].backSymbol!==r.front_symbol) break;
+    cumSpread += +r.spread_cents;
+    cumDays   += +r.days_between;
+    const myCost = cumDays*costPerDay;
+    steps.push({
+      backSymbol: r.back_symbol,
+      dest: parseSymbol(r.back_symbol),
+      cumSpread, cumDays, myCost,
+      net: cumSpread-myCost,
+      coverage: myCost>0 ? cumSpread/myCost*100 : null,
+    });
+  }
+  const best = steps.reduce((a,b)=> b.net>a.net ? b : a, steps[0]);
+  return { code, frontPrice, myStorage, myRate, steps, best,
+           frontSymbol: rows[0].front_symbol };
+}
+
+function fmtNet(n){ return (n>=0?'+':'')+n.toFixed(1)+'¢'; }
+function destLabel(d){ return MONTH_NAME[d.mc]+' ’'+String(d.year).slice(2); }
+
+function renderSell(){
+  if(!settings) return;
+  // inputs
+  el('my-interest').value = settings.my_interest_rate_pct ?? 7.5;
+  el('my-storage-rest').innerHTML = commodities.map(c=>`
+    <div class="field">
+      <label>${COMMODITY_ICON[c.code]||''} ${c.name} storage</label>
+      <div class="input-wrap">
+        <input type="number" step="0.1" id="mycost-${c.code}"
+          value="${myCosts.find(m=>m.commodity===c.code)?.storage_cents_month ?? 4}" class="sfx-in">
+        <span class="sfx">¢/bu/mo</span>
+      </div>
+    </div>`).join('');
+
+  // ranking
+  const chains = commodities.map(c=>holdChain(c.code)).filter(Boolean);
+  if(!chains.length){ el('sell-ranking').innerHTML='<div class="empty">No spread data yet.</div>'; return; }
+  chains.sort((a,b)=>{
+    const am=a.best.net/(a.best.cumDays/30.4), bm=b.best.net/(b.best.cumDays/30.4);
+    return am-bm; // worst net per month first = sell first
+  });
+  el('sell-ranking').innerHTML = chains.map((ch,i)=>{
+    const name=COMMODITY_NAME[ch.code], icon=COMMODITY_ICON[ch.code]||'';
+    const perMo = ch.best.net/(ch.best.cumDays/30.4);
+    const sell = ch.best.net<=0;
+    const marginal = !sell && perMo < 1;
+    const badge = sell ? '🔴 SELL FIRST' : marginal ? '🟡 MARGINAL' : '🟢 STORE';
+    const verdict = sell
+      ? `Market never covers your carry — best case ${fmtNet(ch.best.net)} holding to ${destLabel(ch.best.dest)}.`
+      : `Best hold: to ${destLabel(ch.best.dest)} — market pays ${ch.best.cumSpread.toFixed(1)}¢, costs you ${ch.best.myCost.toFixed(1)}¢, net ${fmtNet(ch.best.net)} (${fmtNet(perMo)}/mo).`;
+    return `<div class="watch-row" style="align-items:flex-start">
+      <div style="font-size:1.1rem;padding-top:2px">${i+1}.</div>
+      <div class="watch-info">
+        <div class="watch-pair">${icon} ${name}
+          <span class="watch-tag ${sell?'hit':''}">${badge}</span></div>
+        <div class="watch-sub">${verdict}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // detail selector
+  const sel=el('sell-commodity');
+  const cur=sel.value;
+  sel.innerHTML = chains.map(ch=>`<option value="${ch.code}">${COMMODITY_NAME[ch.code]}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  renderSellDetail();
+}
+
+function renderSellDetail(){
+  const code=el('sell-commodity').value;
+  const ch=holdChain(code);
+  if(!ch){ el('sell-detail').innerHTML='<div class="empty">No data.</div>'; return; }
+  const rowsHtml = ch.steps.map(st=>{
+    const best = st===ch.best && st.net>0;
+    return `<div class="log-row" style="${best?'background:#f0fdf4;border-radius:8px;padding-left:6px':''}">
+      <div style="display:flex;justify-content:space-between;font-weight:600">
+        <span>Hold to ${destLabel(st.dest)} (${st.cumDays}d)${best?' ⭐':''}</span>
+        <span class="${st.net>=0?'pct-green':'pct-red'}">${fmtNet(st.net)}/bu</span>
+      </div>
+      <div class="log-time">market pays ${st.cumSpread.toFixed(1)}¢ · costs you ${st.myCost.toFixed(1)}¢ · covers ${st.coverage!=null?st.coverage.toFixed(0)+'%':'—'} of your carry</div>
+    </div>`;
+  }).join('');
+  el('sell-detail').innerHTML = `
+    <p class="hint" style="margin-bottom:8px">From ${destLabel(parseSymbol(ch.frontSymbol))} futures at
+    ${ch.frontPrice.toFixed(2)}¢ · your cost: ${ch.myStorage}¢/mo storage + ${ch.myRate}% interest</p>
+    ${rowsHtml}`;
+}
+
+async function saveMyCosts(){
+  try{
+    await api('carry_settings?id=eq.1',{method:'PATCH',headers:{Prefer:'return=minimal'},
+      body:JSON.stringify({my_interest_rate_pct:parseFloat(el('my-interest').value)||0})});
+    for(const c of commodities){
+      const v=parseFloat(el('mycost-'+c.code).value);
+      if(!isNaN(v)){
+        await api(`carry_my_costs?commodity=eq.${c.code}`,{method:'PATCH',headers:{Prefer:'return=minimal'},
+          body:JSON.stringify({storage_cents_month:v,updated_at:new Date().toISOString()})});
+      }
+    }
+    toast('Your costs saved ✓');
+    loadAll();
+  }catch(e){ toast('Save failed: '+e.message); }
 }
 
 /* ---------- nav ---------- */
