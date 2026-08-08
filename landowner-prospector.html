@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Landowner Prospector">
+<meta name="theme-color" content="#1e5a3c">
+<link rel="manifest" href="manifest.json">
+<title>Landowner Prospector</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#1e5a3c;--green2:#163f2a;--green-m:#a8e6bf;
+  --slate:#1e293b;--slate-m:#64748b;--border:#e2e8f0;
+  --white:#fff;--rad:12px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0fdf4;display:flex;flex-direction:column;color:var(--slate);overflow:hidden}
+#hdr{background:var(--green);color:white;flex-shrink:0;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-icon{background:rgba(255,255,255,.15);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#hdr-title{font-size:.95rem;font-weight:700}
+#hdr-sub{font-size:.68rem;color:var(--green-m);margin-top:1px}
+#count-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:5px 12px;text-align:right;flex-shrink:0;display:none}
+#count-label{font-size:.62rem;color:var(--green-m);font-weight:600}
+#count-val{font-size:.88rem;font-weight:800;line-height:1.2}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;padding-bottom:calc(70px + var(--safe-b) + 8px)}
+#scroll::-webkit-scrollbar{display:none}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-m);margin-bottom:10px}
+.field{margin-bottom:10px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px}
+.hint{font-size:.68rem;color:#94a3b8;margin-top:3px;line-height:1.45}
+input[type=number],input[type=text],select,textarea{width:100%;padding:11px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:.9rem;color:var(--slate);outline:none;background:white;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,90,60,.1)}
+textarea{resize:vertical;min-height:70px;font-size:.75rem;font-family:ui-monospace,Menlo,monospace}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{width:100%;padding:13px;background:var(--green);border:none;border-radius:10px;font-size:.9rem;font-weight:700;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity .15s}
+.btn:active{opacity:.8}
+.btn:disabled{background:#94a3b8;cursor:default}
+.btn-line{background:white;color:var(--green);border:1.5px solid var(--green)}
+.btn-sm{padding:9px 12px;font-size:.78rem;width:auto;border-radius:8px}
+.town-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.town-chip{display:flex;align-items:center;gap:6px;border:1.5px solid var(--border);border-radius:9px;padding:8px 9px;cursor:pointer;background:white;transition:border-color .15s,background .15s;user-select:none}
+.town-chip.on{border-color:var(--green);background:#f0fdf4}
+.town-chip input{display:none}
+.town-dot{width:14px;height:14px;border-radius:4px;border:1.5px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:white;font-size:.6rem}
+.town-chip.on .town-dot{background:var(--green);border-color:var(--green)}
+.town-name{font-size:.75rem;font-weight:600}
+.town-cty{font-size:.6rem;color:#94a3b8}
+#status{display:none;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:10px 12px;font-size:.78rem;margin-bottom:10px;line-height:1.5}
+#status.err{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+#status.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.flag{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 6px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em;margin:1px 2px 1px 0;white-space:nowrap}
+.flag-farmer{background:#fef3c7;color:#b45309}
+.flag-managed{background:#fee2e2;color:#b91c1c}
+.flag-absentee{background:#dcfce7;color:#15803d}
+.flag-trust{background:#ede9fe;color:#6d28d9}
+.flag-entity{background:#dbeafe;color:#1d4ed8}
+.owner-row{border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:8px;background:white;transition:opacity .15s}
+.owner-row.excluded{opacity:.45}
+.or-top{display:flex;align-items:flex-start;gap:9px}
+.or-check{width:20px;height:20px;border-radius:6px;border:1.5px solid #cbd5e1;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;color:white;cursor:pointer;background:white}
+.owner-row:not(.excluded) .or-check{background:var(--green);border-color:var(--green)}
+.or-name{font-size:.85rem;font-weight:700;flex:1;line-height:1.3}
+.or-acres{font-size:.85rem;font-weight:800;color:var(--green);white-space:nowrap}
+.or-addr{font-size:.73rem;color:var(--slate-m);margin:3px 0 4px 29px;line-height:1.45}
+.or-meta{font-size:.66rem;color:#94a3b8;margin-left:29px}
+.or-flags{margin-left:29px;margin-top:3px}
+.filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.fbtn{background:white;border:1.5px solid var(--border);border-radius:999px;padding:6px 11px;font-size:.7rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:all .15s}
+.fbtn.on{background:var(--green);border-color:var(--green);color:white}
+#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe-b);box-shadow:0 -2px 12px rgba(0,0,0,.06);z-index:100}
+.nbtn{flex:1;background:none;border:none;cursor:pointer;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate-m);transition:color .12s;min-height:56px}
+.nbtn:active{opacity:.7}
+.nbtn.active{color:var(--green)}
+.nbtn svg{width:20px;height:20px}
+.nbtn span{font-size:.68rem;font-weight:600}
+.sec{display:none}
+.sec.active{display:block}
+.g-h{font-size:.85rem;font-weight:700;margin:14px 0 6px;color:var(--slate)}
+.g-h:first-child{margin-top:0}
+.g-p{font-size:.78rem;color:#475569;line-height:1.6;margin-bottom:8px}
+.g-p a{color:var(--green);font-weight:600}
+.g-li{font-size:.78rem;color:#475569;line-height:1.6;margin:0 0 6px 16px}
+.pill-note{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:.72rem;color:var(--slate-m);line-height:1.55;margin-top:8px}
+.adv-toggle{font-size:.72rem;font-weight:600;color:var(--green);background:none;border:none;cursor:pointer;padding:4px 0}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-top">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="hdr-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+      </div>
+      <div>
+        <div id="hdr-title">Landowner Prospector</div>
+        <div id="hdr-sub">Find 100–500 ac owners from county records</div>
+      </div>
+    </div>
+    <div id="count-pill">
+      <div id="count-label">Leads</div>
+      <div id="count-val">—</div>
+    </div>
+  </div>
+</div>
+
+<div id="scroll">
+
+<!-- ============ SEARCH TAB ============ -->
+<div class="sec active" id="sec-search">
+
+  <div class="card">
+    <div class="card-title">1 · County data source</div>
+    <div class="field">
+      <label>County</label>
+      <select id="src-preset" onchange="applyPreset()">
+        <option value="sangamon">Sangamon Co. (Auburn · Chatham · Pawnee) — live API</option>
+        <option value="custom">Other county — paste an ArcGIS layer URL</option>
+      </select>
+      <div class="hint">Sangamon's parcel layer is queried live from the county GIS server. For Macoupin (Virden), Montgomery (Farmersville) and Morgan (Waverly) see the Guide tab — their data needs a different route.</div>
+    </div>
+    <div class="field" id="url-field" style="display:none">
+      <label>ArcGIS REST layer URL</label>
+      <input type="text" id="src-url" placeholder="https://…/rest/services/…/MapServer/0" autocomplete="off">
+      <div class="hint">Any county parcel layer ending in /MapServer/N or /FeatureServer/N works.</div>
+    </div>
+    <button class="btn btn-line" id="btn-fields" onclick="loadFields()">Connect &amp; detect fields</button>
+    <div id="field-map" style="display:none;margin-top:10px">
+      <div class="row2">
+        <div class="field"><label>Owner name field</label><select id="f-owner"></select></div>
+        <div class="field"><label>Acres field</label><select id="f-acres"></select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Mailing address field</label><select id="f-mail"></select></div>
+        <div class="field"><label>Mailing city/st/zip field</label><select id="f-mailcsz"></select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Parcel # (PIN) field</label><select id="f-pin"></select></div>
+        <div class="field"><label>Property (situs) address field</label><select id="f-situs"></select></div>
+      </div>
+      <div class="hint">Auto-detected from the layer — fix any that look wrong before searching.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">2 · Area &amp; acreage</div>
+    <div class="field">
+      <label>Towns to search around (≈6-mile square each)</label>
+      <div class="town-grid" id="towns"></div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Min combined acres</label>
+        <input type="number" id="min-ac" value="100" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label>Max combined acres</label>
+        <input type="number" id="max-ac" value="500" inputmode="decimal">
+      </div>
+    </div>
+    <div class="hint">Acres are summed <b>per owner</b> across all their parcels in the searched area — a 240-acre farm is often 3–4 parcels. Parcels under 10 ac are ignored (house lots).</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">3 · Run</div>
+    <button class="btn" id="btn-run" onclick="runSearch()" disabled>Search parcels</button>
+    <div class="pill-note" id="manual-note" style="display:none"></div>
+    <button class="adv-toggle" onclick="document.getElementById('manual-box').style.display='block';this.style.display='none'">Server blocking the browser? Use manual import…</button>
+    <div id="manual-box" style="display:none">
+      <div class="field" style="margin-top:8px">
+        <label>Manual import — paste ArcGIS query JSON</label>
+        <textarea id="manual-json" placeholder='Open the query URL(s) shown after a failed search in a new tab, then paste the {"features":[…]} response here. Paste multiple responses one after another.'></textarea>
+      </div>
+      <button class="btn btn-line" onclick="importManual()">Import pasted JSON</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<!-- ============ LEADS TAB ============ -->
+<div class="sec" id="sec-leads">
+  <div class="filter-bar" id="flagbar" style="display:none">
+    <button class="fbtn" data-hide="farmer" onclick="toggleHide(this)">Hide likely farmers</button>
+    <button class="fbtn" data-hide="managed" onclick="toggleHide(this)">Hide managed/bank</button>
+    <button class="fbtn" data-only="absentee" onclick="toggleOnly(this)">Absentee only</button>
+  </div>
+  <div id="leads-list">
+    <div class="card"><div class="g-p" style="margin:0">No results yet — run a search from the first tab. Each lead card can be tapped to include/exclude it from the export.</div></div>
+  </div>
+  <div id="export-wrap" style="display:none">
+    <button class="btn" onclick="exportCSV()">Download CSV of included leads</button>
+    <div class="hint" style="text-align:center;margin-top:6px">Owner · mailing address · combined acres · parcel count · PINs · flags</div>
+  </div>
+</div>
+
+<!-- ============ GUIDE TAB ============ -->
+<div class="sec" id="sec-guide">
+  <div class="card">
+    <div class="card-title">What this tool does</div>
+    <div class="g-p">County assessment records are public. This tool pulls every tax parcel around the towns you pick, groups parcels by owner, totals the acres, and keeps owners in your target range. It then screens each owner:</div>
+    <div class="g-li"><span class="flag flag-farmer">likely farmer</span> Name looks like an operating farm ("… Farms Inc", grain/livestock words). These fail your "no farmers" rule — hide them with the filter.</div>
+    <div class="g-li"><span class="flag flag-managed">managed / bank</span> Mailing address is "c/o" someone, or a bank trust department is in the name — land likely under professional farm management (Hertz, First Mid Ag Services, Busey trust, etc.). Also usually a skip for you.</div>
+    <div class="g-li"><span class="flag flag-absentee">absentee</span> Owner's mailing address is outside the local towns (or out of state). <b>These are your best leads</b> — non-farming heirs and investors who own the ground but don't work it.</div>
+    <div class="g-li"><span class="flag flag-trust">trust / estate</span> Family trusts and estates — often inherited ground, frequently open to a new operator or services.</div>
+    <div class="g-li"><span class="flag flag-entity">entity</span> LLC / partnership that isn't obviously a farm operation.</div>
+    <div class="pill-note">No public record says who farms a parcel or whether a farm manager is involved — the flags are honest heuristics, not facts. You know the names around Auburn: give the list a once-over and drop neighbors you know are operators before mailing.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">County-by-county data routes</div>
+    <div class="g-h">Sangamon — Auburn, Chatham, Pawnee, Divernon, Loami</div>
+    <div class="g-p">Built in. The county's GIS server (<b>gis.co.sangamon.il.us</b>) serves the tax-parcel layer this tool queries. Cross-check any owner at the county's <a href="https://sangamonil.gov/property-info" target="_blank" rel="noopener">property search</a>.</div>
+    <div class="g-h">Macoupin — Virden, Girard</div>
+    <div class="g-p">Viewer at <a href="https://macoupin-il.bhamaps.com/" target="_blank" rel="noopener">macoupin-il.bhamaps.com</a> and tax records at <a href="https://macoupinil.devnetwedge.com/" target="_blank" rel="noopener">macoupinil.devnetwedge.com</a>. The county also runs an <a href="https://data.macoupincountyil.gov/" target="_blank" rel="noopener">open-data portal</a> — if a parcel layer with an ArcGIS REST endpoint is published there, paste its URL into this tool ("Other county") and it works exactly like Sangamon.</div>
+    <div class="g-h">Montgomery — Farmersville, Waggoner</div>
+    <div class="g-p">On <a href="https://beacon.schneidercorp.com/" target="_blank" rel="noopener">Beacon (Schneider)</a> — no open API. Route: Beacon's advanced search → filter by acreage → work through Bois D'Arc &amp; Pitman townships. Slower, but the same owner + mailing address data is there. A $50–100 county GIS export (GIS office, Old Courthouse, Hillsboro) gets you the whole parcel table at once.</div>
+    <div class="g-h">Morgan — Waverly</div>
+    <div class="g-p">County viewer runs on ArcGIS Online (<a href="https://morgancounty-il.com/wp/departments/gis-geographic-information-systems/" target="_blank" rel="noopener">county GIS page</a>). Open the viewer, then in the browser address bar of any parcel popup's data source you'll find a <b>…/FeatureServer/0</b> URL — paste it here as "Other county". Otherwise the assessor's office sells the parcel export.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">From names to phone numbers</div>
+    <div class="g-p">County data gives you the two things that matter most — <b>legal owner name and mailing address</b>. Landowner outreach runs on direct mail for a reason: it's the one channel that reaches every owner on the list. To add phones/emails:</div>
+    <div class="g-li">1. Free people-search (TruePeopleSearch, FastPeopleSearch) — match name + city from your CSV; hit rate ~50–60% for individuals.</div>
+    <div class="g-li">2. Paid skip-trace or list append (DataTree, USLandGrid, or any list broker) — $0.10–0.25/record, better for trusts.</div>
+    <div class="g-li">3. AcreValue / Acres.com / LandGlide subscriptions bundle ownership + acreage + plat maps if you'd rather not touch raw county data at all.</div>
+    <div class="pill-note">Keep it CAN-SPAM/TCPA-clean: cold <b>mail</b> to landowners is unrestricted; cold <b>calls</b> to numbers on the Do-Not-Call registry are not, so scrub against DNC before dialing.</div>
+  </div>
+</div>
+
+</div><!-- /scroll -->
+
+<div id="bnav">
+  <button class="nbtn active" data-sec="search" onclick="nav(this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <span>Search</span>
+  </button>
+  <button class="nbtn" data-sec="leads" onclick="nav(this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span>Leads</span>
+  </button>
+  <button class="nbtn" data-sec="guide" onclick="nav(this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    <span>Guide</span>
+  </button>
+</div>
+
+<script>
+'use strict';
+/* ================= towns & presets ================= */
+const TOWNS = [
+  {id:'auburn',      name:'Auburn',       cty:'Sangamon',   lat:39.5917, lon:-89.7462, on:true},
+  {id:'chatham',     name:'Chatham',      cty:'Sangamon',   lat:39.6731, lon:-89.7057, on:true},
+  {id:'pawnee',      name:'Pawnee',       cty:'Sangamon',   lat:39.5917, lon:-89.5548, on:true},
+  {id:'virden',      name:'Virden',       cty:'Macoupin',   lat:39.5009, lon:-89.7679, on:false},
+  {id:'farmersville',name:'Farmersville', cty:'Montgomery', lat:39.4423, lon:-89.6512, on:false},
+  {id:'waverly',     name:'Waverly',      cty:'Morgan',     lat:39.5917, lon:-89.9529, on:false},
+];
+const HALF_LAT = 0.045, HALF_LON = 0.057; // ~ +/- 3 miles
+const SANGAMON_URL = 'https://gis.co.sangamon.il.us/arcgis/rest/services/TaxParcel/MapServer';
+const LOCAL_CITIES = ['AUBURN','CHATHAM','PAWNEE','VIRDEN','FARMERSVILLE','WAVERLY','DIVERNON','GIRARD','THAYER','LOAMI','GLENARM','NEW BERLIN','WAGGONER','SPRINGFIELD','ROCHESTER'];
+
+const FARMER_RX  = /\bFARMS?\b(?!\s*(TRUST|TR\b))|\bGRAIN\b|\bAGRI|\bAG\s+(SERV|ENT|PROD)|\bCATTLE\b|\bDAIRY\b|\bLIVESTOCK\b|\bPORK\b|\bSEED\b|\bHARVEST/i;
+const MANAGED_RX = /\bC\/O\b|%\s|\bTRUST\s*(CO|COMPANY|DEPT)\b|\bBANK\b|\bTRUSTEE\b.*\bBANK\b|FIRST\s+MID|BUSEY|HERTZ\s+FARM|SOY\s+CAPITAL|MURRAY\s+WISE/i;
+const SKIP_RX    = /\bCHURCH\b|\bCEMETERY\b|\bSCHOOL\b|\bDISTRICT\b|\bTOWNSHIP\b|\bCITY\s+OF\b|\bVILLAGE\b|\bCOUNTY\b|\bSTATE\s+OF\b|\bUNITED\s+STATES\b|\bRAILROAD\b|\bRAILWAY\b|\bPIPELINE\b|\bUTILIT|\bAMEREN\b|\bSOLAR\b|\bWIND\s|\bCONSERV|\bDEPT\b|\bAUTHORITY\b/i;
+const TRUST_RX   = /\bTRUST\b|\bTRS?\b|\bTRUSTEE\b|\bESTATE\b|\bREV\s+TR\b|\bLIVING\s+TR/i;
+const ENTITY_RX  = /\bLLC\b|\bINC\b|\bCORP\b|\bLTD\b|\bPARTNERSHIP\b|\bLP\b|\bCO\b\.?$/i;
+
+let layerUrl = null, fields = [], leads = [], hideFlags = new Set(), onlyAbsentee = false;
+let lastQueryUrls = [];
+
+/* ================= ui basics ================= */
+function nav(btn){
+  document.querySelectorAll('.nbtn').forEach(b=>b.classList.toggle('active',b===btn));
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+btn.dataset.sec).classList.add('active');
+  document.getElementById('scroll').scrollTop = 0;
+}
+function status(msg, cls){
+  const el = document.getElementById('status');
+  el.style.display = msg ? 'block' : 'none';
+  el.className = cls || '';
+  el.innerHTML = msg || '';
+}
+function applyPreset(){
+  const p = document.getElementById('src-preset').value;
+  document.getElementById('url-field').style.display = p==='custom' ? 'block' : 'none';
+  document.getElementById('field-map').style.display = 'none';
+  document.getElementById('btn-run').disabled = true;
+}
+(function initTowns(){
+  const wrap = document.getElementById('towns');
+  TOWNS.forEach(t=>{
+    const l = document.createElement('label');
+    l.className = 'town-chip'+(t.on?' on':'');
+    l.innerHTML = '<span class="town-dot">✓</span><span><div class="town-name">'+t.name+'</div><div class="town-cty">'+t.cty+'</div></span>';
+    l.onclick = e=>{e.preventDefault(); t.on=!t.on; l.classList.toggle('on',t.on);};
+    wrap.appendChild(l);
+  });
+})();
+
+/* ================= field detection ================= */
+async function fetchJson(url){
+  const r = await fetch(url, {mode:'cors'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const j = await r.json();
+  if(j.error) throw new Error(j.error.message || 'server error');
+  return j;
+}
+function guessField(names, patterns){
+  for(const p of patterns){
+    const hit = names.find(n=>p.test(n));
+    if(hit) return hit;
+  }
+  return '';
+}
+async function loadFields(){
+  const preset = document.getElementById('src-preset').value;
+  let base = preset==='sangamon' ? SANGAMON_URL : document.getElementById('src-url').value.trim().replace(/\/+$/,'').replace(/\/query$/,'');
+  if(!base){ status('Enter a layer URL first.','err'); return; }
+  status('Connecting to the county server…');
+  try{
+    // if URL is a service root, find a parcel layer
+    if(!/\/\d+$/.test(base)){
+      const svc = await fetchJson(base+'?f=json');
+      const lyrs = (svc.layers||[]).filter(l=>!l.subLayerIds || !l.subLayerIds.length);
+      if(!lyrs.length) throw new Error('No layers found in service');
+      const parcel = lyrs.find(l=>/parcel|tax/i.test(l.name)) || lyrs[0];
+      base += '/'+parcel.id;
+    }
+    const meta = await fetchJson(base+'?f=json');
+    fields = (meta.fields||[]).filter(f=>!/geometry|shape/i.test(f.type)||true).map(f=>({name:f.name, type:f.type, alias:f.alias||f.name}));
+    if(!fields.length) throw new Error('Layer has no queryable fields');
+    layerUrl = base;
+    const names = fields.map(f=>f.name);
+    const numNames = fields.filter(f=>/Double|Single|Integer|Float/i.test(f.type)).map(f=>f.name);
+    const sel = (id, val)=>{
+      const s = document.getElementById(id);
+      s.innerHTML = '<option value="">— none —</option>'+names.map(n=>'<option'+(n===val?' selected':'')+'>'+n+'</option>').join('');
+    };
+    sel('f-owner',  guessField(names,[/^owner.?name/i,/^owner1?$/i,/owner/i,/name/i]));
+    sel('f-acres',  guessField(numNames,[/deed.*acre|acre.*deed/i,/gross.*acre/i,/^acres?$/i,/acre/i]));
+    sel('f-mail',   guessField(names,[/mail.*(addr|street|line)/i,/^addr(ess)?1?$/i,/tax.*addr/i]));
+    sel('f-mailcsz',guessField(names,[/mail.*(csz|city)/i,/city.*state|csz/i,/^city$/i]));
+    sel('f-pin',    guessField(names,[/^pin$/i,/parcel.*(num|id|no)/i,/^ppn|^apn/i,/pin/i]));
+    sel('f-situs',  guessField(names,[/situs/i,/prop.*addr/i,/site.*addr/i,/location/i]));
+    document.getElementById('field-map').style.display = 'block';
+    document.getElementById('btn-run').disabled = false;
+    status('Connected — '+fields.length+' fields found on <b>'+(meta.name||'parcel layer')+'</b>. Check the field mapping, then search.','ok');
+  }catch(err){
+    layerUrl = null;
+    status('Could not reach the layer from this browser ('+err.message+'). If you are offline or the server blocks cross-site requests, use <b>manual import</b> below — the query URLs it needs are generated for you after you pick towns and tap Search.','err');
+    document.getElementById('btn-run').disabled = false; // allow run → will surface manual URLs
+  }
+}
+
+/* ================= query ================= */
+function envFor(t){
+  return {xmin:t.lon-HALF_LON, ymin:t.lat-HALF_LAT, xmax:t.lon+HALF_LON, ymax:t.lat+HALF_LAT};
+}
+function buildQueryUrl(base, env, offset){
+  const p = new URLSearchParams({
+    f:'json', where:'1=1', outFields:'*', returnGeometry:'false',
+    geometry: JSON.stringify(env), geometryType:'esriGeometryEnvelope',
+    inSR:'4326', spatialRel:'esriSpatialRelIntersects',
+    resultOffset: String(offset), resultRecordCount:'1000'
+  });
+  return base+'/query?'+p.toString();
+}
+async function runSearch(){
+  const towns = TOWNS.filter(t=>t.on);
+  if(!towns.length){ status('Pick at least one town.','err'); return; }
+  if(!layerUrl && document.getElementById('src-preset').value==='sangamon') layerUrl = SANGAMON_URL+'/0';
+  if(!layerUrl){ status('Connect to a data source first.','err'); return; }
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  lastQueryUrls = [];
+  const feats = [];
+  try{
+    for(const t of towns){
+      status('Querying parcels around <b>'+t.name+'</b>…');
+      let offset = 0, more = true;
+      while(more){
+        const url = buildQueryUrl(layerUrl, envFor(t), offset);
+        lastQueryUrls.push(url);
+        const j = await fetchJson(url);
+        const f = j.features||[];
+        feats.push(...f);
+        more = j.exceededTransferLimit && f.length>0;
+        offset += f.length;
+        if(offset > 60000) break;
+      }
+    }
+    processFeatures(feats.map(f=>f.attributes||{}));
+  }catch(err){
+    const note = document.getElementById('manual-note');
+    note.style.display='block';
+    note.innerHTML = 'Browser was blocked ('+err.message+'). <b>Manual route:</b> open each link below in a new tab, copy the whole JSON response, and paste all of them into the manual import box.<br><br>'+
+      lastQueryUrls.slice(-towns.length).map((u,i)=>'<a href="'+u+'" target="_blank" rel="noopener" style="color:var(--green);word-break:break-all;display:block;margin-bottom:6px">Query '+(i+1)+' ↗</a>').join('');
+    document.getElementById('manual-box').style.display='block';
+    status('Live query failed — use the manual import links shown in step 3.','err');
+  }
+  btn.disabled = false;
+}
+function importManual(){
+  const txt = document.getElementById('manual-json').value.trim();
+  if(!txt){ status('Paste at least one JSON response first.','err'); return; }
+  const feats = [];
+  // tolerate several pasted responses back-to-back
+  const chunks = txt.split(/}\s*{(?="?\s*"?(?:displayFieldName|features|fields))/).map((c,i,a)=>{
+    if(a.length===1) return c;
+    if(i===0) return c+'}';
+    if(i===a.length-1) return '{'+c;
+    return '{'+c+'}';
+  });
+  for(const c of chunks){
+    try{
+      const j = JSON.parse(c);
+      (j.features||[]).forEach(f=>feats.push(f.attributes||f));
+    }catch(e){ /* skip bad chunk */ }
+  }
+  if(!feats.length){ status('Could not parse any features from the pasted text.','err'); return; }
+  processFeatures(feats);
+}
+
+/* ================= aggregation & screening ================= */
+function normName(s){
+  return String(s||'').toUpperCase().replace(/[^A-Z0-9& ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function pick(attrs, fieldId){
+  const f = document.getElementById(fieldId).value;
+  return f ? attrs[f] : undefined;
+}
+function processFeatures(rows){
+  const minAc = parseFloat(document.getElementById('min-ac').value)||100;
+  const maxAc = parseFloat(document.getElementById('max-ac').value)||500;
+  const owners = new Map();
+  let usable = 0;
+  const seen = new Set();
+  for(const a of rows){
+    const pin = pick(a,'f-pin');
+    const key0 = pin!=null ? String(pin) : JSON.stringify(a).slice(0,120);
+    if(seen.has(key0)) continue; // dedupe overlapping town envelopes
+    seen.add(key0);
+    const name = normName(pick(a,'f-owner'));
+    let acres = parseFloat(pick(a,'f-acres'));
+    if(!name || !isFinite(acres) || acres < 10) continue; // skip lots/houses
+    usable++;
+    const k = name;
+    if(!owners.has(k)) owners.set(k, {name, acres:0, parcels:0, pins:[], mail:'', csz:'', situs:[]});
+    const o = owners.get(k);
+    o.acres += acres; o.parcels++;
+    if(pin!=null) o.pins.push(String(pin));
+    const m = pick(a,'f-mail'), c = pick(a,'f-mailcsz'), s = pick(a,'f-situs');
+    if(m && !o.mail) o.mail = String(m).trim();
+    if(c && !o.csz) o.csz = String(c).trim();
+    if(s) o.situs.push(String(s).trim());
+  }
+  leads = [];
+  for(const o of owners.values()){
+    if(o.acres < minAc || o.acres > maxAc) continue;
+    if(SKIP_RX.test(o.name)) continue; // gov/church/utility — never a lead
+    const mailAll = (o.mail+' '+o.csz).toUpperCase();
+    const flags = [];
+    if(FARMER_RX.test(o.name)) flags.push('farmer');
+    if(MANAGED_RX.test(o.name) || MANAGED_RX.test(mailAll)) flags.push('managed');
+    if(TRUST_RX.test(o.name)) flags.push('trust');
+    else if(ENTITY_RX.test(o.name) && !flags.includes('farmer')) flags.push('entity');
+    const cszU = o.csz.toUpperCase();
+    const isLocalCity = LOCAL_CITIES.some(c=>cszU.includes(c));
+    const outOfState = /,\s*(?!IL)[A-Z]{2}\b/.test(cszU) || (cszU && !/\bIL\b|ILLINOIS/.test(cszU) && /[A-Z]{2}\s+\d{5}/.test(cszU));
+    if(cszU && (!isLocalCity || outOfState)) flags.push('absentee');
+    o.flags = flags;
+    o.included = !flags.includes('farmer') && !flags.includes('managed');
+    leads.push(o);
+  }
+  leads.sort((a,b)=>b.acres-a.acres);
+  renderLeads();
+  status('Done — '+usable.toLocaleString()+' farm parcels read, <b>'+leads.length+'</b> owners in the '+minAc+'–'+maxAc+' acre range. See the Leads tab.','ok');
+  document.querySelector('[data-sec="leads"]').click();
+}
+
+/* ================= render & export ================= */
+function toggleHide(btn){
+  btn.classList.toggle('on');
+  hideFlags = new Set([...document.querySelectorAll('.fbtn[data-hide].on')].map(b=>b.dataset.hide));
+  renderLeads();
+}
+function toggleOnly(btn){
+  btn.classList.toggle('on');
+  onlyAbsentee = btn.classList.contains('on');
+  renderLeads();
+}
+const FLAG_LABEL = {farmer:'likely farmer', managed:'managed / bank', absentee:'absentee', trust:'trust / estate', entity:'entity'};
+function renderLeads(){
+  const list = document.getElementById('leads-list');
+  const vis = leads.filter(o=>!o.flags.some(f=>hideFlags.has(f)) && (!onlyAbsentee || o.flags.includes('absentee')));
+  document.getElementById('flagbar').style.display = leads.length ? 'flex':'none';
+  document.getElementById('export-wrap').style.display = leads.length ? 'block':'none';
+  const inc = leads.filter(o=>o.included).length;
+  const pill = document.getElementById('count-pill');
+  pill.style.display = leads.length ? 'block':'none';
+  document.getElementById('count-val').textContent = inc+' / '+leads.length;
+  if(!vis.length){
+    list.innerHTML = '<div class="card"><div class="g-p" style="margin:0">'+(leads.length?'All results are hidden by the current filters.':'No results yet — run a search from the first tab.')+'</div></div>';
+    return;
+  }
+  list.innerHTML = vis.map((o)=>{
+    const i = leads.indexOf(o);
+    return '<div class="owner-row'+(o.included?'':' excluded')+'" onclick="leads['+i+'].included=!leads['+i+'].included;renderLeads()">'+
+      '<div class="or-top"><div class="or-check">✓</div>'+
+      '<div class="or-name">'+esc(o.name)+'</div>'+
+      '<div class="or-acres">'+o.acres.toFixed(0)+' ac</div></div>'+
+      (o.mail||o.csz ? '<div class="or-addr">'+esc(o.mail)+(o.csz?'<br>'+esc(o.csz):'')+'</div>' : '<div class="or-addr" style="color:#cbd5e1">no mailing address on record</div>')+
+      '<div class="or-meta">'+o.parcels+' parcel'+(o.parcels>1?'s':'')+(o.pins.length?' · PIN '+esc(o.pins[0])+(o.pins.length>1?' +'+(o.pins.length-1):''):'')+'</div>'+
+      (o.flags.length?'<div class="or-flags">'+o.flags.map(f=>'<span class="flag flag-'+f+'">'+FLAG_LABEL[f]+'</span>').join('')+'</div>':'')+
+      '</div>';
+  }).join('');
+}
+function esc(s){ return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function exportCSV(){
+  const rows = leads.filter(o=>o.included);
+  if(!rows.length) return;
+  const head = ['Owner','Mailing Address','Mailing City/State/Zip','Combined Acres','Parcel Count','PINs','Flags'];
+  const q = v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const csv = [head.join(',')].concat(rows.map(o=>[
+    q(o.name), q(o.mail), q(o.csz), o.acres.toFixed(1), o.parcels, q(o.pins.join(' ')), q(o.flags.map(f=>FLAG_LABEL[f]).join('; '))
+  ].join(','))).join('\r\n');
+  const blob = new Blob(["﻿"+csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'landowner-leads-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body>
+</html>
