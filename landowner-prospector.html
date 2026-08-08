@@ -61,6 +61,10 @@ textarea{resize:vertical;min-height:70px;font-size:.75rem;font-family:ui-monospa
 .flag-absentee{background:#dcfce7;color:#15803d}
 .flag-trust{background:#ede9fe;color:#6d28d9}
 .flag-entity{background:#dbeafe;color:#1d4ed8}
+.flag-onland{background:#ffedd5;color:#c2410c}
+.flag-status-clear{background:#16a34a;color:#fff}
+.flag-status-farmer{background:#b45309;color:#fff}
+.flag-status-managed{background:#b91c1c;color:#fff}
 .owner-row{border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:8px;background:white;transition:opacity .15s}
 .owner-row.excluded{opacity:.45}
 .or-top{display:flex;align-items:flex-start;gap:9px}
@@ -71,6 +75,21 @@ textarea{resize:vertical;min-height:70px;font-size:.75rem;font-family:ui-monospa
 .or-addr{font-size:.73rem;color:var(--slate-m);margin:3px 0 4px 29px;line-height:1.45}
 .or-meta{font-size:.66rem;color:#94a3b8;margin-left:29px}
 .or-flags{margin-left:29px;margin-top:3px}
+.or-expand-btn{background:none;border:none;color:var(--green);font-size:.7rem;font-weight:700;cursor:pointer;padding:6px 0 0 29px;display:block}
+.or-detail{margin:8px 0 2px 29px;border-top:1px dashed var(--border);padding-top:9px}
+.or-detail .row2{margin-bottom:8px}
+.or-detail input[type=text],.or-detail input[type=email]{padding:8px 9px;font-size:.8rem}
+.or-detail label{font-size:.66rem;margin-bottom:3px}
+.link-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+.link-chip{display:inline-block;background:#f1f5f9;border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:.66rem;font-weight:600;color:var(--green);text-decoration:none;white-space:nowrap}
+.link-chip:active{opacity:.7}
+.status-row{display:flex;gap:5px;flex-wrap:wrap}
+.status-btn{flex:1;min-width:90px;border:1.5px solid var(--border);background:white;border-radius:8px;padding:7px 6px;font-size:.66rem;font-weight:700;cursor:pointer;color:var(--slate-m);transition:all .15s}
+.status-btn.s-clear.on{background:#16a34a;border-color:#16a34a;color:white}
+.status-btn.s-farmer.on{background:#b45309;border-color:#b45309;color:white}
+.status-btn.s-managed.on{background:#b91c1c;border-color:#b91c1c;color:white}
+.exp-opt{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:8px;font-size:.75rem;font-weight:600;color:var(--slate-m);cursor:pointer;user-select:none}
+.exp-opt input{width:16px;height:16px;accent-color:var(--green)}
 .filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .fbtn{background:white;border:1.5px solid var(--border);border-radius:999px;padding:6px 11px;font-size:.7rem;font-weight:600;color:var(--slate-m);cursor:pointer;transition:all .15s}
 .fbtn.on{background:var(--green);border-color:var(--green);color:white}
@@ -198,8 +217,9 @@ textarea{resize:vertical;min-height:70px;font-size:.75rem;font-family:ui-monospa
     <div class="card"><div class="g-p" style="margin:0">No results yet — run a search from the first tab. Each lead card can be tapped to include/exclude it from the export.</div></div>
   </div>
   <div id="export-wrap" style="display:none">
+    <label class="exp-opt"><input type="checkbox" id="exp-verified">Only export leads verified as non-farmers</label>
     <button class="btn" onclick="exportCSV()">Download CSV of included leads</button>
-    <div class="hint" style="text-align:center;margin-top:6px">Owner · mailing address · combined acres · parcel count · PINs · flags</div>
+    <div class="hint" style="text-align:center;margin-top:6px">Owner · mailing address · email · phone · acres · parcels · PINs · status · flags · notes</div>
   </div>
 </div>
 
@@ -213,7 +233,27 @@ textarea{resize:vertical;min-height:70px;font-size:.75rem;font-family:ui-monospa
     <div class="g-li"><span class="flag flag-absentee">absentee</span> Owner's mailing address is outside the local towns (or out of state). <b>These are your best leads</b> — non-farming heirs and investors who own the ground but don't work it.</div>
     <div class="g-li"><span class="flag flag-trust">trust / estate</span> Family trusts and estates — often inherited ground, frequently open to a new operator or services.</div>
     <div class="g-li"><span class="flag flag-entity">entity</span> LLC / partnership that isn't obviously a farm operation.</div>
+    <div class="g-li"><span class="flag flag-onland">lives on parcel</span> Owner's mailing address is on the land they own — strong sign they're the operator (or a retired one). Verify before excluding.</div>
     <div class="pill-note">No public record says who farms a parcel or whether a farm manager is involved — the flags are honest heuristics, not facts. You know the names around Auburn: give the list a once-over and drop neighbors you know are operators before mailing.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Verifying "not a farmer" — the honest workflow</div>
+    <div class="g-p">USDA/FSA does not publish who operates a parcel, so there is no database lookup that proves a landowner doesn't farm. The reliable method is a 2-minute check per lead, built into every lead card under <b>Verify &amp; add contact info</b>:</div>
+    <div class="g-li">1. Auto-signals first: <b>lives on parcel</b> or a farm-style name → probably an operator. <b>Absentee</b> + trust/estate + city or out-of-state address → probably not.</div>
+    <div class="g-li">2. Tap <b>Google + farm</b> — searches the owner's name with farm/farmer terms. An operator shows up fast: FSA newsletters, county fair results, equipment auctions, obituaries listing "farmed near…".</div>
+    <div class="g-li">3. For LLCs/trusts, tap <b>IL SOS entity</b> — the registered agent and manager names tell you if it's a farm operation or an investment/heir entity.</div>
+    <div class="g-li">4. Mark the verdict: <b>✓ Not a farmer</b>, <b>Farms it</b>, or <b>Farm manager</b>. Excluded verdicts drop the lead; verified leads survive the "only export verified" filter.</div>
+    <div class="g-p">Your verdicts, emails, phones and notes are saved on this device and come back next time you run a search.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Where emails actually come from</div>
+    <div class="g-p">Straight truth: <b>no public record contains landowner email addresses</b> — not the assessor, not the recorder, not USDA. Every "landowner email list" for sale is a data-append match against consumer databases, typically hitting 30–50% of names. Your three routes, best first:</div>
+    <div class="g-li">1. <b>Manual match (free, most accurate):</b> the TruePeopleSearch / FastPeopleSearch links on each lead card pre-fill the owner's name and city. Both sites list known emails on the person's profile. Type it into the lead's Email field — it saves and exports.</div>
+    <div class="g-li">2. <b>Bulk append (paid):</b> export your CSV and send it to an append service (Datazapp, Melissa, TowerData/AtData ≈ $0.10–0.25/match; skip-trace shops like BatchSkipTracing bundle email + cell). Expect roughly half the list back with emails.</div>
+    <div class="g-li">3. <b>Trust/entity leads:</b> emails rarely append — for these, the IL SOS filing names a registered agent or manager; search that person instead.</div>
+    <div class="pill-note">Cold email to a business purpose contact is legal under CAN-SPAM (identify yourself, real address, working unsubscribe) — but appended-email cold outreach lands better as mail first, then email as the follow-up channel once they've seen your name.</div>
   </div>
 
   <div class="card">
@@ -278,6 +318,58 @@ const ENTITY_RX  = /\bLLC\b|\bINC\b|\bCORP\b|\bLTD\b|\bPARTNERSHIP\b|\bLP\b|\bCO
 
 let layerUrl = null, fields = [], leads = [], hideFlags = new Set(), onlyAbsentee = false;
 let lastQueryUrls = [];
+
+/* ===== per-owner enrichment (email/phone/notes/verification) — persists in this browser ===== */
+const ENRICH_KEY = 'lp-enrich-v1';
+let enrich = {};
+try{ enrich = JSON.parse(localStorage.getItem(ENRICH_KEY)) || {}; }catch(e){ enrich = {}; }
+function saveEnrich(){ try{ localStorage.setItem(ENRICH_KEY, JSON.stringify(enrich)); }catch(e){} }
+function getEnrich(name){ return enrich[name] || (enrich[name] = {email:'',phone:'',note:'',status:'unverified'}); }
+function setEnrich(i, key, val){
+  const o = leads[i];
+  getEnrich(o.name)[key] = val;
+  saveEnrich();
+}
+function setStatus(i, st){
+  const o = leads[i];
+  const e = getEnrich(o.name);
+  e.status = (e.status === st) ? 'unverified' : st;
+  saveEnrich();
+  o.status = e.status;
+  o.included = e.status === 'clear' ? true : (e.status === 'unverified' ? o.autoIncluded : false);
+  renderLeads();
+}
+/* people-search / verification links, prefilled per owner */
+function personName(o){
+  // county records are usually LAST FIRST — offer both raw and flipped forms
+  let n = o.name.replace(/\b(TRUSTEE?S?|TRUST|REV(OCABLE)?|LIVING|FAMILY|ESTATE|ETAL|ET\s*AL|LLC|INC|LTD|LP|JR|SR|II|III)\b/g,' ').replace(/\s+/g,' ').trim();
+  const parts = n.split(' ');
+  if(parts.length >= 2 && !TRUST_RX.test(o.name) && !ENTITY_RX.test(o.name))
+    n = parts.slice(1).concat(parts[0]).join(' '); // FIRST M LAST
+  return n;
+}
+function leadCityState(o){
+  const csz = o.csz||'';
+  const city = (csz.match(/^([A-Za-z .]+)/)||[])[1];
+  const st = (csz.toUpperCase().match(/\b([A-Z]{2})\s+\d{5}/)||[])[1];
+  return {city:(city||'Auburn').trim(), st: st||'IL'};
+}
+function researchLinks(o){
+  const nm = personName(o), {city, st} = leadCityState(o);
+  const enc = encodeURIComponent;
+  const links = [
+    ['Google', 'https://www.google.com/search?q='+enc('"'+nm+'" '+city+' '+st)],
+    // farm activity search stays local to the land, not the mailing city
+    ['Google + farm', 'https://www.google.com/search?q='+enc('"'+nm+'" farm OR farmer OR farms Illinois')],
+  ];
+  if(ENTITY_RX.test(o.name) || TRUST_RX.test(o.name)){
+    links.push(['IL SOS entity', 'https://apps.ilsos.gov/businessentitysearch/']);
+  }else{
+    links.push(['TruePeopleSearch', 'https://www.truepeoplesearch.com/results?name='+enc(nm)+'&citystatezip='+enc(city+', '+st)]);
+    links.push(['FastPeopleSearch', 'https://www.fastpeoplesearch.com/name/'+enc(nm.toLowerCase().replace(/\s+/g,'-'))+'_'+enc(city.toLowerCase().replace(/\s+/g,'-'))+'-'+st.toLowerCase()]);
+  }
+  return links;
+}
 
 /* ================= ui basics ================= */
 function nav(btn){
@@ -480,8 +572,15 @@ function processFeatures(rows){
     const isLocalCity = LOCAL_CITIES.some(c=>cszU.includes(c));
     const outOfState = /,\s*(?!IL)[A-Z]{2}\b/.test(cszU) || (cszU && !/\bIL\b|ILLINOIS/.test(cszU) && /[A-Z]{2}\s+\d{5}/.test(cszU));
     if(cszU && (!isLocalCity || outOfState)) flags.push('absentee');
+    // lives-on-parcel: mailing street number matches a situs address on their own land
+    const mailNum = (o.mail.match(/^(\d+)\s/)||[])[1];
+    if(mailNum && o.situs.some(s=>s.startsWith(mailNum+' '))) flags.push('onland');
     o.flags = flags;
-    o.included = !flags.includes('farmer') && !flags.includes('managed');
+    o.autoIncluded = !flags.includes('farmer') && !flags.includes('managed');
+    const e = getEnrich(o.name);
+    o.status = e.status;
+    o.included = e.status === 'clear' ? true : (e.status === 'unverified' ? o.autoIncluded : false);
+    o.open = false;
     leads.push(o);
   }
   leads.sort((a,b)=>b.acres-a.acres);
@@ -501,41 +600,68 @@ function toggleOnly(btn){
   onlyAbsentee = btn.classList.contains('on');
   renderLeads();
 }
-const FLAG_LABEL = {farmer:'likely farmer', managed:'managed / bank', absentee:'absentee', trust:'trust / estate', entity:'entity'};
+const FLAG_LABEL = {farmer:'likely farmer', managed:'managed / bank', absentee:'absentee', trust:'trust / estate', entity:'entity', onland:'lives on parcel'};
+const STATUS_LABEL = {clear:'verified non-farmer', farmer:'verified farmer', managed:'verified managed'};
 function renderLeads(){
   const list = document.getElementById('leads-list');
   const vis = leads.filter(o=>!o.flags.some(f=>hideFlags.has(f)) && (!onlyAbsentee || o.flags.includes('absentee')));
   document.getElementById('flagbar').style.display = leads.length ? 'flex':'none';
   document.getElementById('export-wrap').style.display = leads.length ? 'block':'none';
   const inc = leads.filter(o=>o.included).length;
+  const ver = leads.filter(o=>o.status==='clear').length;
   const pill = document.getElementById('count-pill');
   pill.style.display = leads.length ? 'block':'none';
-  document.getElementById('count-val').textContent = inc+' / '+leads.length;
+  document.getElementById('count-val').textContent = inc+' / '+leads.length+(ver?' · '+ver+'✓':'');
   if(!vis.length){
     list.innerHTML = '<div class="card"><div class="g-p" style="margin:0">'+(leads.length?'All results are hidden by the current filters.':'No results yet — run a search from the first tab.')+'</div></div>';
     return;
   }
   list.innerHTML = vis.map((o)=>{
     const i = leads.indexOf(o);
-    return '<div class="owner-row'+(o.included?'':' excluded')+'" onclick="leads['+i+'].included=!leads['+i+'].included;renderLeads()">'+
-      '<div class="or-top"><div class="or-check">✓</div>'+
-      '<div class="or-name">'+esc(o.name)+'</div>'+
+    const e = getEnrich(o.name);
+    const statusFlag = o.status!=='unverified' ? '<span class="flag flag-status-'+o.status+'">'+STATUS_LABEL[o.status]+'</span>' : '';
+    return '<div class="owner-row'+(o.included?'':' excluded')+'">'+
+      '<div class="or-top"><div class="or-check" onclick="leads['+i+'].included=!leads['+i+'].included;renderLeads()">✓</div>'+
+      '<div class="or-name">'+esc(o.name)+(e.email?'<div style="font-size:.68rem;font-weight:600;color:var(--green);margin-top:2px">✉ '+esc(e.email)+'</div>':'')+'</div>'+
       '<div class="or-acres">'+o.acres.toFixed(0)+' ac</div></div>'+
       (o.mail||o.csz ? '<div class="or-addr">'+esc(o.mail)+(o.csz?'<br>'+esc(o.csz):'')+'</div>' : '<div class="or-addr" style="color:#cbd5e1">no mailing address on record</div>')+
       '<div class="or-meta">'+o.parcels+' parcel'+(o.parcels>1?'s':'')+(o.pins.length?' · PIN '+esc(o.pins[0])+(o.pins.length>1?' +'+(o.pins.length-1):''):'')+'</div>'+
-      (o.flags.length?'<div class="or-flags">'+o.flags.map(f=>'<span class="flag flag-'+f+'">'+FLAG_LABEL[f]+'</span>').join('')+'</div>':'')+
+      ((o.flags.length||statusFlag)?'<div class="or-flags">'+statusFlag+o.flags.map(f=>'<span class="flag flag-'+f+'">'+FLAG_LABEL[f]+'</span>').join('')+'</div>':'')+
+      '<button class="or-expand-btn" onclick="leads['+i+'].open=!leads['+i+'].open;renderLeads()">'+(o.open?'Hide details ▴':'Verify & add contact info ▾')+'</button>'+
+      (o.open ? renderDetail(o, i, e) : '')+
       '</div>';
   }).join('');
 }
+function renderDetail(o, i, e){
+  return '<div class="or-detail">'+
+    '<div class="link-row">'+researchLinks(o).map(l=>'<a class="link-chip" href="'+l[1]+'" target="_blank" rel="noopener">'+l[0]+' ↗</a>').join('')+'</div>'+
+    '<div class="row2">'+
+      '<div class="field"><label>Email</label><input type="email" value="'+esc(e.email)+'" placeholder="found via links above" oninput="setEnrich('+i+',\'email\',this.value)"></div>'+
+      '<div class="field"><label>Phone</label><input type="text" value="'+esc(e.phone)+'" placeholder="check DNC before calling" oninput="setEnrich('+i+',\'phone\',this.value)"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:8px"><label>Notes</label><input type="text" value="'+esc(e.note)+'" placeholder="e.g. widow of operator, heirs in Chicago…" oninput="setEnrich('+i+',\'note\',this.value)"></div>'+
+    '<label style="font-size:.66rem">Verification — after checking the links, is this owner farming it themselves?</label>'+
+    '<div class="status-row" style="margin-top:4px">'+
+      '<button class="status-btn s-clear'+(o.status==='clear'?' on':'')+'" onclick="setStatus('+i+',\'clear\')">✓ Not a farmer</button>'+
+      '<button class="status-btn s-farmer'+(o.status==='farmer'?' on':'')+'" onclick="setStatus('+i+',\'farmer\')">Farms it</button>'+
+      '<button class="status-btn s-managed'+(o.status==='managed'?' on':'')+'" onclick="setStatus('+i+',\'managed\')">Farm manager</button>'+
+    '</div>'+
+    '</div>';
+}
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function exportCSV(){
-  const rows = leads.filter(o=>o.included);
-  if(!rows.length) return;
-  const head = ['Owner','Mailing Address','Mailing City/State/Zip','Combined Acres','Parcel Count','PINs','Flags'];
+  const verifiedOnly = document.getElementById('exp-verified').checked;
+  const rows = leads.filter(o=>o.included && (!verifiedOnly || o.status==='clear'));
+  if(!rows.length){ alert(verifiedOnly ? 'No leads are marked "Not a farmer" yet — verify some first.' : 'No included leads to export.'); return; }
+  const head = ['Owner','Mailing Address','Mailing City/State/Zip','Email','Phone','Combined Acres','Parcel Count','PINs','Verification','Flags','Notes'];
   const q = v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-  const csv = [head.join(',')].concat(rows.map(o=>[
-    q(o.name), q(o.mail), q(o.csz), o.acres.toFixed(1), o.parcels, q(o.pins.join(' ')), q(o.flags.map(f=>FLAG_LABEL[f]).join('; '))
-  ].join(','))).join('\r\n');
+  const csv = [head.join(',')].concat(rows.map(o=>{
+    const e = getEnrich(o.name);
+    return [
+      q(o.name), q(o.mail), q(o.csz), q(e.email), q(e.phone), o.acres.toFixed(1), o.parcels, q(o.pins.join(' ')),
+      q(o.status==='unverified'?'unverified':STATUS_LABEL[o.status]), q(o.flags.map(f=>FLAG_LABEL[f]).join('; ')), q(e.note)
+    ].join(',');
+  })).join('\r\n');
   const blob = new Blob(["﻿"+csv], {type:'text/csv'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
