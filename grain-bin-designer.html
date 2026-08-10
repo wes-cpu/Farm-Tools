@@ -3617,25 +3617,36 @@ function populate3D(){
       const legH=bin.coneLegHt||3;
       const cH=coneHtCalc(bin); // inverted-cone height
       const binFloorY=foundH+legH+cH; // bottom of cylindrical body
-      // Support legs (8 legs at 70% bin radius)
+      // ── NCHTC-style support structure: stiffener columns at the shell line
+      //    carry from the foundation up to the eave ring, one per sidewall sheet ──
       const legMat=new THREE.MeshLambertMaterial({color:0x6b7280});
-      const legR=r*0.70;
-      for(let i=0;i<8;i++){
-        const ang=(i/8)*Math.PI*2;
-        const lx=x+legR*Math.sin(ang), lz=z-legR*Math.cos(ang);
-        const legPost=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,foundH+legH,8),legMat);
-        legPost.position.set(lx,(foundH+legH)/2,lz);legPost.castShadow=true;add3(legPost);
+      const braceMat=new THREE.MeshLambertMaterial({color:0x4b5563});
+      const nCols=Math.max(8,Math.round(Math.PI*bin.diam/9.4));
+      const colTopY=foundH+legH+cH; // columns run to the eave (bottom of sidewall)
+      for(let i=0;i<nCols;i++){
+        const ang=(i/nCols)*Math.PI*2;
+        const lx=x+(r+0.15)*Math.sin(ang), lz=z-(r+0.15)*Math.cos(ang);
+        const legPost=new THREE.Mesh(new THREE.BoxGeometry(0.6,colTopY-foundH,0.45),legMat);
+        legPost.position.set(lx,foundH+(colTopY-foundH)/2,lz);legPost.rotation.y=-ang;legPost.castShadow=true;add3(legPost);
       }
-      // Ring beam at top of legs
-      const ringBeam=new THREE.Mesh(new THREE.TorusGeometry(legR,0.5,8,48),new THREE.MeshLambertMaterial({color:0x374151}));ringBeam.rotation.x=Math.PI/2;ringBeam.position.set(x,foundH+legH,z);add3(ringBeam);
-      // Inverted cone (ConeGeometry flipped upside down)
-      const coneMesh=new THREE.Mesh(new THREE.ConeGeometry(r,cH,48),new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.55),transparent:true,opacity:0.85}));
+      // Bracing bands: ring beam under the eave + mid-height brace ring
+      const ringBeam=new THREE.Mesh(new THREE.TorusGeometry(r+0.15,0.35,8,48),new THREE.MeshLambertMaterial({color:0x374151}));ringBeam.rotation.x=Math.PI/2;ringBeam.position.set(x,colTopY-0.3,z);add3(ringBeam);
+      const midBrace=new THREE.Mesh(new THREE.TorusGeometry(r+0.15,0.2,6,48),braceMat);midBrace.rotation.x=Math.PI/2;midBrace.position.set(x,foundH+(legH+cH)*0.5,z);add3(midBrace);
+      // Inverted hopper cone at the configured 40/45/60° slope — galvanized steel look
+      const coneMesh=new THREE.Mesh(new THREE.ConeGeometry(r,cH,48),new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.68)}));
       coneMesh.rotation.x=Math.PI; // flip so tip points downward
       coneMesh.position.set(x,foundH+legH+cH/2,z);coneMesh.castShadow=true;coneMesh.userData={siteId:bin.id,siteType:'bin'};add3(coneMesh);
-      // Central discharge pipe (orange, from ground to bottom of cone)
-      const pipeH=Math.min(legH,6);
-      const dischPipe=new THREE.Mesh(new THREE.CylinderGeometry(1,1,pipeH,12),new THREE.MeshLambertMaterial({color:0xf97316}));
-      dischPipe.position.set(x,foundH+pipeH/2,z);add3(dischPipe);
+      // Hopper seam rings down the cone (panel joints)
+      for(let s=1;s<=2;s++){
+        const t=s/3, sr=r*(1-t);
+        const seam=new THREE.Mesh(new THREE.TorusGeometry(sr,0.08,6,36),new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.5)}));
+        seam.rotation.x=Math.PI/2; seam.position.set(x,foundH+legH+cH*t,z); add3(seam);
+      }
+      // Outlet collar + slide-gate box at the apex (~34″ clearance under it)
+      const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.95,0.95,1.1,14),new THREE.MeshLambertMaterial({color:0x374151}));
+      collar.position.set(x,foundH+legH-0.35,z);add3(collar);
+      const gate=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.7,1.6),new THREE.MeshLambertMaterial({color:0xf97316}));
+      gate.position.set(x,foundH+Math.max(0.6,legH-1.0),z);gate.castShadow=true;add3(gate);
       // Cylindrical bin body (sits on top of the inverted cone)
       const body=new THREE.Mesh(new THREE.CylinderGeometry(r,r,sideHt,48,1,false),new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.88}));
       body.position.set(x,binFloorY+sideHt/2,z);body.castShadow=body.receiveShadow=true;body.userData={siteId:bin.id,siteType:'bin'};add3(body);
