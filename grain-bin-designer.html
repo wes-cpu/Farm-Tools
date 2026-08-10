@@ -2292,7 +2292,8 @@ function binHTML(bin) {
   <div class="fr"><label>Diameter (ft)</label><input type="number" id="pd" value="${bin.diam}" min="12" max="156" step="6"/></div>
   <div class="fr"><label>Ring Height (in)</label><input type="number" id="prh" value="${bin.ringIn}" min="24" max="72" step="6"/></div>
   <div class="fr"><label>Ring Count</label><input type="number" id="prc" value="${bin.ringCount}" min="1" max="32"/></div>
-  <div class="fr"><label>Roof Height (ft)</label><input type="number" id="prof" value="${bin.roofFt}" min="2" max="30" step="0.5"/></div>
+  <div class="fr"><label>Total Height (ground → peak, ft)</label><input type="number" id="ptot" value="${peakHt(bin).toFixed(1)}" min="8" max="250" step="0.5"/></div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Enter the manufacturer's overall peak height. Roof height is calculated: ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${bin.roofFt.toFixed(1)}′ roof</b>.</p>
   <div class="fr"><label>Sidewall Type</label><select id="pstiff">
     <option value="0"${!bin.stiffened?' selected':''}>Unstiffened (corrugated only)</option>
     <option value="1"${bin.stiffened?' selected':''}>Stiffened (vertical stiffener channels)</option>
@@ -2366,7 +2367,6 @@ function bindBin(bin) {
     bin.diam=+document.getElementById('pd')?.value||bin.diam;
     bin.ringIn=+document.getElementById('prh')?.value||bin.ringIn;
     bin.ringCount=+document.getElementById('prc')?.value||bin.ringCount;
-    bin.roofFt=+document.getElementById('prof')?.value||bin.roofFt;
     bin.foundFt=+document.getElementById('pfound')?.value||0;
     bin.foundDiamFt=+document.getElementById('pfodd')?.value||0;
     bin.fanAng=+document.getElementById('pfa')?.value||0;
@@ -2393,7 +2393,14 @@ function bindBin(bin) {
     document.querySelectorAll('.xfanhp').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].hp=+el.value||0; });
     renderBin(bin); renderProperties(); autoSave();
   }
-  ['pn','pd','prh','prc','prof','pstiff','pfound','pfa','pfhp','pua','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  // Total Height edits derive the roof height (total − eave). Ring/foundation edits
+  // deliberately do NOT re-derive — adding a ring raises the peak, keeping the roof.
+  document.getElementById('ptot')?.addEventListener('change',e=>{
+    const tot=+e.target.value||0;
+    if(tot>0) bin.roofFt=Math.max(1,Math.round((tot-eaveHt(bin))*10)/10);
+    renderBin(bin); renderProperties(); autoSave();
+  });
   ['psf','psu','pssd','pssd2','pss','bpsrc'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
   document.querySelectorAll('.xfan').forEach(el=>el.addEventListener('change',upd));
   document.querySelectorAll('.xfanhp').forEach(el=>el.addEventListener('change',upd));
