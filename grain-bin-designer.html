@@ -1042,7 +1042,7 @@ window.removeDryerFan = function(dryerId, idx) {
 window.applyGsi2322 = function(dryerId) {
   const d=S.dryers.find(x=>x.id===dryerId); if(!d) return;
   d.dryerType='portable'; d.shape='rect'; d.modules=2;
-  d.dryerFans=[{hp:30,module:2,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:-2.5},{hp:15,module:1,side:'back',offFt:2.5}];
+  d.dryerFans=[{hp:30,module:2,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0}];
   d.moduleDims=[{lenFt:32,widFt:9,htFt:6.5},{lenFt:32,widFt:9,htFt:6.5}]; d.legHtFt=d.legHtFt||0;
   d.lenFt=32; d.widFt=9; d.htFt=13+(+d.legHtFt||0); d.motorHp=16;
   renderDryer(d); renderProperties(); autoSave();
@@ -1155,15 +1155,19 @@ function dryerStack(dr) {
   }
   return {mods,dims:dr.moduleDims,legHt,stackH,totalH};
 }
-// Lateral offset for an end-mounted dryer fan. If the user hasn't set one, fans
-// sharing the same module + mount auto-spread across the width so they don't overlap.
+// Lateral offset for an end-mounted dryer fan (user-set only; fans stay centered
+// across the width unless an offset is typed — GSI stacks same-module fans vertically).
 function dryerFanOffFt(dr,i) {
-  const fans=dr.dryerFans||[]; const f=fans[i]; if(!f) return 0;
-  if(f.offFt!=null) return +f.offFt;
+  const f=(dr.dryerFans||[])[i];
+  return f&&f.offFt!=null?+f.offFt:0;
+}
+// Vertical stacking group for a fan: fans sharing the same module + mount stack
+// one above the other within that module (GSI multi-fan module layout).
+function dryerFanStack(dr,i) {
+  const fans=dr.dryerFans||[]; const f=fans[i]; if(!f) return {n:1,pos:0};
   const key=(f.side||'back')+'|'+(f.module||1);
   const grp=fans.map((ff,j)=>((ff.side||'back')+'|'+(ff.module||1))===key?j:-1).filter(j=>j>=0);
-  const n=grp.length, pos=grp.indexOf(i);
-  return n>1?(pos/(n-1)-0.5)*((+dr.widFt||9)*0.6):0;
+  return {n:grp.length,pos:grp.indexOf(i)};
 }
 // Returns {lat,lng,htFt} of a dryer's load point: always the TOP of the dryer,
 // at the configured load end for rectangular dryers (center for cylindrical).
@@ -1572,7 +1576,7 @@ function deletePit(id) { removePitLyr(id); S.pits=S.pits.filter(p=>p.id!==id); i
 // ── GRAIN DRYER ───────────────────────────────────────────────
 function addDryer(lat,lng) {
   const d={id:'dryer_'+uid(),lat,lng,name:'Dryer '+(S.dryers.length+1),dryerType:'portable',modules:2,
-    dryerFans:[{hp:30,module:2,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:-2.5},{hp:15,module:1,side:'back',offFt:2.5}],
+    dryerFans:[{hp:30,module:2,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0}],
     moduleDims:[{lenFt:32,widFt:9,htFt:6.5},{lenFt:32,widFt:9,htFt:6.5}],legHtFt:0,
     shape:'rect',htFt:13,widFt:9,lenFt:32,diamFt:12,headDeg:0,color:'#d97706',loadEnd:'tail',unloadEnd:'head',phase:0,foundHtFt:0,foundExtFt:0,motorHp:16,cost:0,infraItems:[]};
   S.dryers.push(d); renderDryer(d); select('dryer',d.id); autoSave();
@@ -1607,7 +1611,9 @@ function renderDryer(dr) {
           const endBear=mount==='front'?dr.headDeg:dr.headDeg+180;
           const hw=md.widFt/2;
           const offFt=Math.max(-hw,Math.min(hw,dryerFanOffFt(dr,i)));
-          fLL=bearingOffset(ll,(md.lenFt/2+2.5)*FT2M,((endBear%360)+360)%360);
+          // Vertically stacked fans share a plan position — step each one outward so tags stay readable
+          const stk2=dryerFanStack(dr,i);
+          fLL=bearingOffset(ll,(md.lenFt/2+2.5+stk2.pos*3)*FT2M,((endBear%360)+360)%360);
           if(offFt) fLL=bearingOffset(fLL,Math.abs(offFt)*FT2M,(((dr.headDeg+(offFt>0?90:-90))%360)+360)%360);
         } else {
           const posFt=(f.posFt!=null)?f.posFt:md.lenFt/2;
@@ -4029,8 +4035,10 @@ function populate3D(){
       fans.forEach((f,i)=>{
         const fMod=Math.min(st3.mods,f.module||((st3.mods>1&&i===0)?st3.mods:1));
         const md=st3.dims[fMod-1];
-        const y=modBases[fMod-1]+md.htFt/2; // vertical center of that module
-        const fr=Math.min(2.4,md.widFt*0.26,md.htFt*0.42);
+        // Fans sharing a module stack VERTICALLY within it (GSI layout)
+        const stk=dryerFanStack(dr,i);
+        const y=modBases[fMod-1]+md.htFt*((stk.pos+0.5)/stk.n);
+        const fr=Math.min(2.4,md.widFt*0.26,md.htFt/(stk.n*2.3));
         const mount=f.side||'back';
         let cx,cz,outV;
         if(mount==='back'||mount==='front'){
