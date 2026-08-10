@@ -911,6 +911,12 @@ function convNodes(cv) {
 // Double-run conveyor tolerances: available diameters with capacity tied to size,
 // plus manufacturer limits on total run length and incline angle.
 const DBLRUN_SIZES = {8:4000, 10:7500, 12:11000, 14:15000}; // diameter (in) → capacity (BPH)
+// Hi-flight chain conveyor box sizes (GSI Select Hi-Flight lineup): housing W″×H″ → BPH at full chain speed
+const HIFLIGHT_SIZES = [
+  {w:12,h:12,bph:3600},{w:16,h:12,bph:5100},{w:16,h:14,bph:5900},{w:21,h:14,bph:7800},
+  {w:14,h:20,bph:7400},{w:16,h:20,bph:8500},{w:20,h:20,bph:10800},{w:26,h:20,bph:13800},
+  {w:32,h:20,bph:17000},{w:26,h:26,bph:18000},{w:32,h:26,bph:22100},{w:32,h:32,bph:28800},{w:36,h:32,bph:30600}
+];
 const DBLRUN_MAX_LEN = 325;  // ft — max stretched length per double-run
 const DBLRUN_MAX_ANG = 60;   // ° — max incline angle
 function convTypeColor(type) {
@@ -946,7 +952,8 @@ function addConveyor(ll1, ll2, type, options={}) {
   const name = convTypeName(type)+' '+(S.conveyors.filter(x=>x.type===type).length+1);
   const c={
     id:'conv_'+uid(), name, type, bootType:'flat', color:convTypeColor(type),
-    diamIn:type==='doublerun'?10:6, capBph:type==='doublerun'?DBLRUN_SIZES[10]:0, phase:0, cost:0, infraItems:[],
+    diamIn:type==='doublerun'?10:6, capBph:type==='doublerun'?DBLRUN_SIZES[10]:type==='highflight'?3600:0,
+    boxWidIn:type==='highflight'?12:undefined, boxHtIn:type==='highflight'?12:undefined, phase:0, cost:0, infraItems:[],
     feedsFrom: options.feedsFrom || [],
     feedsTo:   options.feedsTo   || [],
     srcSnapMode:'unload', dstSnapMode:'unload',
@@ -2667,7 +2674,8 @@ function convHTML(cv) {
   const nodes=cv.nodes;
   const typeName=cv.type==='auger'?'Inclined Auger':cv.type==='highflight'?'High-Flight Conveyor':cv.type==='doublerun'?'Double-Run Conveyor':'Drag / Horizontal Conveyor';
   const isDblCv=cv.type==='doublerun';
-  const recRange=cv.type==='auger'?'30°–45°':cv.type==='highflight'?'35°–55°':isDblCv?`≤ ${DBLRUN_MAX_ANG}° max`:'~0° (flat)';
+  const isHfCv=cv.type==='highflight';
+  const recRange=cv.type==='auger'?'30°–45°':isHfCv?'up to ~60° (steep-incline chain)':isDblCv?`≤ ${DBLRUN_MAX_ANG}° max`:'~0° (flat)';
   const addNodeActive=S.convAddNodeMode===cv.id;
 
   // Node table rows
@@ -2722,6 +2730,11 @@ function convHTML(cv) {
   ${isDblCv
     ?`<div class="fr"><label>Size (diameter)</label><select id="cvdiam">${dblSizeOpts}</select></div>
       <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Capacity is set by the size: 8"=4,000 · 10"=7,500 · 12"=11,000 · 14"=15,000 BPH. Max ${DBLRUN_MAX_LEN}′ per run · max ${DBLRUN_MAX_ANG}° incline.</p>`
+    :isHfCv
+    ?`<div class="fr"><label>Box Size (W″ × H″)</label><select id="cvbox">
+        ${HIFLIGHT_SIZES.map(s=>`<option value="${s.w}x${s.h}"${(cv.boxWidIn||12)===s.w&&(cv.boxHtIn||12)===s.h?' selected':''}>${s.w}″ × ${s.h}″ — ${s.bph.toLocaleString()} BPH</option>`).join('')}
+      </select></div>
+      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Hi-flight conveyors are rectangular chain-paddle housings (GSI Select Hi-Flight sizes). Capacity is set by the box size at full chain speed.</p>`
     :`<div class="fr"><label>Pipe Diameter (in)</label><input type="number" id="cvdiam" value="${cv.diamIn||6}" min="2" max="30" step="1"/></div>
   <div class="fr"><label>Capacity (BPH)</label><input type="number" id="cvbph" value="${cv.capBph||0}" min="0" max="100000" step="500"/></div>`}
   <div class="fr"><label>Motor HP</label>
@@ -2778,7 +2791,8 @@ function convHTML(cv) {
     <div class="crow"><span class="lbl">Total Run Length</span><span class="val"${overLen?' style="color:#ef4444;font-weight:700"':''}>${totalLen.toFixed(1)} ft${isDblCv?` / ${DBLRUN_MAX_LEN} max`:''}</span></div>
     <div class="crow"><span class="lbl">Net Rise</span><span class="val">${rise>=0?'+':''}${rise.toFixed(1)} ft</span></div>
     <div class="crow"><span class="lbl">${isDblCv?'Angle Limit':'Recommended Angle'}</span><span class="val"${overAng?' style="color:#ef4444;font-weight:700"':''}>${isDblCv?`${maxSegAng.toFixed(1)}° / ${DBLRUN_MAX_ANG}° max`:recRange}</span></div>
-    ${cv.diamIn?`<div class="crow"><span class="lbl">Pipe Diameter</span><span class="val">${cv.diamIn}"</span></div>`:''}
+    ${isHfCv?`<div class="crow"><span class="lbl">Box Size</span><span class="val">${cv.boxWidIn||12}″ × ${cv.boxHtIn||12}″</span></div>`
+      :cv.diamIn?`<div class="crow"><span class="lbl">Pipe Diameter</span><span class="val">${cv.diamIn}"</span></div>`:''}
     ${cv.capBph?`<div class="crow"><span class="lbl">Capacity</span><span class="val">${cv.capBph.toLocaleString()} BPH</span></div>`:''}
     ${cv.phase?`<div class="crow"><span class="lbl">Build Phase</span><span class="val" style="color:${phaseColor(cv.phase)}">${phaseName(cv.phase)}</span></div>`:''}
   </div>
@@ -2791,6 +2805,11 @@ function bindConv(cv) {
     if(!DBLRUN_SIZES[cv.diamIn]) cv.diamIn=10;
     cv.capBph=DBLRUN_SIZES[cv.diamIn];
   }
+  // Migrate hi-flights to a standard rectangular box size + derived capacity
+  if(cv.type==='highflight'&&!cv.boxWidIn){
+    cv.boxWidIn=12; cv.boxHtIn=12;
+    if(!cv.capBph) cv.capBph=3600;
+  }
 
   function updBasic(){
     cv.name=document.getElementById('cvn')?.value||cv.name;
@@ -2802,6 +2821,11 @@ function bindConv(cv) {
         cv.diamIn=+Object.keys(DBLRUN_SIZES).reduce((a,b)=>Math.abs(+b-cv.diamIn)<Math.abs(+a-cv.diamIn)?b:a);
       }
       cv.capBph=DBLRUN_SIZES[cv.diamIn];
+    } else if(cv.type==='highflight'){
+      // Box size drives dimensions + capacity
+      const sel=(document.getElementById('cvbox')?.value||'12x12').split('x');
+      const sz=HIFLIGHT_SIZES.find(s=>s.w===+sel[0]&&s.h===+sel[1])||HIFLIGHT_SIZES[0];
+      cv.boxWidIn=sz.w; cv.boxHtIn=sz.h; cv.capBph=sz.bph;
     } else {
       cv.capBph=+document.getElementById('cvbph')?.value||0;
     }
@@ -2810,7 +2834,7 @@ function bindConv(cv) {
     cv.powerSrc=document.getElementById('cvsrc')?.value||cv.powerSrc||'utility';
     renderConveyor(cv); renderProperties(); autoSave();
   }
-  ['cvn','cvbt','cvdiam','cvbph','cvhp','cvhpauto','cvsrc'].forEach(id=>document.getElementById(id)?.addEventListener('change',updBasic));
+  ['cvn','cvbt','cvdiam','cvbox','cvbph','cvhp','cvhpauto','cvsrc'].forEach(id=>document.getElementById(id)?.addEventListener('change',updBasic));
 
   document.querySelectorAll('.cv-node-ht').forEach(el=>{
     el.addEventListener('change',()=>{
@@ -3716,9 +3740,10 @@ function populate3D(){
           const seg2=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(v.clone().sub(off),v1.clone().sub(off)),1,cvW/2,10,false),mat);
           seg2.castShadow=true; seg2.userData={siteId:cv.id,siteType:'conveyor'}; add3(seg2);
         } else {
-          // Rectangular trough for drag / hi-flight
-          const cvH=cv.type==='drag'?cvW*0.55:cvW*0.7;
-          seg=new THREE.Mesh(new THREE.BoxGeometry(cvW,cvH,segLen),mat);
+          // Rectangular housing: hi-flight uses its real box W×H; drag uses a low trough
+          const bw=cv.type==='highflight'?Math.max(1,(cv.boxWidIn||12)/12):cvW;
+          const bh=cv.type==='highflight'?Math.max(1,(cv.boxHtIn||12)/12):cvW*0.55;
+          seg=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,segLen),mat);
           seg.position.copy(v.clone().add(v1).multiplyScalar(0.5));
           seg.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(zAxis,dir));
         }
@@ -3726,12 +3751,15 @@ function populate3D(){
         if(i===0) seg.userData={siteId:cv.id,siteType:'conveyor'};
         add3(seg);
       }
-      // Joint at each node — double-run gets a tall housing spanning both stacked tubes
+      // Joint at each node — double-run gets a tall housing spanning both stacked tubes;
+      // hi-flight joints match the rectangular box cross-section
       const jR=nd.bendId?cvW*0.65:cvW*0.55;
       const joint=isAuger
         ? new THREE.Mesh(new THREE.SphereGeometry(jR,8,8),mat)
         : isDbl3
         ? new THREE.Mesh(new THREE.BoxGeometry(cvW*1.2,cvW*2.6,cvW*1.2),mat)
+        : cv.type==='highflight'
+        ? new THREE.Mesh(new THREE.BoxGeometry(Math.max(1,(cv.boxWidIn||12)/12)*1.15,Math.max(1,(cv.boxHtIn||12)/12)*1.15,Math.max(1,(cv.boxWidIn||12)/12)*1.15),mat)
         : new THREE.Mesh(new THREE.BoxGeometry(cvW*1.1,cvW*0.7,cvW*1.1),mat);
       joint.position.copy(v);add3(joint);
     });
