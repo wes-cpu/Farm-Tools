@@ -3247,6 +3247,7 @@ function serialise() {
   return JSON.stringify({
     bins:S.bins,legs:S.legs,conveyors:S.conveyors,pits:S.pits,dryers:S.dryers,trucks:S.trucks,
     loadouts:S.loadouts,structures:S.structures,bends:S.bends,walkways:S.walkways,portaugers:S.portaugers,propanetanks:S.propanetanks,generators:S.generators,power:S.power,opModes:S.opModes,opAssign:S.opAssign,
+    savedAt:Date.now(),
     measurements:S.measurements.map(m=>({...m,pts:m.pts.map(p=>({lat:p.lat,lng:p.lng}))})),
     grainType:S.grainType, uid:S.uid, projectId:S.projectId, projectName:S.projectName,
     typeHidden3d:S.typeHidden3d, shownPhases3d:S.shownPhases3d, phases:S.phases,
@@ -5352,12 +5353,32 @@ function updateDataFileBtn(state){
 async function writeDataFile(){
   if(!_dataFileHandle) return;
   try{ const w=await _dataFileHandle.createWritable(); await w.write(serialise()); await w.close(); }
-  catch(e){ console.warn('Data file write failed:',e); }
+  catch(e){
+    console.warn('Data file write failed:',e);
+    updateDataFileBtn('reconnect');
+    showToast('⚠ Could not write the data file — click 🔗 Reconnect Data to fix');
+  }
 }
 function scheduleDataFileWrite(){ if(!_dataFileHandle) return; clearTimeout(_dataFileTimer); _dataFileTimer=setTimeout(writeDataFile,1500); }
+// Flush a pending debounced write the moment the tab is hidden/closed so quick
+// "edit then close" sessions still reach the file.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'&&_dataFileTimer){ clearTimeout(_dataFileTimer); _dataFileTimer=null; writeDataFile(); }
+});
 async function loadFromHandle(h){
   const f=await h.getFile(); const txt=await f.text();
-  if(txt.trim()){ hydrateData(JSON.parse(txt)); updateProjDisplay(); flash('✓ Loaded "'+h.name+'"'); }
+  if(!txt.trim()) return;
+  const data=JSON.parse(txt);
+  // Newer-wins: if this browser's local session is newer than the file (a write
+  // didn't make it out last time), keep the local work and sync it TO the file
+  // instead of letting the stale file erase it.
+  let local=null; try{ local=JSON.parse(localStorage.getItem('gbd_v3')||'null'); }catch(e){}
+  if(local&&(+local.savedAt||0)>(+data.savedAt||0)){
+    scheduleDataFileWrite();
+    flash('✓ Kept newer local work — syncing to "'+h.name+'"');
+    return;
+  }
+  hydrateData(data); updateProjDisplay(); flash('✓ Loaded "'+h.name+'"');
 }
 window.linkDataFile=async function(){
   if(!dataFileSupported()){ alert('This browser cannot link files directly.\nUse Chrome or Microsoft Edge for OneDrive file sync,\nor use the ⬇ Export / ⬆ Import buttons instead.'); return; }
@@ -5396,7 +5417,7 @@ window.linkDataFile=async function(){
 initMap();
 setTimeout(()=>{
   const r=localStorage.getItem('gbd_v3');
-  if(r){try{const d=JSON.parse(r);const has=(d.bins||[]).length||(d.legs||[]).length||(d.conveyors||[]).length||(d.pits||[]).length||(d.dryers||[]).length;if(has){hydrateData(d);updateProjDisplay();flash('Auto-loaded previous session');}}catch(e){}}
+  if(r){try{const d=JSON.parse(r);const has=['bins','legs','conveyors','pits','dryers','trucks','loadouts','structures','bends','walkways','portaugers','propanetanks','generators'].some(k=>(d[k]||[]).length);if(has){hydrateData(d);updateProjDisplay();flash('Auto-loaded previous session');}}catch(e){}}
   else { updateProjDisplay(); }
   // After local restore, prefer the linked data file if this computer still has permission
   if(dataFileSupported()){
