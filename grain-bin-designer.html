@@ -544,12 +544,12 @@ function livePolyArea(pts, curLat, curLng) {
 // Height of the cone portion of a cone-bottom bin (0 for flat-bottom)
 function coneHtCalc(bin) {
   if ((bin.bottomType||'flat') !== 'cone') return 0;
-  return (bin.diam/2) * Math.tan(((bin.coneAngleDeg||37)*Math.PI/180));
+  return (bin.diam/2) * Math.tan(((bin.coneAngleDeg||45)*Math.PI/180));
 }
 function eaveHt(bin) {
   const sw=(bin.ringCount*bin.ringIn)/12;
   if ((bin.bottomType||'flat') === 'cone') {
-    return (bin.foundFt||0) + (bin.coneLegHt||10) + coneHtCalc(bin) + sw;
+    return (bin.foundFt||0) + (bin.coneLegHt||3) + coneHtCalc(bin) + sw;
   }
   return (bin.foundFt||0) + sw;
 }
@@ -558,7 +558,9 @@ function peakHt(bin)  { return eaveHt(bin)+bin.roofFt; }
 function sidewallHt(bin) { return (bin.ringCount*bin.ringIn)/12; }
 function bushels(bin,gt) {
   const r=bin.diam/2, h=sidewallHt(bin);
-  return (Math.PI*r*r*h + (1/3)*Math.PI*r*r*bin.roofFt*0.65) / (GRAIN_DENS[gt]||1.2445);
+  // Hopper-bottom tanks also hold grain in the cone (full cone volume)
+  const coneVol=(bin.bottomType||'flat')==='cone' ? (1/3)*Math.PI*r*r*coneHtCalc(bin) : 0;
+  return (Math.PI*r*r*h + (1/3)*Math.PI*r*r*bin.roofFt*0.65 + coneVol) / (GRAIN_DENS[gt]||1.2445);
 }
 function legAngle(legHt,binPeak,d) { const dh=legHt-binPeak; return dh<=0?null:Math.atan2(dh,d)*180/Math.PI; }
 function reqLegHt(peak,d,ang=TARGET_ANG) { return peak+d*Math.tan(ang*Math.PI/180); }
@@ -615,7 +617,7 @@ function addBin(lat,lng) {
     showSideDraw:false,sideDrawHt:10,sideDrawBearing:90,
     showSideDraw2:false,sideDrawHt2:10,sideDrawBearing2:270,
     showStairs:false,stairsLandDeg:0,stairsWrapDeg:450,
-    bottomType:'flat',coneLegHt:10,coneAngleDeg:37,
+    bottomType:'flat',coneLegHt:3,coneAngleDeg:45,
     phase:0, color:BIN_COLORS[S.bins.length%BIN_COLORS.length], cost:0, infraItems:[]};
   S.bins.push(b); renderBin(b); select('bin',b.id); autoSave();
 }
@@ -2302,7 +2304,7 @@ function renderProperties() {
 function binHTML(bin) {
   const eh=eaveHt(bin),ph=peakHt(bin),cap=bushels(bin,S.grainType),fp=Math.PI*(bin.diam/2)**2;
   const isCone=(bin.bottomType||'flat')==='cone';
-  const cH=coneHtCalc(bin), legH=bin.coneLegHt||10;
+  const cH=coneHtCalc(bin), legH=bin.coneLegHt||3;
   const swatches=BIN_COLORS.map(c=>`<div class="cswatch${bin.color===c?' sel':''}" style="background:${c}" data-clr="${c}"></div>`).join('');
   return `<div class="ph">Grain Bin — ${bin.name}</div>
   <div class="fr"><label>Name</label><input type="text" id="pn" value="${escH(bin.name)}"/></div>
@@ -2322,8 +2324,14 @@ function binHTML(bin) {
   <div class="ph">Bottom Type</div>
   <div class="fr"><label>Bottom Style</label><select id="pbottom"><option value="flat"${!isCone?' selected':''}>Flat Bottom</option><option value="cone"${isCone?' selected':''}>Cone Bottom</option></select></div>
   ${isCone?`
-  <div class="fr"><label>Support Leg Height (ft)</label><input type="number" id="pconeleght" value="${legH}" min="4" max="30" step="0.5"/></div>
-  <div class="fr"><label>Cone Angle (°)</label><input type="number" id="pconeang" value="${bin.coneAngleDeg||37}" min="20" max="60" step="1"/></div>
+  <div class="fr"><label>Hopper Clearance / Legs (ft)</label><input type="number" id="pconeleght" value="${legH}" min="1" max="30" step="0.5"/></div>
+  <div class="fr"><label>Hopper Angle (°)</label><select id="pconeang">
+    ${[40,45,60].includes(+bin.coneAngleDeg)?'':`<option value="${bin.coneAngleDeg}" selected>${bin.coneAngleDeg}° (custom)</option>`}
+    <option value="40"${+bin.coneAngleDeg===40?' selected':''}>40° hopper</option>
+    <option value="45"${+bin.coneAngleDeg===45?' selected':''}>45° hopper</option>
+    <option value="60"${+bin.coneAngleDeg===60?' selected':''}>60° hopper</option>
+  </select></div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">GSI NCHTC hopper tanks come in 40°/45°/60° hoppers with ~34″ (≈3′) outlet clearance, 32″ rings and stiffened (CTS) sidewalls. Diameters 12–36′.</p>
   <div class="cbox">
     <div class="crow"><span class="lbl">Cone Height</span><span class="val">${cH.toFixed(2)} ft</span></div>
     <div class="crow"><span class="lbl">Leg + Cone Elev.</span><span class="val">${(legH+cH).toFixed(2)} ft</span></div>
@@ -2369,7 +2377,7 @@ function binHTML(bin) {
   <div class="fr"><label>Grain Type</label><select id="pgt">${['corn','soybeans','wheat','milo','oats'].map(g=>`<option value="${g}"${S.grainType===g?' selected':''}>${g.charAt(0).toUpperCase()+g.slice(1)}</option>`).join('')}</select></div>
   <div class="cbox">
     ${bin.foundFt?`<div class="crow"><span class="lbl">Foundation Pad</span><span class="val">${(bin.foundFt||0).toFixed(1)} ft</span></div>`:''}
-    ${isCone?`<div class="crow"><span class="lbl">Support Legs</span><span class="val">${legH.toFixed(1)} ft</span></div><div class="crow"><span class="lbl">Cone Height</span><span class="val">${cH.toFixed(2)} ft</span></div>`:''}
+    ${isCone?`<div class="crow"><span class="lbl">Hopper Clearance</span><span class="val">${legH.toFixed(1)} ft (${Math.round(legH*12)}″)</span></div><div class="crow"><span class="lbl">Hopper Angle</span><span class="val">${bin.coneAngleDeg||45}°</span></div><div class="crow"><span class="lbl">Hopper Height</span><span class="val">${cH.toFixed(2)} ft</span></div>`:''}
     <div class="crow"><span class="lbl">Sidewall Height</span><span class="val">${((bin.ringCount*bin.ringIn)/12).toFixed(2)} ft</span></div>
     <div class="crow"><span class="lbl">Eave Height</span><span class="val">${eh.toFixed(2)} ft</span></div>
     <div class="crow"><span class="lbl">Roof Peak</span><span class="val">${ph.toFixed(2)} ft</span></div>
@@ -2397,8 +2405,8 @@ function bindBin(bin) {
     bin.showStairs=document.getElementById('pss')?.checked??false;
     bin.stairsLandDeg=+document.getElementById('pssl')?.value||0;
     bin.stairsWrapDeg=+document.getElementById('pssw')?.value||450;
-    bin.coneLegHt=+document.getElementById('pconeleght')?.value||bin.coneLegHt||10;
-    bin.coneAngleDeg=+document.getElementById('pconeang')?.value||bin.coneAngleDeg||37;
+    bin.coneLegHt=+document.getElementById('pconeleght')?.value||bin.coneLegHt||3;
+    bin.coneAngleDeg=+document.getElementById('pconeang')?.value||bin.coneAngleDeg||45;
     bin.showSideDraw2=document.getElementById('pssd2')?.checked??false;
     bin.sideDrawHt2=+document.getElementById('psdh2')?.value??10;
     bin.sideDrawBearing2=+document.getElementById('psdb2')?.value||270;
@@ -3606,7 +3614,7 @@ function populate3D(){
     }
     if(isCone3){
       // ── CONE BOTTOM ──────────────────────────────────────────
-      const legH=bin.coneLegHt||10;
+      const legH=bin.coneLegHt||3;
       const cH=coneHtCalc(bin); // inverted-cone height
       const binFloorY=foundH+legH+cH; // bottom of cylindrical body
       // Support legs (8 legs at 70% bin radius)
