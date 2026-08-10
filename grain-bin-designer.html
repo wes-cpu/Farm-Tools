@@ -1145,6 +1145,13 @@ function dryerStack(dr) {
     dr.moduleDims.push({lenFt:last?+last.lenFt:(+dr.lenFt||32),widFt:last?+last.widFt:(+dr.widFt||9),htFt:last?+last.htFt:Math.round(defH*10)/10});
   }
   if(dr.moduleDims.length>mods) dr.moduleDims.length=mods;
+  // One-time migration: clear fan offsets left over from the old horizontal
+  // side-by-side defaults — vertical stacking is the layout now. Offsets the
+  // user sets after this migration are kept.
+  if(!dr._fanOffMigrated){
+    (dr.dryerFans||[]).forEach(f=>{ f.offFt=0; });
+    dr._fanOffMigrated=true;
+  }
   const legHt=Math.max(0,+dr.legHtFt||0);
   const stackH=dr.moduleDims.reduce((s,m)=>s+(+m.htFt||6),0);
   const totalH=legHt+stackH;
