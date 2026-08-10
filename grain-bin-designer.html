@@ -303,10 +303,12 @@ const LY = { bins:{}, legs:{}, conveyors:{}, pits:{}, dryers:{}, trucks:{}, load
 // HP → kW draw: HP × 0.7457. Amps derived from that kW at 0.85 power factor; √3 factor for 3-phase.
 function hpToAmps(hp, volts, ph) { return hp*745.7/(volts*0.85*(+ph===3?Math.sqrt(3):1)); }
 function hpToKw(hp) { return hp*0.7457; }
-// Options for a load's power-source selector: utility service plus any generators on site
-function powerSrcOpts(cur) {
+// Options for a load's power-source selector: utility service plus any generators on site.
+// allowPto adds a tractor-PTO option (no electrical load) for auger-type equipment.
+function powerSrcOpts(cur, allowPto) {
   return `<option value="utility"${(!cur||cur==='utility')?' selected':''}>Utility Service</option>`
-    + (S.generators||[]).map(g=>`<option value="${g.id}"${cur===g.id?' selected':''}>⚡ ${escH(g.name)}</option>`).join('');
+    + (S.generators||[]).map(g=>`<option value="${g.id}"${cur===g.id?' selected':''}>⚡ ${escH(g.name)}</option>`).join('')
+    + (allowPto?`<option value="pto"${cur==='pto'?' selected':''}>🚜 Tractor PTO — no electrical load</option>`:'');
 }
 // Gather every motor load on the site: {key, name, hp, src}
 // key is stable per motor so operating-mode assignments survive re-renders.
@@ -319,13 +321,13 @@ function gatherElecLoads() {
     if(b.showUnload&&(+b.unloadHp||0)>0) loads.push({key:b.id+'|unload',name:b.name+' — Unload',hp:+b.unloadHp,src});
   });
   S.legs.forEach(l=>{ if((+l.motorHp||0)>0) loads.push({key:l.id+'|motor',name:l.name+' — Motor',hp:+l.motorHp,src:l.powerSrc||'utility'}); });
-  S.conveyors.forEach(c=>{ const hp=convHp(c); if(hp>0) loads.push({key:c.id+'|motor',name:c.name+' — Motor'+(isHpAuto(c)?' (est.)':''),hp,src:c.powerSrc||'utility'}); });
+  S.conveyors.forEach(c=>{ if(c.powerSrc==='pto') return; const hp=convHp(c); if(hp>0) loads.push({key:c.id+'|motor',name:c.name+' — Motor'+(isHpAuto(c)?' (est.)':''),hp,src:c.powerSrc||'utility'}); });
   S.dryers.forEach(d=>{
     const src=d.powerSrc||'utility';
     (d.dryerFans||[]).forEach((f,i)=>{ if((+f.hp||0)>0) loads.push({key:`${d.id}|fan${i}`,name:`${d.name} — Fan ${i+1}`,hp:+f.hp,src}); });
     if((+d.motorHp||0)>0) loads.push({key:d.id+'|other',name:d.name+' — Augers/Other',hp:+d.motorHp,src});
   });
-  S.portaugers.forEach(p=>{ const hp=paHp(p); if(hp>0) loads.push({key:p.id+'|motor',name:p.name+' — Motor'+(isHpAuto(p)?' (est.)':''),hp,src:p.powerSrc||'utility'}); });
+  S.portaugers.forEach(p=>{ if(p.powerSrc==='pto') return; const hp=paHp(p); if(hp>0) loads.push({key:p.id+'|motor',name:p.name+' — Motor'+(isHpAuto(p)?' (est.)':''),hp,src:p.powerSrc||'utility'}); });
   return loads;
 }
 // Does this motor run in the given operating mode? Unassigned motors default to ALL modes.
@@ -586,6 +588,8 @@ function defaultColor(obj, type) {
   if(type==='walkway') return '#94a3b8';
   if(type==='generator') return '#eab308';
   if(type==='propanetank') return '#94a3b8';
+  if(type==='truck') return '#6b7280';
+  if(type==='portauger') return '#f97316';
   return obj.color||'#6b7280';
 }
 window.setSelPhase = function(ph) {
@@ -1860,7 +1864,8 @@ function portAugerHTML(pa) {
     <label style="display:flex;align-items:center;gap:3px;font-size:0.72em;color:#9ca3af;margin-left:5px;cursor:pointer"><input type="checkbox" id="pahpauto" ${isHpAuto(pa)?'checked':''}/>Auto</label>
   </div>
   ${isHpAuto(pa)?`<p style="font-size:0.69em;color:#6b7280;margin-bottom:3px">Estimated from diameter × length × angle, rounded up to a standard motor. Uncheck Auto to enter your own.</p>`:''}
-  <div class="fr"><label>Power Source</label><select id="pasrc">${powerSrcOpts(pa.powerSrc)}</select></div>
+  <div class="fr"><label>Power Source</label><select id="pasrc">${powerSrcOpts(pa.powerSrc,true)}</select></div>
+  ${pa.powerSrc==='pto'?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">🚜 PTO-driven — hooks to a tractor and is left out of the ⚡ electrical load estimate.</p>`:''}
   ${phaseRowHTML(pa.phase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Tube Length</span><span class="val">${pa.lengthFt} ft</span></div>
@@ -2798,7 +2803,8 @@ function convHTML(cv) {
     <label style="display:flex;align-items:center;gap:3px;font-size:0.72em;color:#9ca3af;margin-left:5px;cursor:pointer"><input type="checkbox" id="cvhpauto" ${isHpAuto(cv)?'checked':''}/>Auto</label>
   </div>
   ${isHpAuto(cv)?`<p style="font-size:0.69em;color:#6b7280;margin-bottom:3px">Estimated from ${cv.type==='auger'?'diameter × length × incline':'capacity × length × lift'}, rounded up to a standard motor. Uncheck Auto to enter your own.</p>`:''}
-  <div class="fr"><label>Power Source</label><select id="cvsrc">${powerSrcOpts(cv.powerSrc)}</select></div>
+  <div class="fr"><label>Power Source</label><select id="cvsrc">${powerSrcOpts(cv.powerSrc,cv.type==='auger')}</select></div>
+  ${cv.powerSrc==='pto'?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">🚜 PTO-driven — left out of the ⚡ electrical load estimate.</p>`:''}
   ${phaseRowHTML(cv.phase||0)}
   ${cv.type==='auger'||cv.type==='highflight'||cv.type==='doublerun'?`<div class="fr"><label>Boot Type</label><select id="cvbt">
     <option value="flat"${cv.bootType==='flat'?' selected':''}>Flat Bottom (at grade)</option>
@@ -3789,7 +3795,8 @@ function populate3D(){
   S.conveyors.forEach(cv=>{
     if(S.typeHidden3d['conveyors']||cv.hidden) return;
     const nodes=convNodes(cv);
-    const clr3=cv.type==='auger'?0xf97316:cv.type==='highflight'?0xeab308:cv.type==='doublerun'?0xa855f7:0x06b6d4;
+    // Phase/custom color wins; fall back to the type's default color
+    const clr3=new THREE.Color(cv.color||convTypeColor(cv.type)).getHex();
     const mat=new THREE.MeshLambertMaterial({color:clr3});
     const cvW=Math.max(1.2,(cv.diamIn||6)/12); // tube radius / half-width in ft
     const isAuger=cv.type==='auger';
@@ -4388,30 +4395,60 @@ function populate3D(){
     const col=new THREE.Color(pa.color);
     const mat=new THREE.MeshLambertMaterial({color:col});
     const darkMat=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.6)});
-    // Auger tube (rectangular box spanning boot → discharge)
+    // ── Swing-away auger: round main tube, transport wheels mid-tube,
+    //    swing hopper that rolls out beside the boot, tractor hitch tongue ──
     const tubW=Math.max(0.8,(pa.diamIn||8)/12);
+    const tubR=Math.max(0.45,tubW/2);
     const bootV=new THREE.Vector3(x,bootY,z), disV=new THREE.Vector3(ex,disY,ez);
-    const tubeLen=Math.max(1,bootV.distanceTo(disV));
     const dir=disV.clone().sub(bootV).normalize();
-    const zAxis=new THREE.Vector3(0,0,1);
-    const tube=new THREE.Mesh(new THREE.BoxGeometry(tubW,tubW,tubeLen),mat);
-    tube.position.copy(bootV.clone().add(disV).multiplyScalar(0.5));
-    tube.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(zAxis,dir));
+    const tube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(bootV,disV),1,tubR,12,false),mat);
     tube.castShadow=true; tube.userData={siteId:pa.id,siteType:'portauger'}; add3(tube);
-    // Hopper intake box at boot
-    const hopper=new THREE.Mesh(new THREE.BoxGeometry(tubW*2.5,tubW*1.5,tubW*2),darkMat);
-    hopper.position.set(x,bootY+tubW*0.25,z); hopper.castShadow=true; add3(hopper);
-    // Discharge spout at top
-    const spout=new THREE.Mesh(new THREE.BoxGeometry(tubW*1.5,tubW*1.5,tubW*1.5),darkMat);
-    spout.position.set(ex,disY+tubW*0.5,ez); spout.castShadow=true; add3(spout);
-    // Wheel undercarriage under the ground end (boot for standalone/reclaim; the free boot for fill)
-    const wheelMat=new THREE.MeshLambertMaterial({color:0x374151});
-    const axle=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,tubW*3,8),wheelMat);
-    axle.rotation.z=Math.PI/2; axle.position.set(x,0.5,z); add3(axle);
-    [-tubW*1.3,tubW*1.3].forEach(wx=>{
-      const wh=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,0.3,16),wheelMat);
-      wh.rotation.z=Math.PI/2; wh.position.set(x+wx,0.5,z); add3(wh);
+    // Horizontal run direction + perpendicular (for hopper, wheels, hitch)
+    const hdir=new THREE.Vector3(dir.x,0,dir.z); if(hdir.lengthSq()<0.01) hdir.set(0,0,1); hdir.normalize();
+    const perp=new THREE.Vector3(-hdir.z,0,hdir.x);
+    // Boot intake housing
+    const bootBox=new THREE.Mesh(new THREE.BoxGeometry(tubR*3,tubR*2.2,tubR*3),darkMat);
+    bootBox.position.set(x,bootY+0.2,z); bootBox.castShadow=true; add3(bootBox);
+    // Swing hopper: low drive-over hopper rolled out beside the boot, feeding it
+    // through a short swing tube (this is what backs under the truck/grain cart)
+    const hopC={x:x+perp.x*5,z:z+perp.z*5};
+    const hopRim=new THREE.Mesh(new THREE.BoxGeometry(4.2,0.5,4.2),darkMat);
+    hopRim.position.set(hopC.x,1.55,hopC.z); add3(hopRim);
+    const hopBody=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.3,3.2),mat);
+    hopBody.position.set(hopC.x,0.8,hopC.z); hopBody.castShadow=true; add3(hopBody);
+    [-1,1].forEach(s=>{ // hopper transport rollers
+      const roller=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.25,10),new THREE.MeshLambertMaterial({color:0x374151}));
+      roller.rotation.x=Math.PI/2; roller.position.set(hopC.x+perp.x*s*1.8,0.35,hopC.z+perp.z*s*1.8); add3(roller);
     });
+    const swing=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(
+      new THREE.Vector3(hopC.x,0.9,hopC.z), new THREE.Vector3(x,bootY+0.3,z)
+    ),1,Math.max(0.35,tubR*0.75),10,false),mat);
+    swing.castShadow=true; add3(swing);
+    // Discharge downspout at the head
+    const spout=new THREE.Mesh(new THREE.CylinderGeometry(tubR*0.95,tubR*0.7,2.2,10),darkMat);
+    spout.position.set(ex,disY-1.1,ez); spout.castShadow=true; add3(spout);
+    // Transport undercarriage ~45% up the tube: axle, A-frame lift arms, big wheels
+    const wheelMat=new THREE.MeshLambertMaterial({color:0x374151});
+    const yUpW=new THREE.Vector3(0,1,0);
+    const axQ=new THREE.Quaternion().setFromUnitVectors(yUpW,perp);
+    const axP=bootV.clone().lerp(disV,0.45);
+    const wR=1.4;
+    [-1,1].forEach(s=>{
+      const wh=new THREE.Mesh(new THREE.CylinderGeometry(wR,wR,0.45,16),wheelMat);
+      wh.setRotationFromQuaternion(axQ);
+      wh.position.set(axP.x+perp.x*s*(tubR+1.3),wR,axP.z+perp.z*s*(tubR+1.3)); wh.castShadow=true; add3(wh);
+      const armH=Math.max(1,axP.y-wR);
+      const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,armH,8),wheelMat);
+      arm.position.set(axP.x+perp.x*s*(tubR+0.7),wR+armH/2,axP.z+perp.z*s*(tubR+0.7)); add3(arm);
+    });
+    const axle=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,(tubR+1.3)*2+0.5,8),wheelMat);
+    axle.setRotationFromQuaternion(axQ); axle.position.set(axP.x,wR,axP.z); add3(axle);
+    // Tractor hitch tongue extending back past the boot, with hitch ball + jack
+    const hitchEnd=new THREE.Vector3(x,0.8,z).sub(hdir.clone().multiplyScalar(6));
+    const tongue=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(x,bootY,z),hitchEnd),1,0.13,8,false),wheelMat);
+    add3(tongue);
+    const hitch=new THREE.Mesh(new THREE.SphereGeometry(0.28,8,8),wheelMat); hitch.position.copy(hitchEnd); add3(hitch);
+    const jack=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.8,6),wheelMat); jack.position.set(hitchEnd.x,0.4,hitchEnd.z); add3(jack);
     if(S.showLabels){
       const tag=ep.mode==='fill'?`↑ fills ${ep.bin.name}`:ep.mode==='reclaim'?`↓ from ${ep.bin.name}`:`${htFt.toFixed(0)}′ dis`;
       const spr=makeLabel3(`⤴ ${pa.name}\n${tag}`,pa.color);spr.position.set(ex,disY+8,ez);add3(spr);
@@ -4541,7 +4578,18 @@ function togglePhaseFilter3d(phase) {
 function setObjPhase3d(type, id, phase) {
   const arr = S[type] || [];
   const obj = arr.find(o => o.id === id);
-  if (obj) { obj.phase = +phase; autoSave(); populate3D(); refreshSummary3D(); }
+  if (!obj) return;
+  obj.phase = +phase;
+  // Color-code to the phase (or back to the type default), same as the properties panel
+  const singular={bins:'bin',legs:'leg',conveyors:'conveyor',pits:'pit',dryers:'dryer',trucks:'truck',
+    loadouts:'loadout',bends:'bend',structures:'structure',portaugers:'portauger',
+    propanetanks:'propanetank',generators:'generator',walkways:'walkway'}[type]||type;
+  obj.color = +phase>0 ? phaseColor(+phase) : defaultColor(obj,singular);
+  const rfns={bin:renderBin,leg:renderLeg,conveyor:renderConveyor,dryer:renderDryer,pit:renderPit,
+    bend:renderBend,structure:renderStructure,loadout:renderLoadout,truck:renderTruck,
+    walkway:renderWalkway,portauger:renderPortAuger,propanetank:renderPropaneTank,generator:renderGenerator};
+  const rfn=rfns[singular]; if(rfn) rfn(obj);
+  autoSave(); populate3D(); refreshSummary3D();
 }
 
 function selectFromSummary3d(type, id) {
