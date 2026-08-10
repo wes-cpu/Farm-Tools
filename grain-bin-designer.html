@@ -3491,7 +3491,8 @@ function on3DMouseMove(e){
   const pt=get3DPoint(e);if(!pt) return;
   const{lat,lng}=fromXZ(pt.x,pt.z);
   const maps={bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
-    conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks};
+    conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
+    generator:S.generators,propanetank:S.propanetanks,portauger:S.portaugers};
   const arr=maps[_drag3.siteType];if(!arr) return;
   const obj=arr.find(o=>o.id===_drag3.siteId);if(!obj) return;
   if(_drag3.siteType==='conveyor'){
@@ -3521,10 +3522,12 @@ function on3DMouseUp(e){
   if(wasDrag){
     _drag3Dirty=false;
     const rfns={bin:renderBin,leg:renderLeg,conveyor:renderConveyor,dryer:renderDryer,
-      pit:renderPit,bend:renderBend,structure:renderStructure,loadout:renderLoadout,truck:renderTruck};
+      pit:renderPit,bend:renderBend,structure:renderStructure,loadout:renderLoadout,truck:renderTruck,
+      generator:renderGenerator,propanetank:renderPropaneTank,portauger:renderPortAuger};
     const rfn=rfns[capturedType];
     const maps={bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
-      conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks};
+      conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
+      generator:S.generators,propanetank:S.propanetanks,portauger:S.portaugers};
     const arr=maps[capturedType];
     const obj=arr&&arr.find(o=>o.id===capturedId);
     if(rfn&&obj) rfn(obj);
@@ -4749,7 +4752,8 @@ function show3DSelectionRing(type, id) {
   clear3DSelectionRing();
   if(!scene3||!_rLat) return;
   const maps={bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
-    conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks};
+    conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
+    generator:S.generators,propanetank:S.propanetanks,portauger:S.portaugers};
   const arr=maps[type]; if(!arr) return;
   const obj=arr.find(o=>o.id===id); if(!obj) return;
   let cx,cz,radius=4;
