@@ -568,15 +568,21 @@ function convAngle(fromHt,toHt,d) { const dh=toHt-fromHt; if(d===0)return 90; re
 function convLength(fromHt,toHt,d) { return Math.sqrt(d*d+Math.pow(toHt-fromHt,2)); }
 
 // ── PHASE / COLOR HELPER ──────────────────────────────────────
-function phaseRowHTML(phase) {
-  const p = phase || 0;
+function phaseRowHTML(phase, removedPhase) {
+  const p = phase || 0, rem = removedPhase || 0;
   const phases = S.phases || [];
-  const opts = `<option value="0"${p===0?' selected':''}>— No Phase —</option>`
+  const opts = `<option value="0"${p===0?' selected':''}>— No Phase (existing) —</option>`
     + phases.map(ph=>`<option value="${ph.num}"${p===ph.num?' selected':''}>${ph.name}</option>`).join('');
+  const remOpts = `<option value="0"${rem===0?' selected':''}>— stays for good —</option>`
+    + phases.map(ph=>`<option value="${ph.num}"${rem===ph.num?' selected':''}>Torn down in ${ph.name}</option>`).join('');
   const clr = p ? phaseColor(p) : '#6b7280';
   return `<div class="ph">Build Phase <span style="font-size:0.8em;text-transform:none;color:#9ca3af;font-weight:400">— color-code by construction sequence</span></div>
-  <div class="fr"><select onchange="setSelPhase(parseInt(this.value))" style="background:#1f2937;border:1px solid #374151;color:${clr};border-radius:4px;padding:3px 6px;cursor:pointer;width:100%">${opts}</select></div>`;
+  <div class="fr"><select onchange="setSelPhase(parseInt(this.value))" style="background:#1f2937;border:1px solid #374151;color:${clr};border-radius:4px;padding:3px 6px;cursor:pointer;width:100%">${opts}</select></div>
+  <div class="fr"><label>Removed in Phase</label><select onchange="setSelRemovedPhase(parseInt(this.value))" style="background:#1f2937;border:1px solid #374151;color:${rem?'#ef4444':'#6b7280'};border-radius:4px;padding:3px 6px;cursor:pointer">${remOpts}</select></div>
+  <p style="font-size:0.68em;color:#6b7280;margin-bottom:3px">Existing equipment that gets torn down later: leave Build Phase as "existing" and pick the phase it comes out. The 3D phase view shows the site as it stands in each phase.</p>`;
 }
+// Phase rows use inline onchange handlers — nothing extra to bind.
+function bindPhaseRow(obj, upd) {}
 // Default color per component type (used when phase=0)
 function defaultColor(obj, type) {
   if(type==='bin') return BIN_COLORS[S.bins.indexOf(obj)%BIN_COLORS.length] || obj.color;
@@ -607,6 +613,18 @@ window.setSelPhase = function(ph) {
   const rfns={bin:renderBin,leg:renderLeg,conveyor:renderConveyor,dryer:renderDryer,
     pit:renderPit,bend:renderBend,structure:renderStructure,loadout:renderLoadout,walkway:renderWalkway,portauger:renderPortAuger,propanetank:renderPropaneTank,generator:renderGenerator};
   const rfn=rfns[S.selType]; if(rfn) rfn(obj);
+  renderProperties(); autoSave();
+};
+
+// Set the teardown phase on the selected object (0 = never removed)
+window.setSelRemovedPhase = function(ph) {
+  if(!S.selId||!S.selType) return;
+  const map2={bin:S.bins,leg:S.legs,conveyor:S.conveyors,dryer:S.dryers,pit:S.pits,
+    bend:S.bends,structure:S.structures,loadout:S.loadouts,truck:S.trucks,walkway:S.walkways,
+    portauger:S.portaugers,propanetank:S.propanetanks,generator:S.generators};
+  const arr=map2[S.selType]; if(!arr) return;
+  const obj=arr.find(x=>x.id===S.selId); if(!obj) return;
+  obj.removedPhase=+ph||0;
   renderProperties(); autoSave();
 };
 
@@ -885,7 +903,7 @@ function bendHTML(bd) {
   <div class="fr"><label>Lane Width (ft)</label><input type="number" id="bdlw" value="${bd.laneWidFt||16}" min="8" max="40" step="1"/></div>
   <div class="fr"><label>Structure Depth (ft)</label><input type="number" id="bdld" value="${bd.laneDepFt||12}" min="8" max="40" step="1"/></div>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:4px">Open-ended H-frame with side supports only — trucks can drive through from either end.</p>` : ''}
-  ${phaseRowHTML(bd.phase||0)}
+  ${phaseRowHTML(bd.phase||0,bd.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Clearance Ht</span><span class="val">${bd.htFt} ft</span></div>
     <div class="crow"><span class="lbl">Type</span><span class="val">${bd.bendType}</span></div>
@@ -1522,7 +1540,7 @@ function walkwayHTML(ww) {
   <div class="fr"><label>From Bin</label><select id="wwb1">${binOpts1}</select></div>
   <div class="fr"><label>To Bin</label><select id="wwb2">${binOpts2}</select></div>
   <div class="fr"><label>Width (ft)</label><input type="number" id="wwwid" value="${ww.widFt||3}" min="2" max="12" step="0.5"/></div>
-  ${phaseRowHTML(ww.phase||0)}
+  ${phaseRowHTML(ww.phase||0,ww.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">From Bin</span><span class="val">${b1?escH(b1.name):'—'}</span></div>
     <div class="crow"><span class="lbl">To Bin</span><span class="val">${b2?escH(b2.name):'—'}</span></div>
@@ -1745,7 +1763,7 @@ function loadoutHTML(lo) {
   <div class="fr"><label>Hopper Length (ft)</label><input type="number" id="lolen" value="${lo.hopperLenFt}" min="4" max="60"/></div>
   <div class="fr"><label>Hopper Height (ft)</label><input type="number" id="loht" value="${lo.hopperHtFt}" min="2" max="30"/></div>
   <div class="fr"><label>Roof Height (ft)</label><input type="number" id="lorf" value="${lo.roofFt||8}" min="2" max="30" step="0.5"/></div>
-  ${phaseRowHTML(lo.phase||0)}
+  ${phaseRowHTML(lo.phase||0,lo.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Support Height</span><span class="val">${lo.supportHt} ft</span></div>
     <div class="crow"><span class="lbl">Total Structure Ht</span><span class="val">${lo.supportHt+lo.hopperHtFt+(lo.roofFt||8)} ft</span></div>
@@ -1868,7 +1886,7 @@ function portAugerHTML(pa) {
   ${isHpAuto(pa)?`<p style="font-size:0.69em;color:#6b7280;margin-bottom:3px">Estimated from diameter × length × angle, rounded up to a standard motor. Uncheck Auto to enter your own.</p>`:''}
   <div class="fr"><label>Power Source</label><select id="pasrc">${powerSrcOpts(pa.powerSrc,true)}</select></div>
   ${pa.powerSrc==='pto'?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">🚜 PTO-driven — hooks to a tractor and is left out of the ⚡ electrical load estimate.</p>`:''}
-  ${phaseRowHTML(pa.phase||0)}
+  ${phaseRowHTML(pa.phase||0,pa.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Tube Length</span><span class="val">${pa.lengthFt} ft</span></div>
     <div class="crow"><span class="lbl">Angle</span><span class="val">${pa.angleDeg}°</span></div>
@@ -1933,7 +1951,7 @@ function propaneTankHTML(pt) {
   <div class="fr"><label>Length (ft)</label><input type="number" id="ptlen" value="${pt.lengthFt}" min="4" max="120" step="1"/></div>
   <div class="fr"><label>Diameter (ft)</label><input type="number" id="ptdiam" value="${pt.diamFt||4}" min="1" max="12" step="0.5"/></div>
   <div class="fr"><label>Heading (°)</label><input type="number" id="pthead" value="${pt.headingDeg||0}" min="0" max="359" step="5"/></div>
-  ${phaseRowHTML(pt.phase||0)}
+  ${phaseRowHTML(pt.phase||0,pt.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Length</span><span class="val">${pt.lengthFt} ft</span></div>
     <div class="crow"><span class="lbl">Diameter</span><span class="val">${pt.diamFt||4} ft</span></div>
@@ -2006,7 +2024,7 @@ function generatorHTML(g) {
   <div class="fr"><label>Width (ft)</label><input type="number" id="gnw" value="${g.widFt}" min="2" max="20" step="0.5"/></div>
   <div class="fr"><label>Height (ft)</label><input type="number" id="gnh" value="${g.htFt||6}" min="2" max="20" step="0.5"/></div>
   <div class="fr"><label>Heading (°)</label><input type="number" id="gnhd" value="${g.headingDeg||0}" min="0" max="359" step="5"/></div>
-  ${phaseRowHTML(g.phase||0)}
+  ${phaseRowHTML(g.phase||0,g.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Output</span><span class="val">${g.kw} kW · ${g.elecVolts}V ${+g.elecPhase===3?'3φ':'1φ'}</span></div>
     <div class="crow"><span class="lbl">Rated Current</span><span class="val">${capAmps.toFixed(0)} A</span></div>
@@ -2120,7 +2138,7 @@ function structureHTML(st) {
   <div class="fr"><label>Pad Height (ft)</label><input type="number" id="stfht" value="${st.foundHtFt||0}" min="0" max="10" step="0.5"/></div>
   <div class="fr"><label>Pad Extension (ft)</label><input type="number" id="stfext" value="${st.foundExtFt||0}" min="0" max="20" step="1"/></div>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Extension = extra ft of concrete pad beyond each edge of the structure.</p>
-  ${phaseRowHTML(st.phase||0)}
+  ${phaseRowHTML(st.phase||0,st.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Width</span><span class="val">${st.widFt} ft</span></div>
     <div class="crow"><span class="lbl">Length</span><span class="val">${st.lenFt} ft</span></div>
@@ -2370,7 +2388,7 @@ function binHTML(bin) {
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0°=N 90°=E 180°=S 270°=W</p>
   <div class="fr"><label>Power Source</label><select id="bpsrc">${powerSrcOpts(bin.powerSrc)}</select></div>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Fan and unload HP feed the ⚡ Power estimate. Set HP to 0 to leave a motor out.</p>
-  ${phaseRowHTML(bin.phase||0)}
+  ${phaseRowHTML(bin.phase||0,bin.removedPhase||0)}
   <div class="ph">Custom Color <span style="font-size:0.8em;text-transform:none;color:#9ca3af;font-weight:400">— or set phase above</span></div>
   <div class="colors" id="pclrs">${swatches}</div>
   <div class="ph">Capacity</div>
@@ -2533,7 +2551,7 @@ function legHTML(leg) {
   <div class="fr"><label>Capacity (BPH)</label><input type="number" id="plbph" value="${leg.capBph||0}" min="0" max="100000" step="500"/></div>
   <div class="fr"><label>Motor HP</label><input type="number" id="plhp" value="${leg.motorHp||0}" min="0" max="500" step="0.5"/></div>
   <div class="fr"><label>Power Source</label><select id="plsrc">${powerSrcOpts(leg.powerSrc)}</select></div>
-  ${phaseRowHTML(leg.phase||0)}
+  ${phaseRowHTML(leg.phase||0,leg.removedPhase||0)}
   <div class="ph">Downspout</div>
   <div class="fr"><label>Show Downspout</label><input type="checkbox" id="plss" ${leg.showSpout?'checked':''}></div>
   <div class="fr"><label>Discharge Height (ft)</label><input type="number" id="plsh" value="${leg.spoutHt||10}" min="0" max="200" step="0.5"/></div>
@@ -2813,7 +2831,7 @@ function convHTML(cv) {
   ${isHpAuto(cv)?`<p style="font-size:0.69em;color:#6b7280;margin-bottom:3px">Estimated from ${cv.type==='auger'?'diameter × length × incline':'capacity × length × lift'}, rounded up to a standard motor. Uncheck Auto to enter your own.</p>`:''}
   <div class="fr"><label>Power Source</label><select id="cvsrc">${powerSrcOpts(cv.powerSrc,cv.type==='auger')}</select></div>
   ${cv.powerSrc==='pto'?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">🚜 PTO-driven — left out of the ⚡ electrical load estimate.</p>`:''}
-  ${phaseRowHTML(cv.phase||0)}
+  ${phaseRowHTML(cv.phase||0,cv.removedPhase||0)}
   ${cv.type==='auger'||cv.type==='highflight'||cv.type==='doublerun'?`<div class="fr"><label>Boot Type</label><select id="cvbt">
     <option value="flat"${cv.bootType==='flat'?' selected':''}>Flat Bottom (at grade)</option>
     <option value="upper"${cv.bootType==='upper'?' selected':''}>Upper Bend (elevated boot)</option>
@@ -2973,7 +2991,7 @@ function pitHTML(pit) {
   <div class="fr"><label>Depth (ft)</label><input type="number" id="pitd" value="${pit.depthFt}" min="4" max="30"/></div>
   <div class="fr"><label>Heading (°)</label><input type="number" id="pith" value="${pit.headDeg}" min="0" max="359" step="5"/></div>
   <div class="fr"><label>Grain Type</label><select id="pitgt">${grainOpts}</select></div>
-  ${phaseRowHTML(pit.phase||0)}
+  ${phaseRowHTML(pit.phase||0,pit.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Footprint</span><span class="val">${(pit.widFt*pit.lenFt).toFixed(0)} sq ft</span></div>
     <div class="crow"><span class="lbl">Volume (below grade)</span><span class="val">${vol.toFixed(0)} cu ft · ${(vol/27).toFixed(1)} cu yd</span></div>
@@ -3073,7 +3091,7 @@ function dryerHTML(dr) {
        <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Extension = extra ft of concrete pad beyond each dryer wall.</p>`
     : `<div class="fr"><label>Pad Diameter (ft)</label><input type="number" id="drfext" value="${dr.foundExtFt||0}" min="0" max="100" step="1"/></div>
        <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0 = auto (dryer diam + 4 ft). Set to override foundation diameter.</p>`}
-  ${phaseRowHTML(dr.phase||0)}
+  ${phaseRowHTML(dr.phase||0,dr.removedPhase||0)}
   <div class="ph">Custom Color <span style="font-size:0.8em;text-transform:none;color:#9ca3af;font-weight:400">— or set phase above</span></div>
   <div class="colors" id="drclrs">${BIN_COLORS.map(c=>`<div class="cswatch${dr.color===c?' sel':''}" style="background:${c}" data-clr="${c}"></div>`).join('')}
     <input type="color" id="drcpick" value="${/^#[0-9a-fA-F]{6}$/.test(dr.color||'')?dr.color:'#d97706'}" title="Pick any color" style="width:26px;height:22px;padding:0;border:1px solid #4b5563;border-radius:4px;background:none;cursor:pointer"/>
@@ -3134,7 +3152,7 @@ function truckHTML(truck) {
   <div class="fr"><label>Heading (°)</label><input type="number" id="pthd" value="${truck.headDeg}" min="0" max="359" step="5"/></div>
   <div class="fr"><label>Length (ft)</label><input type="number" id="ptl" value="${truck.lenFt}" min="20" max="100" step="5"/></div>
   <div class="fr"><label>Width (ft)</label><input type="number" id="ptw" value="${truck.widFt}" min="6" max="12" step="0.5"/></div>
-  ${phaseRowHTML(truck.phase||0)}
+  ${phaseRowHTML(truck.phase||0,truck.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">Length</span><span class="val">${truck.lenFt} ft</span></div>
     <div class="crow"><span class="lbl">Width</span><span class="val">${truck.widFt} ft</span></div>
@@ -3257,11 +3275,14 @@ window.useAreaForRock = function(measId) {
 };
 
 // ── SAVE / LOAD ──────────────────────────────────────────────
-function serialise() {
+function serialise(includeProjects) {
   return JSON.stringify({
     bins:S.bins,legs:S.legs,conveyors:S.conveyors,pits:S.pits,dryers:S.dryers,trucks:S.trucks,
     loadouts:S.loadouts,structures:S.structures,bends:S.bends,walkways:S.walkways,portaugers:S.portaugers,propanetanks:S.propanetanks,generators:S.generators,power:S.power,opModes:S.opModes,opAssign:S.opAssign,
     savedAt:Date.now(),
+    // Saved-project library rides along (data file / export only — never inside a
+    // project payload itself, which would nest the library recursively)
+    ...(includeProjects?{projLib:projIndex().map(p=>({id:p.id,name:p.name,savedAt:p.savedAt,data:(()=>{try{return localStorage.getItem('gbd_proj_'+p.id);}catch(e){return null;}})()}))}:{}),
     measurements:S.measurements.map(m=>({...m,pts:m.pts.map(p=>({lat:p.lat,lng:p.lng}))})),
     grainType:S.grainType, uid:S.uid, projectId:S.projectId, projectName:S.projectName,
     typeHidden3d:S.typeHidden3d, shownPhases3d:S.shownPhases3d, phases:S.phases,
@@ -3288,6 +3309,7 @@ window.saveNewProject = function() {
   S.projectId=id; S.projectName=name;
   try{ localStorage.setItem('gbd_proj_'+id,serialise()); }catch(e){ alert('Storage full: '+e.message); return; }
   const idx=projIndex(); idx.push({id,name,savedAt:new Date().toISOString()}); saveProjIndex(idx);
+  scheduleDataFileWrite();
   updateProjDisplay(); openProjectsModal(); showToast('✓ Saved as "'+name+'"');
 };
 window.saveToProject = function(id, name) {
@@ -3295,6 +3317,7 @@ window.saveToProject = function(id, name) {
   const idx=projIndex(), i=idx.findIndex(p=>p.id===id);
   if(i>=0){ idx[i].savedAt=new Date().toISOString(); saveProjIndex(idx); }
   if(id===S.projectId) S.projectName=name;
+  scheduleDataFileWrite();
   updateProjDisplay(); openProjectsModal(); showToast('✓ Updated "'+name+'"');
 };
 window.loadProjectById = function(id) {
@@ -3314,6 +3337,7 @@ window.deleteProjectById = function(id) {
   localStorage.removeItem('gbd_proj_'+id);
   saveProjIndex(projIndex().filter(p=>p.id!==id));
   if(S.projectId===id){ S.projectId=null; S.projectName=''; updateProjDisplay(); }
+  scheduleDataFileWrite();
   openProjectsModal();
 };
 window.newProject = function() {
@@ -3363,6 +3387,24 @@ function hydrateData(data) {
   if(!S.power.activeMode) S.power.activeMode='all';
   S.opModes=data.opModes||[{id:'m1',name:'Receiving / Fill'},{id:'m2',name:'Drying'},{id:'m3',name:'Load-Out'}];
   S.opAssign=data.opAssign||{};
+  // Restore any saved projects carried in the data file (newer copies win)
+  if(Array.isArray(data.projLib)&&data.projLib.length){
+    const idx=projIndex(); let changed=false;
+    data.projLib.forEach(p=>{
+      if(!p||!p.id) return;
+      const ex=idx.find(q=>q.id===p.id);
+      if(!ex){
+        idx.push({id:p.id,name:p.name,savedAt:p.savedAt});
+        if(p.data){try{localStorage.setItem('gbd_proj_'+p.id,p.data);}catch(e){}}
+        changed=true;
+      } else if(p.data&&(!ex.savedAt||(p.savedAt&&p.savedAt>ex.savedAt))){
+        ex.name=p.name; ex.savedAt=p.savedAt;
+        try{localStorage.setItem('gbd_proj_'+p.id,p.data);}catch(e){}
+        changed=true;
+      }
+    });
+    if(changed) saveProjIndex(idx);
+  }
   S.grainType=data.grainType||'corn'; S.uid=data.uid||1;
   S.projectId=data.projectId||null; S.projectName=data.projectName||'';
   S.typeHidden3d=data.typeHidden3d||{}; S.shownPhases3d=data.shownPhases3d||[];
@@ -3383,7 +3425,7 @@ function hydrateData(data) {
   if(data.view) map.setView([data.view.lat,data.view.lng],data.view.zoom);
   select(null,null);
 }
-function exportJSON() { autoSave(); const b=new Blob([serialise()],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='grain-site-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(u); flash('✓ Exported'); }
+function exportJSON() { autoSave(); const b=new Blob([serialise(true)],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='grain-site-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(u); flash('✓ Exported'); }
 function importJSON(e) { const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{try{hydrateData(JSON.parse(ev.target.result));flash('✓ Imported');}catch(err){alert('Import error: '+err.message);}}; r.readAsText(f); e.target.value=''; }
 function clearAllLayers() {
   Object.keys(LY.walkways).forEach(removeWalkwayLyr);
@@ -4581,15 +4623,19 @@ function showAll3d() {
   autoSave(); populate3D(); refreshSummary3D();
 }
 
+// Does this object exist on the site during phase p?
+// Built in phase b (0 = existing/pre-project) and standing until removedPhase (0 = never removed).
+function objStandsIn(o,p){ const b=o.phase||0, rem=o.removedPhase||0; return b<=p && (!rem || rem>p); }
 function togglePhaseFilter3d(phase) {
   const idx = S.shownPhases3d.indexOf(phase);
   if (idx >= 0) S.shownPhases3d.splice(idx, 1);
   else S.shownPhases3d.push(phase);
-  // Apply visibility: objects not in any selected phase get hidden
+  // Apply visibility: show the site AS IT STANDS in the selected phase(s) —
+  // everything built by then that hasn't been torn down yet
   if (S.shownPhases3d.length === 0) {
     allSiteObjs().forEach(o => { o.hidden = false; });
   } else {
-    allSiteObjs().forEach(o => { o.hidden = !S.shownPhases3d.includes(o.phase||0); });
+    allSiteObjs().forEach(o => { o.hidden = !S.shownPhases3d.some(p=>objStandsIn(o,p)); });
   }
   autoSave(); populate3D(); refreshSummary3D();
 }
@@ -4674,6 +4720,7 @@ function buildSummary3DHTML() {
         style="background:#1f2937;border:1px solid #374151;color:${phClr};border-radius:3px;font-size:0.7em;padding:0 1px;cursor:pointer;flex-shrink:0;max-width:68px">
         ${phaseOpts(obj.phase||0)}
       </select>
+      ${obj.removedPhase?`<span style="color:#ef4444;font-size:0.68em;flex-shrink:0" title="Torn down in ${escH(phaseName(obj.removedPhase))}">✕P${obj.removedPhase}</span>`:''}
       ${eyeBtn(type, obj.id, obj.hidden)}
     </div>`;
   };
@@ -4723,7 +4770,7 @@ function buildSummary3DHTML() {
       html += `<button onclick="togglePhaseFilter3d(${p})" style="padding:1px 7px;border-radius:4px;border:1px solid ${clr};background:${active?`${clr}33`:'rgba(0,0,0,0.3)'};color:${clr};cursor:pointer;font-size:0.76em;font-weight:${active?700:400}">● ${nm}</button>`;
     });
     html += `</div>`;
-    if (SP.length > 0) html += `<p style="font-size:0.69em;color:#6b7280;margin-bottom:5px">${SP.length} phase${SP.length>1?'s':''} selected — objects outside selected phases are hidden.</p>`;
+    if (SP.length > 0) html += `<p style="font-size:0.69em;color:#6b7280;margin-bottom:5px">Showing the site <b>as it stands</b> in the selected phase${SP.length>1?'s':''} — existing + already-built equipment shows, torn-down equipment is gone. Set "Removed in Phase" on equipment that comes out.</p>`;
   }
 
   const sections = [
@@ -5423,7 +5470,7 @@ function updateDataFileBtn(state){
 }
 async function writeDataFile(){
   if(!_dataFileHandle) return;
-  try{ const w=await _dataFileHandle.createWritable(); await w.write(serialise()); await w.close(); }
+  try{ const w=await _dataFileHandle.createWritable(); await w.write(serialise(true)); await w.close(); }
   catch(e){
     console.warn('Data file write failed:',e);
     updateDataFileBtn('reconnect');
