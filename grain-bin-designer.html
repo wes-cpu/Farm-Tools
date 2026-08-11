@@ -631,7 +631,7 @@ window.setSelRemovedPhase = function(ph) {
 // ── BINS ─────────────────────────────────────────────────────
 function addBin(lat,lng) {
   const b={id:'bin_'+uid(),lat,lng,name:'Bin '+(S.bins.length+1),diam:48,ringCount:8,ringIn:42,roofFt:10,stiffened:false,
-    foundFt:0,foundDiamFt:0,fanAng:180,showFan:true,fans:[],unloadAng:0,showUnload:true,
+    foundFt:0,foundDiamFt:0,fanAng:180,showFan:true,fans:[],unloadAng:0,showUnload:true,unloadExtFt:4,
     showSideDraw:false,sideDrawHt:10,sideDrawBearing:90,
     showSideDraw2:false,sideDrawHt2:10,sideDrawBearing2:270,
     showStairs:false,stairsLandDeg:0,stairsWrapDeg:450,
@@ -682,7 +682,14 @@ function renderBin(bin) {
   if(bin.showFan) { fanMk=L.marker(bearingOffset(ll,rM+2,bin.fanAng),{icon:dotIcon('F','#3b82f6'),interactive:false}).addTo(map); }
   // Extra fans from fans[] array — tracked in xfanMks so removeBinLyr can clean them up
   (bin.fans||[]).forEach((f,i)=>{ xfanMks.push(L.marker(bearingOffset(ll,rM+2,f.bearing),{icon:dotIcon(`F${i+2}`,'#60a5fa'),interactive:false}).addTo(map)); });
-  if(bin.showUnload) { unloadMk=L.marker(bearingOffset(ll,rM+2,bin.unloadAng),{icon:dotIcon('U','#f97316'),interactive:false}).addTo(map); }
+  let unldLn=null;
+  if(bin.showUnload) {
+    const extFt=Math.max(0,bin.unloadExtFt!=null?+bin.unloadExtFt:4);
+    const tipLL=bearingOffset(ll,rM+Math.max(1,extFt)*FT2M,bin.unloadAng);
+    // Unloader tube sticking out from under the sidewall to the tip
+    unldLn=L.polyline([bearingOffset(ll,rM*0.15,bin.unloadAng),tipLL],{color:'#f97316',weight:3,opacity:0.9,interactive:false}).addTo(map);
+    unloadMk=L.marker(tipLL,{icon:dotIcon('U','#f97316'),interactive:false}).addTo(map);
+  }
   if(bin.showSideDraw){
     const sdLL=bearingOffset(ll,rM+3,bin.sideDrawBearing||90);
     sdMk=L.marker(sdLL,{icon:L.divIcon({html:`<div style="background:#8b5cf6;color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;border:1px solid #fff;white-space:nowrap">↓ ${bin.sideDrawHt||10}′</div>`,className:'',iconAnchor:[20,6]}),interactive:false}).addTo(map);
@@ -706,19 +713,21 @@ function renderBin(bin) {
   const foundLabel=bin.foundFt?` f:${bin.foundFt}′`:'';
   const coneLabel=(bin.bottomType||'flat')==='cone'?' ▽':'';
   const lblMk=L.marker(ll,{icon:L.divIcon({html:`<div class="bin-lbl" style="color:${bin.color}">${bin.name}${coneLabel}<br><small>${bin.diam}′ · ${(cap/1000).toFixed(1)}k bu${foundLabel}</small></div>`,className:'',iconSize:[140,34],iconAnchor:[70,42]}),interactive:false}).addTo(map);
-  LY.bins[bin.id]={circle,fanMk,xfanMks,unloadMk,sdMk,sdMk2,stairArc,stairLandMk,stairEntryMk,lblMk};
+  LY.bins[bin.id]={circle,fanMk,xfanMks,unloadMk,unldLn,sdMk,sdMk2,stairArc,stairLandMk,stairEntryMk,lblMk};
   if(bin.hidden) applyLayerHidden(LY.bins[bin.id]);
 }
 function updateBinOverlays(bin,ll,rM) {
   const l=LY.bins[bin.id]; if(!l) return;
   if(l.fanMk&&bin.showFan)    l.fanMk.setLatLng(bearingOffset(ll,rM+2,bin.fanAng));
   (l.xfanMks||[]).forEach((mk,i)=>{ if(bin.fans&&bin.fans[i]) mk.setLatLng(bearingOffset(ll,rM+2,bin.fans[i].bearing)); });
-  if(l.unloadMk&&bin.showUnload) l.unloadMk.setLatLng(bearingOffset(ll,rM+2,bin.unloadAng));
+  const uExt=Math.max(0,bin.unloadExtFt!=null?+bin.unloadExtFt:4);
+  if(l.unloadMk&&bin.showUnload) l.unloadMk.setLatLng(bearingOffset(ll,rM+Math.max(1,uExt)*FT2M,bin.unloadAng));
+  if(l.unldLn&&bin.showUnload) l.unldLn.setLatLngs([bearingOffset(ll,rM*0.15,bin.unloadAng),bearingOffset(ll,rM+Math.max(1,uExt)*FT2M,bin.unloadAng)]);
   if(l.lblMk) l.lblMk.setLatLng(ll);
 }
 function removeBinLyr(id) {
   const l=LY.bins[id]; if(!l) return;
-  [l.circle,l.fanMk,l.unloadMk,l.sdMk,l.sdMk2,l.stairArc,l.stairLandMk,l.stairEntryMk,l.lblMk,...(l.xfanMks||[])].forEach(x=>x&&x.remove()); delete LY.bins[id];
+  [l.circle,l.fanMk,l.unloadMk,l.unldLn,l.sdMk,l.sdMk2,l.stairArc,l.stairLandMk,l.stairEntryMk,l.lblMk,...(l.xfanMks||[])].forEach(x=>x&&x.remove()); delete LY.bins[id];
 }
 function deleteBin(id) { removeBinLyr(id); S.bins=S.bins.filter(b=>b.id!==id); if(S.selId===id)select(null,null); autoSave(); }
 function dotIcon(label,color) {
@@ -1080,10 +1089,16 @@ function getUnloadPoint(id, type) {
   if (type === 'bin') {
     const b = S.bins.find(x=>x.id===id); if(!b) return null;
     if ((b.bottomType||'flat') === 'cone') {
-      // Cone-bottom: discharge is the central pipe at the bottom of the cone, at grade
+      // Cone-bottom: gate at center; an unloader extension carries it out past the wall
+      const cext=Math.max(0,b.unloadExtFt!=null?+b.unloadExtFt:0);
+      if(cext>0){
+        const cll=bearingOffset(L.latLng(b.lat,b.lng),(b.diam/2+cext)*FT2M,b.unloadAng||0);
+        return { lat:cll.lat, lng:cll.lng, htFt:b.foundFt||0 };
+      }
       return { lat:b.lat, lng:b.lng, htFt: b.foundFt||0 };
     }
-    const ll = bearingOffset(L.latLng(b.lat,b.lng), (b.diam/2)*FT2M, b.unloadAng||0);
+    const uext=Math.max(0,b.unloadExtFt!=null?+b.unloadExtFt:4);
+    const ll = bearingOffset(L.latLng(b.lat,b.lng), (b.diam/2+uext)*FT2M, b.unloadAng||0);
     return { lat:ll.lat, lng:ll.lng, htFt:0 };
   }
   if (type === 'leg') {
@@ -2383,6 +2398,7 @@ function binHTML(bin) {
   <button class="pbtn" onclick="addBinFan('${bin.id}')" style="margin-bottom:4px">+ Add Fan</button>
   <div class="ph">Unload</div>
   <div class="fr"><label>Unload Bearing (°)</label><input type="number" id="pua" value="${bin.unloadAng}" min="0" max="359" step="5"/></div>
+  <div class="fr"><label>Unloader Sticks Out (ft past wall)</label><input type="number" id="puext" value="${bin.unloadExtFt!=null?bin.unloadExtFt:4}" min="0" max="40" step="0.5"/></div>
   <div class="fr"><label>Show Unload (orange)</label><input type="checkbox" id="psu" ${bin.showUnload?'checked':''}></div>
   <div class="fr"><label>Unload Motor HP</label><input type="number" id="puhp" value="${bin.unloadHp||0}" min="0" max="200" step="0.5"/></div>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0°=N 90°=E 180°=S 270°=W</p>
@@ -2416,6 +2432,7 @@ function bindBin(bin) {
     bin.fanAng=+document.getElementById('pfa')?.value||0;
     bin.showFan=document.getElementById('psf')?.checked??true;
     bin.unloadAng=+document.getElementById('pua')?.value||0;
+    bin.unloadExtFt=Math.max(0,+document.getElementById('puext')?.value||0);
     bin.showUnload=document.getElementById('psu')?.checked??true;
     bin.showSideDraw=document.getElementById('pssd')?.checked??false;
     bin.sideDrawHt=+document.getElementById('psdh')?.value??bin.sideDrawHt;
@@ -2437,7 +2454,7 @@ function bindBin(bin) {
     document.querySelectorAll('.xfanhp').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].hp=+el.value||0; });
     renderBin(bin); renderProperties(); autoSave();
   }
-  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puext','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
   // Total Height edits derive the roof height (total − eave). Ring/foundation edits
   // deliberately do NOT re-derive — adding a ring raises the peak, keeping the roof.
   document.getElementById('ptot')?.addEventListener('change',e=>{
@@ -3700,7 +3717,23 @@ function populate3D(){
       // Fan & unload markers at grade (cone bottom — fans at perimeter, unload at center)
       if(bin.showFan){const bR=bin.fanAng*Math.PI/180,fm=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,8),new THREE.MeshLambertMaterial({color:0x3b82f6}));fm.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(fm);}
       (bin.fans||[]).forEach(f=>{const bR=f.bearing*Math.PI/180,fm=new THREE.Mesh(new THREE.SphereGeometry(1.5,8,8),new THREE.MeshLambertMaterial({color:0x60a5fa}));fm.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(fm);});
-      if(bin.showUnload){const um=new THREE.Mesh(new THREE.SphereGeometry(1.5,8,8),new THREE.MeshLambertMaterial({color:0xf97316}));um.position.set(x,foundH+1.5,z);add3(um);}
+      if(bin.showUnload){
+        const uext=Math.max(0,bin.unloadExtFt!=null?+bin.unloadExtFt:0);
+        const uMat=new THREE.MeshLambertMaterial({color:0xf97316});
+        if(uext>0){
+          const bR=bin.unloadAng*Math.PI/180, tipR=r+uext;
+          const gY=Math.max(0.6,foundH+legH-0.9);
+          const uTube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(
+            new THREE.Vector3(x,gY,z),
+            new THREE.Vector3(x+tipR*Math.sin(bR),0.8,z-tipR*Math.cos(bR))
+          ),1,0.5,10,false),uMat);
+          uTube.castShadow=true;add3(uTube);
+          const uHead=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.5,1.5),uMat);
+          uHead.position.set(x+tipR*Math.sin(bR),1.2,z-tipR*Math.cos(bR));uHead.castShadow=true;add3(uHead);
+        } else {
+          const um=new THREE.Mesh(new THREE.SphereGeometry(1.5,8,8),uMat);um.position.set(x,foundH+1.5,z);add3(um);
+        }
+      }
       // Staircase on cone-bottom (climbs from binFloorY up the sidewall)
       if(bin.showStairs){
         const landRad=(bin.stairsLandDeg||0)*Math.PI/180;
@@ -3743,7 +3776,21 @@ function populate3D(){
       addBinShellDetail3(bin,x,z,r,foundH,totalSideHt,col);
       const ring=new THREE.Mesh(new THREE.TorusGeometry(r,0.4,8,48),new THREE.MeshLambertMaterial({color:0x1f2937}));ring.rotation.x=Math.PI/2;ring.position.set(x,foundH+0.2,z);add3(ring);
       if(bin.showFan){const bR=bin.fanAng*Math.PI/180,fm=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,8),new THREE.MeshLambertMaterial({color:0x3b82f6}));fm.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(fm);}
-      if(bin.showUnload){const bR=bin.unloadAng*Math.PI/180,um=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,8),new THREE.MeshLambertMaterial({color:0xf97316}));um.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(um);}
+      if(bin.showUnload){
+        const bR=bin.unloadAng*Math.PI/180;
+        const uext=Math.max(0,bin.unloadExtFt!=null?+bin.unloadExtFt:4);
+        const tipR=r+Math.max(1,uext);
+        const uMat=new THREE.MeshLambertMaterial({color:0xf97316});
+        // Unloader tube from under the bin floor out past the sidewall
+        const uTube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(
+          new THREE.Vector3(x,foundH+0.55,z),
+          new THREE.Vector3(x+tipR*Math.sin(bR),foundH+0.55,z-tipR*Math.cos(bR))
+        ),1,0.55,10,false),uMat);
+        uTube.castShadow=true;add3(uTube);
+        // Discharge spout head at the tip
+        const uHead=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.6,1.6),uMat);
+        uHead.position.set(x+tipR*Math.sin(bR),foundH+1.1,z-tipR*Math.cos(bR));uHead.castShadow=true;add3(uHead);
+      }
       // STAIRCASE helix
       if(bin.showStairs){
         const landRad=(bin.stairsLandDeg||0)*Math.PI/180;
