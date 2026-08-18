@@ -1142,7 +1142,13 @@ function getUnloadPoint(id, type) {
   }
   if (type === 'pit') {
     const p = S.pits.find(x=>x.id===id); if(!p) return null;
-    return { lat:p.lat, lng:p.lng, htFt:0 };
+    // Both pit types hand grain off at the TAIL end (opposite the truck heading):
+    // drive-over = collecting-conveyor discharge head; burial = sump outlet tube
+    const tailBear=(((p.headDeg||0)+180)%360+360)%360;
+    const isDO=(p.pitType||'burial')==='driveover';
+    const outFt=isDO?(p.lenFt/2+2.5):Math.max(2,(p.lenFt||14)*0.6);
+    const ll=bearingOffset(L.latLng(p.lat,p.lng),outFt*FT2M,tailBear);
+    return { lat:ll.lat, lng:ll.lng, htFt:isDO?0.5:0 };
   }
   if (type === 'dryer') {
     const d = S.dryers.find(x=>x.id===id); if(!d) return null;
@@ -1645,7 +1651,9 @@ function bindWalkway(ww) {
 
 // ── DUMP PIT ──────────────────────────────────────────────────
 function addPit(lat,lng) {
-  const p={id:'pit_'+uid(),lat,lng,name:'Pit '+(S.pits.length+1),widFt:10,lenFt:14,depthFt:10,headDeg:0,color:'#78350f',phase:0,cost:0,infraItems:[]};
+  const p={id:'pit_'+uid(),lat,lng,name:'Pit '+(S.pits.length+1),pitType:'burial',widFt:10,lenFt:14,depthFt:10,headDeg:0,color:'#78350f',phase:0,
+    // Drive-over specifics (Sudenga SDDO-style): two grates over a shallow center trench, collecting conveyor to the leg
+    trenchDepthIn:38,grateLenFt:12,grateWidFt:8,grateGapFt:14,capBph:10000,rampLenFt:30,cost:0,infraItems:[]};
   S.pits.push(p); renderPit(p); select('pit',p.id); autoSave();
 }
 function renderPit(pit) {
@@ -1661,7 +1669,7 @@ function renderPit(pit) {
   const corners=[corner(-wM,-lM),corner(wM,-lM),corner(wM,lM),corner(-wM,lM)];
   const pitClr=pit.color||'#78350f';
   const poly=L.polygon(corners,{color:pitClr,fillColor:pitClr,fillOpacity:0.7,weight:2,dashArray:'4,3'}).addTo(map);
-  const lbl=L.marker(ll,{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${pitClr};color:#fbbf24">⬇ ${pit.name}<br><small>${pit.widFt}×${pit.lenFt}×${pit.depthFt}′</small></div>`,className:'',iconAnchor:[40,6]}),interactive:false}).addTo(map);
+  const lbl=L.marker(ll,{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${pitClr};color:#fbbf24">⬇ ${pit.name}<br><small>${(pit.pitType||'burial')==='driveover'?'Drive-Over · '+(pit.capBph||10000).toLocaleString()+' BPH':pit.widFt+'×'+pit.lenFt+'×'+pit.depthFt+'′ burial'}</small></div>`,className:'',iconAnchor:[40,6]}),interactive:false}).addTo(map);
   poly.on('click',e=>{
     L.DomEvent.stopPropagation(e);
     if(S.tool==='delete'){ deletePit(pit.id); return; }
@@ -3071,30 +3079,76 @@ function bindConv(cv) {
 // PIT
 const PIT_BU_PER_CUFT = 0.803; // ~1 struck bushel = 1.2445 cu ft
 function pitHTML(pit) {
-  const vol=pit.widFt*pit.lenFt*pit.depthFt;
+  const ptype=pit.pitType||'burial';
   const gt=S.grainType||'corn';
-  const pitBu=Math.round(vol*PIT_BU_PER_CUFT);
   const grainOpts=['corn','soybeans','wheat','milo','oats'].map(g=>`<option value="${g}"${gt===g?' selected':''}>${g.charAt(0).toUpperCase()+g.slice(1)}</option>`).join('');
+  const isDO=ptype==='driveover';
+  const doLen=isDO?(2*(pit.grateLenFt||12)+(pit.grateGapFt||14)):0;
+  const doWid=isDO?(pit.grateWidFt||8):0;
+  const vol=isDO?0:pit.widFt*pit.lenFt*pit.depthFt;
+  const pitBu=Math.round(vol*PIT_BU_PER_CUFT);
   return `<div class="ph">Dump Pit — ${pit.name}</div>
   <div class="fr"><label>Name</label><input type="text" id="pitn" value="${escH(pit.name)}"/></div>
+  <div class="fr"><label>Pit Type</label><select id="pittype">
+    <option value="burial"${!isDO?' selected':''}>Direct-Burial Pit — deep concrete hopper below grade</option>
+    <option value="driveover"${isDO?' selected':''}>Drive-Over Pit — shallow trench, conveyor to leg (Sudenga SDDO style)</option>
+  </select></div>
+  ${!isDO?`
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Poured-concrete pit with sloped hopper sides funneling to a sump; grain drops by gravity into a conveyor or leg boot at the bottom. Typically 8–14′ deep. Requires major excavation, dewatering and a receiving conveyor tunnel.</p>
   <div class="fr"><label>Width (ft)</label><input type="number" id="pitw" value="${pit.widFt}" min="4" max="30"/></div>
   <div class="fr"><label>Length (ft)</label><input type="number" id="pitl" value="${pit.lenFt}" min="4" max="60"/></div>
-  <div class="fr"><label>Depth (ft)</label><input type="number" id="pitd" value="${pit.depthFt}" min="4" max="30"/></div>
+  <div class="fr"><label>Depth (ft)</label><input type="number" id="pitd" value="${pit.depthFt}" min="4" max="30"/></div>`
+  :`
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Sits at grade or in a shallow trench (38″/45″). A truck drives over two grates — one under each trailer hopper — and both dump into a low-profile chain conveyor in the trench that carries grain to the receiving leg. Up to ~17,500 BPH; empties a 40–53′ trailer in ~3.5 min. Little excavation, no deep pit.</p>
+  <div class="fr"><label>Trench Depth</label><select id="pittrench">
+    <option value="0"${+pit.trenchDepthIn===0?' selected':''}>On grade (mounded ramps)</option>
+    <option value="38"${(pit.trenchDepthIn==null||+pit.trenchDepthIn===38)?' selected':''}>38″ shallow trench</option>
+    <option value="45"${+pit.trenchDepthIn===45?' selected':''}>45″ shallow trench</option>
+  </select></div>
+  <div class="fr"><label>Grate Length (ft, each)</label><input type="number" id="pitgl" value="${pit.grateLenFt||12}" min="6" max="24" step="1"/></div>
+  <div class="fr"><label>Grate Width (ft)</label><input type="number" id="pitgw" value="${pit.grateWidFt||8}" min="4" max="14" step="0.5"/></div>
+  <div class="fr"><label>Gap Between Grates (ft)</label><input type="number" id="pitgg" value="${pit.grateGapFt!=null?pit.grateGapFt:14}" min="0" max="30" step="1"/></div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Gap ≈ spacing between the trailer's two hoppers (~12–16′ on a 40–53′ hopper-bottom).</p>
+  <div class="fr"><label>Ramp Length (ft, each end)</label><input type="number" id="pitramp" value="${pit.rampLenFt!=null?pit.rampLenFt:30}" min="0" max="80" step="5"/></div>
+  <div class="fr"><label>Conveyor Capacity (BPH)</label><input type="number" id="pitbph" value="${pit.capBph||10000}" min="1000" max="17500" step="500"/></div>`}
   <div class="fr"><label>Heading (°)</label><input type="number" id="pith" value="${pit.headDeg}" min="0" max="359" step="5"/></div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Heading = direction the truck drives${isDO?' over the pit (grates line up along it)':''}.</p>
   <div class="fr"><label>Grain Type</label><select id="pitgt">${grainOpts}</select></div>
   ${phaseRowHTML(pit.phase||0,pit.removedPhase||0)}
   <div class="cbox">
+    ${isDO?`
+    <div class="crow"><span class="lbl">Type</span><span class="val">Drive-Over (dual grate)</span></div>
+    <div class="crow"><span class="lbl">Overall Footprint</span><span class="val">${doWid}′ × ${doLen}′ (+ ${(pit.rampLenFt!=null?pit.rampLenFt:30)}′ ramps each end)</span></div>
+    <div class="crow"><span class="lbl">Trench Depth</span><span class="val">${+pit.trenchDepthIn?pit.trenchDepthIn+'″':'on grade'}</span></div>
+    <div class="crow"><span class="lbl">Receiving Rate</span><span class="val">${(pit.capBph||10000).toLocaleString()} BPH</span></div>
+    <div class="crow"><span class="lbl">~Trailer Unload</span><span class="val">${(1000/(pit.capBph||10000)*60).toFixed(1)} min per 1,000 bu</span></div>`
+    :`
+    <div class="crow"><span class="lbl">Type</span><span class="val">Direct-Burial</span></div>
     <div class="crow"><span class="lbl">Footprint</span><span class="val">${(pit.widFt*pit.lenFt).toFixed(0)} sq ft</span></div>
     <div class="crow"><span class="lbl">Volume (below grade)</span><span class="val">${vol.toFixed(0)} cu ft · ${(vol/27).toFixed(1)} cu yd</span></div>
     <div class="crow"><span class="lbl">Est. Capacity (${gt})</span><span class="val">${pitBu.toLocaleString()} bu</span></div>
-    <div class="crow"><span class="lbl">Rate</span><span class="val" style="color:#6b7280">~0.80 bu/cu ft (level measure)</span></div>
+    <div class="crow"><span class="lbl">Rate</span><span class="val" style="color:#6b7280">~0.80 bu/cu ft (level measure)</span></div>`}
     ${pit.phase?`<div class="crow"><span class="lbl">Build Phase</span><span class="val" style="color:${phaseColor(pit.phase)}">${phaseName(pit.phase)}</span></div>`:''}
   </div>
   <button class="pbtn warn" onclick="deletePit('${pit.id}')">Delete Dump Pit</button>`;
 }
 function bindPit(pit) {
-  function upd(){ pit.name=document.getElementById('pitn')?.value||pit.name; pit.widFt=+document.getElementById('pitw')?.value||pit.widFt; pit.lenFt=+document.getElementById('pitl')?.value||pit.lenFt; pit.depthFt=+document.getElementById('pitd')?.value||pit.depthFt; pit.headDeg=+document.getElementById('pith')?.value||0; renderPit(pit); renderProperties(); autoSave(); }
-  ['pitn','pitw','pitl','pitd','pith'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  function upd(){
+    pit.name=document.getElementById('pitn')?.value||pit.name;
+    pit.pitType=document.getElementById('pittype')?.value||pit.pitType||'burial';
+    pit.widFt=+document.getElementById('pitw')?.value||pit.widFt; pit.lenFt=+document.getElementById('pitl')?.value||pit.lenFt; pit.depthFt=+document.getElementById('pitd')?.value||pit.depthFt;
+    pit.headDeg=+document.getElementById('pith')?.value||0;
+    const tr=document.getElementById('pittrench'); if(tr) pit.trenchDepthIn=+tr.value;
+    pit.grateLenFt=+document.getElementById('pitgl')?.value||pit.grateLenFt||12;
+    pit.grateWidFt=+document.getElementById('pitgw')?.value||pit.grateWidFt||8;
+    const gg=document.getElementById('pitgg'); if(gg) pit.grateGapFt=Math.max(0,+gg.value||0);
+    const rp=document.getElementById('pitramp'); if(rp) pit.rampLenFt=Math.max(0,+rp.value||0);
+    pit.capBph=+document.getElementById('pitbph')?.value||pit.capBph||10000;
+    // Keep the shared footprint fields in sync for drive-over so snapping/labels see the real size
+    if(pit.pitType==='driveover'){ pit.lenFt=2*(pit.grateLenFt||12)+(pit.grateGapFt||0); pit.widFt=pit.grateWidFt||8; }
+    renderPit(pit); renderProperties(); autoSave();
+  }
+  ['pitn','pittype','pitw','pitl','pitd','pith','pittrench','pitgl','pitgw','pitgg','pitramp','pitbph'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
   document.getElementById('pitgt')?.addEventListener('change',e=>{S.grainType=e.target.value;renderProperties();});
 }
 
@@ -4115,70 +4169,118 @@ function populate3D(){
     }
   });
 
-  // DUMP PITS — hopper-bottom below grade with concrete walls
+  // DUMP PITS — direct-burial (deep concrete hopper) or drive-over (Sudenga SDDO-style)
   S.pits.forEach(pit=>{
     if(S.typeHidden3d['pits']||pit.hidden) return;
     const{x,z}=toXZ(pit.lat,pit.lng);
     const hRad=-(pit.headDeg*Math.PI/180);
-    const w=pit.widFt, l=pit.lenFt, d=pit.depthFt;
-    const concMat=new THREE.MeshLambertMaterial({color:0x9ca3af}); // concrete walls
-    const hprMat=new THREE.MeshLambertMaterial({color:0x3b1a06,side:THREE.DoubleSide}); // hopper interior
-    const sumpMat=new THREE.MeshLambertMaterial({color:0x1f2937}); // sump/discharge
+    const concMat=new THREE.MeshLambertMaterial({color:0x9ca3af});
+    const grateMat=new THREE.MeshLambertMaterial({color:0x374151});
+    const steelMat=new THREE.MeshLambertMaterial({color:0x6b7280});
+    const isDO=(pit.pitType||'burial')==='driveover';
+    // helper: box positioned in pit-local coords (X across, Z along heading), then rotated
+    const put=(mesh,lx,ly,lz)=>{ mesh.position.set(x,ly,z); mesh.rotation.y=hRad; mesh.translateX(lx); mesh.translateZ(lz); add3(mesh); return mesh; };
 
-    // ── Above-grade concrete frame (4 walls, wall thickness ~1 ft, top at grade) ──
-    const wallT=1.0, wallH=1.5; // stick up 1.5 ft above grade
-    // Long walls (along length axis)
+    if(isDO){
+      // ── DRIVE-OVER: two grates over a shallow trench, ramps each end, conveyor to leg ──
+      const gl=pit.grateLenFt||12, gw=pit.grateWidFt||8, gap=(pit.grateGapFt!=null?pit.grateGapFt:14);
+      const trenchIn=(pit.trenchDepthIn!=null?+pit.trenchDepthIn:38);
+      const onGrade=trenchIn===0;
+      const totLen=2*gl+gap;
+      const deckH=onGrade?3.2:0.6;              // on-grade units are mounded ~3 ft; trenched sit near grade
+      const deckW=gw+4;                          // drive surface a bit wider than the grates
+      // Drive deck (concrete/steel platform the truck rolls across)
+      const deck=new THREE.Mesh(new THREE.BoxGeometry(deckW,deckH,totLen),concMat);
+      put(deck,0,deckH/2,0).receiveShadow=true; deck.userData={siteId:pit.id,siteType:'pit'};
+      // Two grates (dark, with slotted look) — one per trailer hopper, centered in each half
+      [-1,1].forEach(side=>{
+        const zc=side*(gap/2+gl/2);
+        const grate=new THREE.Mesh(new THREE.BoxGeometry(gw,0.25,gl),grateMat);
+        put(grate,0,deckH+0.13,zc);
+        // slot bars across the grate
+        const nBars=Math.max(4,Math.round(gl/1.5));
+        for(let i=0;i<nBars;i++){
+          const bar=new THREE.Mesh(new THREE.BoxGeometry(gw,0.12,0.15),steelMat);
+          put(bar,0,deckH+0.32,zc-gl/2+(i+0.5)*(gl/nBars));
+        }
+        // hopper throat below each grate (dark box showing the drop into the trench)
+        const throat=new THREE.Mesh(new THREE.BoxGeometry(gw*0.85,Math.max(0.8,deckH-0.4),gl*0.85),new THREE.MeshLambertMaterial({color:0x1f2937}));
+        put(throat,0,Math.max(0.5,deckH/2),zc);
+      });
+      // Low-profile collecting conveyor running the trench length, discharging out the tail end
+      const cvW=1.6, cvH=1.1;
+      const cvY=onGrade?0.7:0.35;
+      const conv=new THREE.Mesh(new THREE.BoxGeometry(cvW,cvH,totLen+2),new THREE.MeshLambertMaterial({color:0x06b6d4}));
+      put(conv,0,cvY,0);
+      // Discharge head at the tail (−Z) end sticking out past the deck
+      const head=new THREE.Mesh(new THREE.BoxGeometry(cvW*1.3,cvH*1.4,1.6),new THREE.MeshLambertMaterial({color:0x0891b2}));
+      put(head,0,cvY+0.2,-(totLen/2+1.8));
+      // Approach ramps at each end (mounded earth/concrete, sloping to grade)
+      const rampL=(pit.rampLenFt!=null?pit.rampLenFt:30);
+      if(rampL>0&&deckH>0.7){
+        [-1,1].forEach(side=>{
+          const ramp=new THREE.Mesh(new THREE.BoxGeometry(deckW,deckH*0.98,rampL),new THREE.MeshLambertMaterial({color:0x8b8f95}));
+          const rAng=Math.atan2(deckH,rampL);
+          ramp.position.set(x,deckH/2,z); ramp.rotation.y=hRad;
+          ramp.translateZ(side*(totLen/2+rampL/2));
+          // tilt so the far end meets grade
+          ramp.rotateX(side>0?rAng:-rAng);
+          ramp.translateY(-deckH*0.5);
+          ramp.receiveShadow=true; add3(ramp);
+        });
+      }
+      // Guard curbs along both edges of the deck
+      [-1,1].forEach(sx=>{
+        const curb=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.6,totLen),concMat);
+        put(curb,sx*(deckW/2-0.25),deckH+0.3,0);
+      });
+      if(S.showLabels){const spr=makeLabel3(`⬇ ${pit.name}\nDrive-Over · ${(pit.capBph||10000).toLocaleString()} BPH`,'#fbbf24');spr.position.set(x,deckH+7,z);add3(spr);}
+      return;
+    }
+
+    // ── DIRECT-BURIAL: concrete curb at grade, grate over the opening, hopper below to a sump ──
+    const w=pit.widFt, l=pit.lenFt, d=pit.depthFt;
+    const hprMat=new THREE.MeshLambertMaterial({color:0x3b1a06,side:THREE.DoubleSide});
+    const sumpMat=new THREE.MeshLambertMaterial({color:0x1f2937});
+    const wallT=1.0, wallH=0.5; // low curb just above grade (trucks drive right up to it)
     [-(w/2-wallT/2),(w/2-wallT/2)].forEach(xo=>{
       const wl=new THREE.Mesh(new THREE.BoxGeometry(wallT,wallH,l),concMat);
-      wl.position.set(x,wallH/2,z); wl.rotation.y=hRad;
-      wl.translateX(xo); wl.receiveShadow=true; wl.userData={siteId:pit.id,siteType:'pit'}; add3(wl);
+      put(wl,xo,wallH/2,0).receiveShadow=true; wl.userData={siteId:pit.id,siteType:'pit'};
     });
-    // Short walls (end caps)
     [-(l/2-wallT/2),(l/2-wallT/2)].forEach(zo=>{
       const wl=new THREE.Mesh(new THREE.BoxGeometry(w,wallH,wallT),concMat);
-      wl.position.set(x,wallH/2,z); wl.rotation.y=hRad;
-      wl.translateZ(zo); wl.receiveShadow=true; add3(wl);
+      put(wl,0,wallH/2,zo).receiveShadow=true;
     });
-    // Top rim cap (thin slab over the walls)
-    const rim=new THREE.Mesh(new THREE.BoxGeometry(w+0.3,0.25,l+0.3),concMat);
-    rim.position.set(x,wallH+0.12,z); rim.rotation.y=hRad; add3(rim);
-
-    // ── Below-grade inverted hopper pyramid ──
-    // Four sloped triangular panels converging to a center sump
-    // Built from a custom BufferGeometry pyramid (5 verts: 4 corners + tip)
-    const hw=w/2, hl=l/2, tipY=-d; // tip is `d` ft below grade
-    // Local (un-rotated) corner positions at grade level (y=0)
-    const corners=[
-      [-hw, 0, -hl], [hw, 0, -hl], [hw, 0, hl], [-hw, 0, hl]
-    ];
-    // Two triangles per face (front, right, back, left)
+    // Steel grate spanning the opening at grade
+    const grate=new THREE.Mesh(new THREE.BoxGeometry(w-2*wallT,0.2,l-2*wallT),grateMat);
+    put(grate,0,wallH+0.1,0);
+    const nBars=Math.max(4,Math.round(l/1.5));
+    for(let i=0;i<nBars;i++){
+      const bar=new THREE.Mesh(new THREE.BoxGeometry(w-2*wallT,0.1,0.15),steelMat);
+      put(bar,0,wallH+0.28,-l/2+wallT+(i+0.5)*((l-2*wallT)/nBars));
+    }
+    // Below-grade inverted hopper pyramid to a center sump
+    const hw=w/2, hl=l/2, tipY=-d;
+    const corners=[[-hw,0,-hl],[hw,0,-hl],[hw,0,hl],[-hw,0,hl]];
     const verts=new Float32Array([
-      // Front face (-Z side): corners[0], corners[1], tip
-      ...corners[0], ...corners[1],  0,tipY,0,
-      // Right face (+X side): corners[1], corners[2], tip
-      ...corners[1], ...corners[2],  0,tipY,0,
-      // Back face (+Z side): corners[2], corners[3], tip
-      ...corners[2], ...corners[3],  0,tipY,0,
-      // Left face (-X side): corners[3], corners[0], tip
-      ...corners[3], ...corners[0],  0,tipY,0,
+      ...corners[0],...corners[1],0,tipY,0,
+      ...corners[1],...corners[2],0,tipY,0,
+      ...corners[2],...corners[3],0,tipY,0,
+      ...corners[3],...corners[0],0,tipY,0,
     ]);
     const hpGeo=new THREE.BufferGeometry();
     hpGeo.setAttribute('position',new THREE.BufferAttribute(verts,3));
     hpGeo.computeVertexNormals();
     const hopper=new THREE.Mesh(hpGeo,hprMat);
-    hopper.position.set(x,0,z); hopper.rotation.y=hRad;
-    hopper.castShadow=hopper.receiveShadow=true; add3(hopper);
-
-    // ── Sump / discharge tube at the bottom of the hopper ──
+    hopper.position.set(x,0,z); hopper.rotation.y=hRad; hopper.castShadow=hopper.receiveShadow=true; add3(hopper);
+    // Sump + discharge tube out the tail end (feeds the receiving conveyor / leg boot tunnel)
     const sumpH=Math.min(d*0.3,4);
     const sump=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,sumpH,8),sumpMat);
-    // Position at tip, hanging down from the pyramid tip
     sump.position.set(x,tipY-sumpH/2,z); add3(sump);
-    // Small discharge cap
-    const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,0.3,8),sumpMat);
-    cap.position.set(x,tipY-sumpH-0.15,z); add3(cap);
-
-    if(S.showLabels){const spr=makeLabel3(`⬇ ${pit.name}`,'#fbbf24');spr.position.set(x,wallH+6,z);add3(spr);}
+    const outLen=Math.max(4,l*0.6);
+    const outTube=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.2,outLen),new THREE.MeshLambertMaterial({color:0x0891b2}));
+    put(outTube,0,tipY-sumpH+0.6,-(outLen/2));
+    if(S.showLabels){const spr=makeLabel3(`⬇ ${pit.name}\nBurial · ${d}′ deep`,'#fbbf24');spr.position.set(x,wallH+6,z);add3(spr);}
   });
 
   // GRAIN DRYERS
