@@ -153,7 +153,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
     <button class="btn"        data-tool="propanetank" title="Add Propane Tank — horizontal cylinder on saddle supports">⬡ Propane Tank</button>
     <button class="btn"        data-tool="generator" title="Add Generator [G] — standby power for the electrical load estimate">⚡ Generator</button>
     <button class="btn"        data-tool="bend"      title="Add Bend / Transfer Point [E] — marks position &amp; height of a bend, head, or boot">⬟ Bend</button>
-    <button class="btn"        data-tool="highflight" title="Add High-Flight Conveyor [F] — inclined drag/chain, click start then end">⤴ Hi-Flight</button>
+    <button class="btn"        data-tool="highflight" title="Add Conveyor [F] — inclined chain conveyor (rectangular box), click start then end">⤴ Conveyor</button>
     <button class="btn"        data-tool="doublerun" title="Add Double-Run Conveyor [R] — twin-tube paddle conveyor, click start then end">⤵⤴ Dbl-Run</button>
     <button class="btn"        data-tool="walkway"   title="Add Walkway Between Bins [W] — click first bin, then second bin">🔗 Walkway</button>
   </div>
@@ -215,6 +215,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
       <button id="a3d-loadout"   onclick="set3DTool('loadout')">🏗 Load-out</button>
       <button id="a3d-auger"     onclick="set3DTool('auger')">⤴ Auger</button>
       <button id="a3d-drag"      onclick="set3DTool('drag')">⟶ Drag</button>
+      <button id="a3d-highflight" onclick="set3DTool('highflight')">⤴ Conveyor</button>
       <button id="a3d-doublerun" onclick="set3DTool('doublerun')">⇄ Dbl-Run</button>
       <button id="a3d-truck"     onclick="set3DTool('truck')">🚛 Truck</button>
       <button id="a3d-bend"      onclick="set3DTool('bend')">⬟ Bend</button>
@@ -228,7 +229,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
     <div id="properties">
       <div class="no-sel">Choose a tool above and click the satellite map.<br><br>
         <b>B</b>=Bin &nbsp;<b>L</b>=Leg &nbsp;<b>A</b>=Auger<br>
-        <b>D</b>=Drag &nbsp;<b>F</b>=Hi-Flight &nbsp;<b>E</b>=Bend<br>
+        <b>D</b>=Drag &nbsp;<b>F</b>=Conveyor &nbsp;<b>E</b>=Bend<br>
         <b>W</b>=Walkway &nbsp;<b>P</b>=Pit &nbsp;<b>Y</b>=Dryer<br>
         <b>T</b>=Truck &nbsp;<b>O</b>=Loadout &nbsp;<b>S</b>=Structure<br>
         <b>M</b>=Measure
@@ -409,7 +410,7 @@ function setTool(t) {
     leg:        'Click on the map to place a grain leg / bucket elevator.',
     auger:      'Click a source object (bin/leg/pit) OR map for start — then click destination object or map for end.',
     drag:       'Click a source object (pit/bin/leg) OR map for start — then click destination object or map for end.',
-    highflight: 'Click a source object OR map for start — then click destination object or map for end. Nodes for angles.',
+    highflight: 'Conveyor (inclined chain, rectangular box). Click a source object OR map for start — then click destination object or map for end.',
     doublerun:  'Double-run conveyor (twin tubes). Click a source object OR map for start — then click destination object or map for end.',
     bend:       'Click on the map to place a bend / transfer point (head, boot, or intermediate bend).',
     walkway:    'Click first bin, then click second bin to connect them with a catwalk at eave height.',
@@ -956,7 +957,7 @@ function convTypeColor(type) {
   return type==='auger'?'#f97316':type==='highflight'?'#eab308':type==='doublerun'?'#a855f7':'#06b6d4';
 }
 function convTypeName(type) {
-  return type==='auger'?'Auger':type==='highflight'?'Hi-Flight':type==='doublerun'?'Double-Run':'Drag';
+  return type==='auger'?'Auger':type==='highflight'?'Conveyor':type==='doublerun'?'Double-Run':'Drag';
 }
 function handleConvClick(latlng) {
   if (!S.convFirstPt) {
@@ -2808,7 +2809,7 @@ function convFlowHTML(cv) {
 function convHTML(cv) {
   if(!cv.nodes) cv.nodes=convNodes(cv); // migrate old format
   const nodes=cv.nodes;
-  const typeName=cv.type==='auger'?'Inclined Auger':cv.type==='highflight'?'High-Flight Conveyor':cv.type==='doublerun'?'Double-Run Conveyor':'Drag / Horizontal Conveyor';
+  const typeName=cv.type==='auger'?'Inclined Auger':cv.type==='highflight'?'Conveyor (chain, inclined)':cv.type==='doublerun'?'Double-Run Conveyor':'Drag / Horizontal Conveyor';
   const isDblCv=cv.type==='doublerun';
   const isHfCv=cv.type==='highflight';
   const recRange=cv.type==='auger'?'30°–45°':isHfCv?'up to ~60° (steep-incline chain)':isDblCv?`≤ ${DBLRUN_MAX_ANG}° max`:'~0° (flat)';
@@ -2870,7 +2871,7 @@ function convHTML(cv) {
     ?`<div class="fr"><label>Box Size (W″ × H″)</label><select id="cvbox">
         ${HIFLIGHT_SIZES.map(s=>`<option value="${s.w}x${s.h}"${(cv.boxWidIn||12)===s.w&&(cv.boxHtIn||12)===s.h?' selected':''}>${s.w}″ × ${s.h}″ — ${s.bph.toLocaleString()} BPH</option>`).join('')}
       </select></div>
-      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Hi-flight conveyors are rectangular chain-paddle housings (GSI Select Hi-Flight sizes). Capacity is set by the box size at full chain speed.</p>`
+      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Conveyors are rectangular chain-paddle housings (GSI Select Hi-Flight sizes). Capacity is set by the box size at full chain speed.</p>`
     :`<div class="fr"><label>Pipe Diameter (in)</label><input type="number" id="cvdiam" value="${cv.diamIn||6}" min="2" max="30" step="1"/></div>
   <div class="fr"><label>Capacity (BPH)</label><input type="number" id="cvbph" value="${cv.capBph||0}" min="0" max="100000" step="500"/></div>`}
   <div class="fr"><label>Motor HP</label>
@@ -3284,7 +3285,7 @@ function summaryHTML() {
     <div class="crow"><span class="lbl">L</span><span class="val" style="color:#d1d5db">Leg</span></div>
     <div class="crow"><span class="lbl">A</span><span class="val" style="color:#d1d5db">Auger</span></div>
     <div class="crow"><span class="lbl">D</span><span class="val" style="color:#d1d5db">Drag conveyor</span></div>
-    <div class="crow"><span class="lbl">F</span><span class="val" style="color:#d1d5db">High-Flight conveyor</span></div>
+    <div class="crow"><span class="lbl">F</span><span class="val" style="color:#d1d5db">Conveyor (chain, inclined)</span></div>
     <div class="crow"><span class="lbl">E</span><span class="val" style="color:#d1d5db">Bend / Transfer point</span></div>
     <div class="crow"><span class="lbl">W</span><span class="val" style="color:#d1d5db">Walkway (click 2 bins)</span></div>
     <div class="crow"><span class="lbl">P/Y/T/O/S</span><span class="val" style="color:#d1d5db">Pit/Dryer/Truck/Loadout/Structure</span></div>
@@ -4868,7 +4869,7 @@ function buildSummary3DHTML() {
   const sections = [
     ['Grain Bins',       'bins',       S.bins,       b=>{ const cap=bushels(b,S.grainType||'corn'); return `${b.diam}′·${cap>=1000?(cap/1000).toFixed(0)+'k':''}bu`; }],
     ['Grain Legs',       'legs',       S.legs,       l=>`${legEffHt(l)}′`],
-    ['Conveyors',        'conveyors',  S.conveyors,  cv=>cv.type==='auger'?'Auger':cv.type==='highflight'?'Hi-Flt':cv.type==='doublerun'?'Dbl-Run':'Drag'],
+    ['Conveyors',        'conveyors',  S.conveyors,  cv=>cv.type==='auger'?'Auger':cv.type==='highflight'?'Conv':cv.type==='doublerun'?'Dbl-Run':'Drag'],
     ['Dump Pits',        'pits',       S.pits,       ()=>''],
     ['Grain Dryers',     'dryers',     S.dryers,     ()=>''],
     ['Overhead Ldouts',  'loadouts',   S.loadouts,   lo=>`${lo.supportHt}′`],
