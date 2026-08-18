@@ -1267,13 +1267,18 @@ function getCenterPoint(id, type, binTopConnect) {
   return { lat:obj.lat, lng:obj.lng, htFt:0 };
 }
 
-window.snapConveyorEndpoints = function(cvId) {
-  const cv = S.conveyors.find(c=>c.id===cvId); if(!cv) return;
+// Core snap: moves a conveyor's boot/head onto its grain-flow connections.
+// Returns true if any endpoint actually changed position. No rendering/saving here.
+function snapConvCore(cv) {
   if(!cv.nodes) cv.nodes = convNodes(cv);
   const nodes = cv.nodes;
-  let snapped = false;
-
-  // Snap BOOT (node[0]) — mode controls connection height on bins
+  let changed = false;
+  const apply=(nd,pt)=>{
+    if(Math.abs(nd.lat-pt.lat)>1e-9||Math.abs(nd.lng-pt.lng)>1e-9||Math.abs((nd.htFt||0)-pt.htFt)>1e-6){
+      nd.lat=pt.lat; nd.lng=pt.lng; nd.htFt=pt.htFt; changed=true;
+    }
+  };
+  // BOOT (node[0])
   if (cv.feedsFrom && cv.feedsFrom.length > 0) {
     const src = cv.feedsFrom[0];
     const srcMode = cv.srcSnapMode || 'unload';
@@ -1286,25 +1291,47 @@ window.snapConveyorEndpoints = function(cvId) {
     } else {
       pt = getSnapPoint(src.id, src.type, srcMode);
     }
-    if (pt) { nodes[0].lat=pt.lat; nodes[0].lng=pt.lng; nodes[0].htFt=pt.htFt; snapped=true; }
+    if (pt) apply(nodes[0],pt);
   }
-
-  // Snap HEAD (last node) — mode controls connection height on bins
+  // HEAD (last node)
   if (cv.feedsTo && cv.feedsTo.length > 0) {
     const dst = cv.feedsTo[0];
     // Dryers are always loaded from the top, so default the head to the load point
     const dstMode = cv.dstSnapMode || (dst.type === 'dryer' ? 'peak' : (cv.binTopConnect ? 'peak' : 'unload'));
     const pt = getSnapPoint(dst.id, dst.type, dstMode);
     if (pt) {
-      const last = nodes[nodes.length-1];
-      last.lat=pt.lat; last.lng=pt.lng;
       // For leg destinations, apply the user-specified inlet height above the leg base
-      last.htFt = dst.type === 'leg' ? pt.htFt + (cv.legInletHt||0) : pt.htFt;
-      snapped=true;
+      const ht = dst.type === 'leg' ? pt.htFt + (cv.legInletHt||0) : pt.htFt;
+      apply(nodes[nodes.length-1],{lat:pt.lat,lng:pt.lng,htFt:ht});
     }
   }
-
-  if (snapped) {
+  return changed;
+}
+// Auto-follow: every conveyor with grain-flow connections re-snaps whenever anything
+// on the site moves or changes shape. Iterates so chained conveyors propagate.
+let _autoSnapping=false;
+function autoSnapAllConveyors() {
+  if(_autoSnapping) return false;
+  _autoSnapping=true;
+  const moved=new Set();
+  try{
+    for(let pass=0;pass<4;pass++){
+      let any=false;
+      S.conveyors.forEach(cv=>{
+        if(!(cv.feedsFrom&&cv.feedsFrom.length)&&!(cv.feedsTo&&cv.feedsTo.length)) return;
+        if(snapConvCore(cv)){ moved.add(cv.id); any=true; }
+      });
+      if(!any) break;
+    }
+    moved.forEach(id=>{ const cv=S.conveyors.find(c=>c.id===id); if(cv&&LY.conveyors[cv.id]) renderConveyor(cv); });
+  } finally { _autoSnapping=false; }
+  return moved.size>0;
+}
+window.snapConveyorEndpoints = function(cvId) {
+  const cv = S.conveyors.find(c=>c.id===cvId); if(!cv) return;
+  const hasFlow=(cv.feedsFrom&&cv.feedsFrom.length)||(cv.feedsTo&&cv.feedsTo.length);
+  if (hasFlow) {
+    snapConvCore(cv);
     renderConveyor(cv); renderProperties(); autoSave();
     showToast('✓ Endpoints snapped to grain flow connections');
   } else {
@@ -1399,10 +1426,13 @@ function renderConveyor(cv) {
     const epLL=L.latLng(nd.lat,nd.lng);
     // Linked bends get a slightly larger marker
     const r=nd.bendId?7:5;
-    const ep=L.circleMarker(epLL,{radius:r,fillColor:clr,fillOpacity:1,color:'#fff',weight:1}).addTo(map);
+    // Endpoints attached to a grain-flow connection are pinned (they follow the object instead)
+    const pinned=(i===0&&cv.feedsFrom&&cv.feedsFrom.length>0)||(i===nodes.length-1&&cv.feedsTo&&cv.feedsTo.length>0);
+    const ep=L.circleMarker(epLL,{radius:r,fillColor:pinned?'#111827':clr,fillOpacity:1,color:pinned?clr:'#fff',weight:pinned?2:1}).addTo(map);
     ep.on('click',e=>{ L.DomEvent.stopPropagation(e); if(S.tool==='delete')deleteConv(cv.id); else select('conveyor',cv.id); });
     ep.on('mousedown',e=>{
       if(S.tool!=='select') return;
+      if(pinned){ L.DomEvent.stopPropagation(e); select('conveyor',cv.id); showToast('This end is attached to a connection — move the connected object, or clear its Grain Flow to free it'); return; }
       L.DomEvent.stopPropagation(e); map.dragging.disable(); select('conveyor',cv.id);
       function onMove(e2){ nd.lat=e2.latlng.lat; nd.lng=e2.latlng.lng; ep.setLatLng(e2.latlng); }
       function onUp(){ map.dragging.enable(); map.off('mousemove',onMove); map.off('mouseup',onUp); renderConveyor(cv); select('conveyor',cv.id); autoSave(); }
@@ -2888,7 +2918,7 @@ function convHTML(cv) {
   <div class="fr"><label>Leg Inlet Height (ft)</label><input type="number" id="cvleght" value="${cv.legInletHt||0}" min="0" max="60" step="0.5"/></div>
   <p style="font-size:0.69em;color:#6b7280;margin-bottom:5px">Height above the leg base where the drag chain enters the boot. 0 = grade / foundation level.</p>
   <button class="pbtn ok" onclick="snapConveyorEndpoints('${cv.id}')">📍 Snap Endpoints to Grain Flow</button>
-  <p style="font-size:0.69em;color:#6b7280;margin:3px 0 8px">Auto-positions boot and head based on your Grain Flow selections and connection point settings above.</p>
+  <p style="font-size:0.69em;color:#6b7280;margin:3px 0 8px">Connected ends <b>follow automatically</b> whenever a bin, leg, dryer or other conveyor moves or changes shape — no re-snapping needed. This button just forces an immediate re-snap.</p>
   <div class="ph">Summary</div>
   <div class="cbox">
     <div class="crow"><span class="lbl">Segments</span><span class="val">${nodes.length-1}</span></div>
@@ -3306,7 +3336,13 @@ function serialise(includeProjects) {
     view:{lat:map.getCenter().lat,lng:map.getCenter().lng,zoom:map.getZoom()}
   },null,2);
 }
-function autoSave() { try{localStorage.setItem('gbd_v3',serialise());}catch(e){} scheduleDataFileWrite(); if(is3D&&scene3){_edit3Mode=true;populate3D();_edit3Mode=false;} }
+function autoSave() {
+  // Connected conveyors follow whatever just moved/changed, before we persist
+  autoSnapAllConveyors();
+  try{localStorage.setItem('gbd_v3',serialise());}catch(e){}
+  scheduleDataFileWrite();
+  if(is3D&&scene3){_edit3Mode=true;populate3D();_edit3Mode=false;}
+}
 
 // ── PROJECT MANAGEMENT ───────────────────────────────────────
 function projIndex() { try{return JSON.parse(localStorage.getItem('gbd_projects')||'[]');}catch(e){return[];} }
@@ -3572,12 +3608,19 @@ function on3DMouseMove(e){
     if(!_drag3.lastPt){_drag3.lastPt=pt.clone();return;}
     const{lat:pLat,lng:pLng}=fromXZ(_drag3.lastPt.x,_drag3.lastPt.z);
     const dLat=lat-pLat,dLng=lng-pLng;
-    const nds=convNodes(obj);nds.forEach(nd=>{nd.lat+=dLat;nd.lng+=dLng;});
-    if(obj.nodes) obj.nodes.forEach(nd=>{nd.lat+=dLat;nd.lng+=dLng;});
+    // Endpoints attached to grain-flow connections stay pinned; free nodes move
+    const nds=obj.nodes||convNodes(obj);
+    const bootPinned=obj.feedsFrom&&obj.feedsFrom.length>0, headPinned=obj.feedsTo&&obj.feedsTo.length>0;
+    nds.forEach((nd,i)=>{
+      if((i===0&&bootPinned)||(i===nds.length-1&&headPinned)) return;
+      nd.lat+=dLat;nd.lng+=dLng;
+    });
   } else {
     obj.lat=lat;obj.lng=lng;
   }
   _drag3.lastPt=pt.clone();_drag3Dirty=true;
+  // Connected conveyors follow live while dragging (skip when the conveyor itself is being dragged)
+  if(_drag3.siteType!=='conveyor') autoSnapAllConveyors();
   _drag3Mode=true;populate3D();_drag3Mode=false;
 }
 function on3DMouseUp(e){

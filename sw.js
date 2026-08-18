@@ -1,4 +1,4 @@
-const CACHE = 'farm-tools-v19';
+const CACHE = 'farm-tools-v20';
 const FILES = [
   './',
   './index.html',
