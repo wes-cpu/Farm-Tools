@@ -739,7 +739,7 @@ function dotIcon(label,color) {
 function addLeg(lat,lng) {
   const l={id:'leg_'+uid(),lat,lng,name:'Leg '+(S.legs.length+1),ht:60,foundFt:0,foundWFt:0,foundLFt:0,
     caseDiamIn:12, capBph:0, phase:0, color:'#f59e0b',
-    showSpout:false,spoutHt:10,spoutBearing:0,spoutReachFt:20,feedsBins:null,feedsDryers:[],feedsLoadouts:[],cost:0,infraItems:[]};
+    showSpout:false,spoutHt:10,spoutBearing:0,spoutReachFt:20,feedsBins:null,feedsDryers:[],feedsLoadouts:[],sharePipesWith:null,cost:0,infraItems:[]};
   S.legs.push(l); renderLeg(l); select('leg',l.id); autoSave();
 }
 function renderLeg(leg) {
@@ -781,6 +781,22 @@ function legIcon(leg) {
 function removeLegLyr(id) { const l=LY.legs[id]; if(!l) return; l.mk.remove(); if(l.spoutMk)l.spoutMk.remove(); delete LY.legs[id]; }
 function deleteLeg(id) { removeLegLyr(id); clearLegLines(); S.legs=S.legs.filter(l=>l.id!==id); if(S.selId===id)select(null,null); autoSave(); }
 function clearLegLines() { LY.legLines.forEach(x=>x.remove()); LY.legLines=[]; }
+// ── SHARED PIPES ──────────────────────────────────────────────
+function legFeedsBin(leg,binId){ return !Array.isArray(leg.feedsBins) || leg.feedsBins.includes(binId); }
+// The primary leg whose pipe this leg shares for a given bin (null if it runs its own pipe)
+function sharedPipePrimary(leg,binId){
+  if(!leg.sharePipesWith) return null;
+  const pri=S.legs.find(l=>l.id===leg.sharePipesWith);
+  if(!pri||pri.id===leg.id||pri.sharePipesWith===leg.id) return null; // guard against loops
+  return legFeedsBin(pri,binId)?pri:null;
+}
+// Tee-in point on the primary leg's pipe: 30% of the way from the primary head toward the bin peak
+function sharedTeePoint(pri,bin){
+  const t=0.30;
+  const ll=L.latLng(pri.lat+(bin.lat-pri.lat)*t, pri.lng+(bin.lng-pri.lng)*t);
+  const h0=legEffHt(pri)+3, h1=peakHt(bin);
+  return {ll, htFt:h0+(h1-h0)*t};
+}
 function drawLegLines(leg) {
   clearLegLines();
   const legLL=L.latLng(leg.lat,leg.lng);
@@ -789,6 +805,19 @@ function drawLegLines(leg) {
   const indirect=isSel?S.bins.filter(b=>!leg.feedsBins.includes(b.id)):[];
 
   direct.forEach(bin=>{
+    const pri=sharedPipePrimary(leg,bin.id);
+    if(pri){
+      // Shared pipe: short link from this leg's head into the primary leg's pipe (tee/distributor)
+      const tee=sharedTeePoint(pri,bin);
+      const d=distFt(legLL,tee.ll);
+      const ang=legAngle(legEffHt(leg),tee.htFt,d);
+      const clr=ang===null?'#ef4444':ang<TARGET_ANG-2?'#ef4444':'#a855f7';
+      LY.legLines.push(L.polyline([legLL,tee.ll],{color:clr,weight:2.5,dashArray:'2,4',opacity:0.9}).addTo(map));
+      LY.legLines.push(L.circleMarker(tee.ll,{radius:4,fillColor:'#a855f7',fillOpacity:1,color:'#fff',weight:1,interactive:false}).addTo(map));
+      // Show the shared main run faintly so the route reads as one pipe
+      LY.legLines.push(L.polyline([L.latLng(pri.lat,pri.lng),L.latLng(bin.lat,bin.lng)],{color:'#a855f7',weight:1.5,dashArray:'5,3',opacity:0.45,interactive:false}).addTo(map));
+      return;
+    }
     const d=distFt(legLL,L.latLng(bin.lat,bin.lng));
     const ang=legAngle(legEffHt(leg),peakHt(bin),d);
     const clr=ang===null?'#ef4444':ang<TARGET_ANG-2?'#ef4444':ang<=TARGET_ANG+5?'#10b981':'#f59e0b';
@@ -2617,6 +2646,14 @@ function legHTML(leg) {
       ↳ Auto slope: <b>${calcAng}°</b> from horizontal &nbsp;|&nbsp; ${horizFt}′ run, ${dropFt}′ drop
     </p>`;
   })()}
+  <div class="ph">Shared Pipes</div>
+  <div class="fr"><label>Shares pipes with</label>
+    <select id="plshare">
+      <option value=""${!leg.sharePipesWith?' selected':''}>— runs its own pipes —</option>
+      ${S.legs.filter(o=>o.id!==leg.id&&o.sharePipesWith!==leg.id).map(o=>`<option value="${o.id}"${leg.sharePipesWith===o.id?' selected':''}>${escH(o.name)}</option>`).join('')}
+    </select>
+  </div>
+  <p style="font-size:0.69em;color:#6b7280;margin-bottom:4px">For bins <b>both</b> legs feed, this leg tees into the other leg's pipe (purple link + distributor) instead of running a second pipe. Bins only this leg feeds still get their own pipe.${leg.sharePipesWith?(()=>{const pri=S.legs.find(o=>o.id===leg.sharePipesWith);if(!pri)return '';const shared=S.bins.filter(b=>legFeedsBin(leg,b.id)&&legFeedsBin(pri,b.id)).length;return ` <b style="color:#a855f7">${shared} shared bin${shared!==1?'s':''}</b> with ${escH(pri.name)}.`;})():''}</p>
   <div class="ph">Bin Routing — which bends this leg feeds</div>
   <div class="fr"><label>Routing Mode</label>
     <select id="plmode">
@@ -2684,6 +2721,10 @@ function bindLeg(leg) {
   document.getElementById('plss')?.addEventListener('change',upd);
 
   // Routing mode toggle
+  document.getElementById('plshare')?.addEventListener('change',e=>{
+    leg.sharePipesWith=e.target.value||null;
+    renderLeg(leg); drawLegLines(leg); renderProperties(); autoSave();
+  });
   document.getElementById('plmode')?.addEventListener('change',e=>{
     const sel=e.target.value==='select';
     const box=document.getElementById('plfeedsbox');
@@ -3914,6 +3955,17 @@ function populate3D(){
     const direct3d=isSel3d?S.bins.filter(b=>leg.feedsBins.includes(b.id)):S.bins;
     const phaseClr3=new THREE.Color(leg.color||phaseColor(leg.phase||0)||'#b0bec5').getHex();
     direct3d.forEach(bin=>{
+      const pri=sharedPipePrimary(leg,bin.id);
+      if(pri){
+        // Shared pipe: short link tube from this head into the primary leg's pipe, with a distributor tee
+        const tee=sharedTeePoint(pri,bin), tp=toXZ(tee.ll.lat,tee.ll.lng);
+        const d=distFt(L.latLng(leg.lat,leg.lng),tee.ll);
+        const ang=legAngle(h,tee.htFt,d);
+        const clr=ang===null||ang<TARGET_ANG-2?0xef4444:0xa855f7;
+        const link=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(x,h+3,z),new THREE.Vector3(tp.x,tee.htFt,tp.z)),1,0.7,8,false),new THREE.MeshLambertMaterial({color:clr}));link.castShadow=true;add3(link);
+        const teeBox=new THREE.Mesh(new THREE.BoxGeometry(2.2,2.2,2.2),new THREE.MeshLambertMaterial({color:0xa855f7}));teeBox.position.set(tp.x,tee.htFt,tp.z);add3(teeBox);
+        return;
+      }
       const bp=toXZ(bin.lat,bin.lng),pk=peakHt(bin),d=distFt(L.latLng(leg.lat,leg.lng),L.latLng(bin.lat,bin.lng));
       const ang=legAngle(h,pk,d);
       const clr=ang===null||ang<TARGET_ANG-2?0xef4444:ang<=TARGET_ANG+5?phaseClr3:0xf59e0b;
