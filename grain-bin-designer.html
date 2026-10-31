@@ -991,7 +991,11 @@ const HIFLIGHT_SIZES = [
   {w:32,h:20,bph:17000},{w:26,h:26,bph:18000},{w:32,h:26,bph:22100},{w:32,h:32,bph:28800},{w:36,h:32,bph:30600}
 ];
 const DBLRUN_MAX_LEN = 325;  // ft — max stretched length per double-run
-const DBLRUN_MAX_ANG = 60;   // ° — max incline angle
+const DBLRUN_MIN_ANG = 0;    // ° — double-runs operate level or inclined, never declining
+const DBLRUN_MAX_ANG = 35;   // ° — max incline angle for operation
+const DBLRUN_RANGE_LBL = `${DBLRUN_MIN_ANG}°–${DBLRUN_MAX_ANG}°`;
+// A segment is in range when it sits between level and the max incline (tiny negative = rounding noise)
+function dblAngOk(ang){ return ang>=DBLRUN_MIN_ANG-0.05 && ang<=DBLRUN_MAX_ANG; }
 function convTypeColor(type) {
   return type==='auger'?'#f97316':type==='highflight'?'#eab308':type==='doublerun'?'#a855f7':'#06b6d4';
 }
@@ -1021,7 +1025,12 @@ function cancelConv() {
 }
 function addConveyor(ll1, ll2, type, options={}) {
   const fromHt = (options.fromHt != null) ? options.fromHt : 0;
-  const toHt   = (options.toHt   != null) ? options.toHt   : (type==='drag'?0:(type==='highflight'||type==='doublerun')?30:peakNearestBin(ll2));
+  let   toHt   = (options.toHt   != null) ? options.toHt   : (type==='drag'?0:(type==='highflight'||type==='doublerun')?30:peakNearestBin(ll2));
+  if(type==='doublerun' && options.toHt==null){
+    // Default head height can't exceed what the 0–35° operating range allows over this horizontal run
+    const maxRise=distFt(ll1,ll2)*Math.tan(DBLRUN_MAX_ANG*Math.PI/180);
+    toHt=Math.max(fromHt, Math.min(toHt, Math.floor((fromHt+maxRise)*2)/2));
+  }
   const name = convTypeName(type)+' '+(S.conveyors.filter(x=>x.type===type).length+1);
   const c={
     id:'conv_'+uid(), name, type, bootType:'flat', color:convTypeColor(type),
@@ -1464,7 +1473,7 @@ function renderConveyor(cv) {
     const mid=L.latLng((n0.lat+n1.lat)/2,(n0.lng+n1.lng)/2);
     const inC=(cv.feedsFrom||[]).length, outC=(cv.feedsTo||[]).length;
     const flowNote=(inC||outC)?`<br><span style="font-size:8px;opacity:0.85">${inC?'←'+inC:''}${inC&&outC?' ':' '}${outC?outC+'→':''}</span>`:'';
-    const dblBad=isDbl&&(ang>DBLRUN_MAX_ANG||dblTotLen>DBLRUN_MAX_LEN);
+    const dblBad=isDbl&&(!dblAngOk(ang)||dblTotLen>DBLRUN_MAX_LEN);
     const lbl=L.marker(mid,{icon:L.divIcon({html:`<div class="conv-lbl"${dblBad?' style="border-color:#ef4444;color:#ef4444"':''}>${dblBad?'⚠ ':''}${ang.toFixed(1)}° · ${len.toFixed(0)}′${flowNote}</div>`,className:'',iconAnchor:[32,-4]}),interactive:false}).addTo(map);
     lbls.push(lbl);
   }
@@ -2887,12 +2896,12 @@ function convHTML(cv) {
   const typeName=cv.type==='auger'?'Inclined Auger':cv.type==='highflight'?'Conveyor (chain, inclined)':cv.type==='doublerun'?'Double-Run Conveyor':'Drag / Horizontal Conveyor';
   const isDblCv=cv.type==='doublerun';
   const isHfCv=cv.type==='highflight';
-  const recRange=cv.type==='auger'?'30°–45°':isHfCv?'up to ~60° (steep-incline chain)':isDblCv?`≤ ${DBLRUN_MAX_ANG}° max`:'~0° (flat)';
+  const recRange=cv.type==='auger'?'30°–45°':isHfCv?'up to ~60° (steep-incline chain)':isDblCv?`${DBLRUN_RANGE_LBL} operating range`:'~0° (flat)';
   const addNodeActive=S.convAddNodeMode===cv.id;
 
   // Node table rows
   let nodeRows='';
-  let maxSegAng=0;
+  let maxSegAng=0, minSegAng=0, dblAngBad=false;
   nodes.forEach((nd,i)=>{
     const isEndpoint=i===0||i===nodes.length-1;
     let segInfo='';
@@ -2900,11 +2909,14 @@ function convHTML(cv) {
       const n1=nodes[i+1];
       const d=distFt(L.latLng(nd.lat,nd.lng),L.latLng(n1.lat,n1.lng));
       const ang=convAngle(nd.htFt,n1.htFt,d),len=convLength(nd.htFt,n1.htFt,d);
-      if(ang>maxSegAng) maxSegAng=ang;
+      if(i===0||ang>maxSegAng) maxSegAng=ang;
+      if(i===0||ang<minSegAng) minSegAng=ang;
+      const segBad=isDblCv&&!dblAngOk(ang);
+      if(segBad) dblAngBad=true;
       const angClr=ang<0?'#ef4444'
-        :isDblCv?(ang>DBLRUN_MAX_ANG?'#ef4444':'#10b981')
+        :isDblCv?(segBad?'#ef4444':'#10b981')
         :ang>=30&&ang<=55?'#10b981':'#f59e0b';
-      segInfo=`<span style="color:${angClr};font-size:0.85em">→ ${ang.toFixed(1)}° · ${len.toFixed(0)}′${isDblCv&&ang>DBLRUN_MAX_ANG?' ⚠':''}</span>`;
+      segInfo=`<span style="color:${angClr};font-size:0.85em">→ ${ang.toFixed(1)}° · ${len.toFixed(0)}′${segBad?' ⚠':''}</span>`;
     }
     nodeRows+=`<tr style="border-bottom:1px solid #1f2937">
       <td style="padding:3px 4px;color:#6b7280;font-size:0.82em;white-space:nowrap">${i===0?'Boot':i===nodes.length-1?'Head':'#'+i}</td>
@@ -2929,11 +2941,13 @@ function convHTML(cv) {
 
   // Double-run: fixed size options; capacity is set by the diameter
   const dblSizeOpts=Object.keys(DBLRUN_SIZES).map(d=>`<option value="${d}"${+(cv.diamIn||10)===+d?' selected':''}>${d}" — ${DBLRUN_SIZES[d].toLocaleString()} BPH</option>`).join('');
-  const overLen=isDblCv&&totalLen>DBLRUN_MAX_LEN, overAng=isDblCv&&maxSegAng>DBLRUN_MAX_ANG;
+  const overLen=isDblCv&&totalLen>DBLRUN_MAX_LEN, overAng=dblAngBad;
+  const tooSteep=isDblCv&&maxSegAng>DBLRUN_MAX_ANG, declining=isDblCv&&minSegAng<DBLRUN_MIN_ANG-0.05;
   const dblWarn=(overLen||overAng)?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">
     ⚠ <b>Out of tolerance:</b>
     ${overLen?`total run ${totalLen.toFixed(0)}′ exceeds the ${DBLRUN_MAX_LEN}′ max — split into a second double-run.`:''}
-    ${overAng?` ${maxSegAng.toFixed(1)}° incline exceeds the ${DBLRUN_MAX_ANG}° max angle.`:''}
+    ${tooSteep?` ${maxSegAng.toFixed(1)}° incline exceeds the ${DBLRUN_MAX_ANG}° max — double-runs operate at ${DBLRUN_RANGE_LBL}. Lower the head, raise the boot, or lengthen the run.`:''}
+    ${declining?` ${minSegAng.toFixed(1)}° segment runs downhill — double-runs operate at ${DBLRUN_RANGE_LBL}; the head must be level with or above the boot.`:''}
   </div>`:'';
 
   return `<div class="ph">${typeName} — ${cv.name}</div>
@@ -2941,7 +2955,7 @@ function convHTML(cv) {
   <div class="fr"><label>Name</label><input type="text" id="cvn" value="${escH(cv.name)}"/></div>
   ${isDblCv
     ?`<div class="fr"><label>Size (diameter)</label><select id="cvdiam">${dblSizeOpts}</select></div>
-      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Capacity is set by the size: 8"=4,000 · 10"=7,500 · 12"=11,000 · 14"=15,000 BPH. Max ${DBLRUN_MAX_LEN}′ per run · max ${DBLRUN_MAX_ANG}° incline.</p>`
+      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Capacity is set by the size: 8"=4,000 · 10"=7,500 · 12"=11,000 · 14"=15,000 BPH. Max ${DBLRUN_MAX_LEN}′ per run · operating angle ${DBLRUN_RANGE_LBL}.</p>`
     :isHfCv
     ?`<div class="fr"><label>Box Size (W″ × H″)</label><select id="cvbox">
         ${HIFLIGHT_SIZES.map(s=>`<option value="${s.w}x${s.h}"${(cv.boxWidIn||12)===s.w&&(cv.boxHtIn||12)===s.h?' selected':''}>${s.w}″ × ${s.h}″ — ${s.bph.toLocaleString()} BPH</option>`).join('')}
@@ -3003,7 +3017,7 @@ function convHTML(cv) {
     <div class="crow"><span class="lbl">Total Horizontal</span><span class="val">${totalHoriz.toFixed(1)} ft</span></div>
     <div class="crow"><span class="lbl">Total Run Length</span><span class="val"${overLen?' style="color:#ef4444;font-weight:700"':''}>${totalLen.toFixed(1)} ft${isDblCv?` / ${DBLRUN_MAX_LEN} max`:''}</span></div>
     <div class="crow"><span class="lbl">Net Rise</span><span class="val">${rise>=0?'+':''}${rise.toFixed(1)} ft</span></div>
-    <div class="crow"><span class="lbl">${isDblCv?'Angle Limit':'Recommended Angle'}</span><span class="val"${overAng?' style="color:#ef4444;font-weight:700"':''}>${isDblCv?`${maxSegAng.toFixed(1)}° / ${DBLRUN_MAX_ANG}° max`:recRange}</span></div>
+    <div class="crow"><span class="lbl">${isDblCv?'Operating Angle':'Recommended Angle'}</span><span class="val"${overAng?' style="color:#ef4444;font-weight:700"':''}>${isDblCv?`${nodes.length>2?minSegAng.toFixed(1)+'° to ':''}${maxSegAng.toFixed(1)}° (range ${DBLRUN_RANGE_LBL})`:recRange}</span></div>
     ${isHfCv?`<div class="crow"><span class="lbl">Box Size</span><span class="val">${cv.boxWidIn||12}″ × ${cv.boxHtIn||12}″</span></div>`
       :cv.diamIn?`<div class="crow"><span class="lbl">Pipe Diameter</span><span class="val">${cv.diamIn}"</span></div>`:''}
     ${cv.capBph?`<div class="crow"><span class="lbl">Capacity</span><span class="val">${cv.capBph.toLocaleString()} BPH</span></div>`:''}
