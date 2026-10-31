@@ -555,13 +555,23 @@ function eaveHt(bin) {
   return (bin.foundFt||0) + sw;
 }
 function legEffHt(leg) { return leg.ht + (leg.foundFt||0); }
-function peakHt(bin)  { return eaveHt(bin)+bin.roofFt; }
+// Roof: default 30° pitch, height derived from the diameter (rise = radius × tan θ).
+// roofAuto=false means the user entered a manufacturer peak height and roofFt is kept as-is.
+const DEFAULT_ROOF_DEG=30;
+function isRoofAuto(bin) { return bin.roofAuto!==false; }
+function roofHtFromAngle(diam,deg) { return (diam/2)*Math.tan(((+deg||DEFAULT_ROOF_DEG)*Math.PI)/180); }
+function roofHt(bin) {
+  if(!isRoofAuto(bin)) return +bin.roofFt||0;
+  return Math.round(roofHtFromAngle(bin.diam,bin.roofDeg)*100)/100;
+}
+function roofDegOf(bin) { return isRoofAuto(bin)?(+bin.roofDeg||DEFAULT_ROOF_DEG):Math.atan2(+bin.roofFt||0,bin.diam/2)*180/Math.PI; }
+function peakHt(bin)  { return eaveHt(bin)+roofHt(bin); }
 function sidewallHt(bin) { return (bin.ringCount*bin.ringIn)/12; }
 function bushels(bin,gt) {
   const r=bin.diam/2, h=sidewallHt(bin);
   // Hopper-bottom tanks also hold grain in the cone (full cone volume)
   const coneVol=(bin.bottomType||'flat')==='cone' ? (1/3)*Math.PI*r*r*coneHtCalc(bin) : 0;
-  return (Math.PI*r*r*h + (1/3)*Math.PI*r*r*bin.roofFt*0.65 + coneVol) / (GRAIN_DENS[gt]||1.2445);
+  return (Math.PI*r*r*h + (1/3)*Math.PI*r*r*roofHt(bin)*0.65 + coneVol) / (GRAIN_DENS[gt]||1.2445);
 }
 function legAngle(legHt,binPeak,d) { const dh=legHt-binPeak; return dh<=0?null:Math.atan2(dh,d)*180/Math.PI; }
 function reqLegHt(peak,d,ang=TARGET_ANG) { return peak+d*Math.tan(ang*Math.PI/180); }
@@ -631,7 +641,7 @@ window.setSelRemovedPhase = function(ph) {
 
 // ── BINS ─────────────────────────────────────────────────────
 function addBin(lat,lng) {
-  const b={id:'bin_'+uid(),lat,lng,name:'Bin '+(S.bins.length+1),diam:48,ringCount:8,ringIn:42,roofFt:10,stiffened:false,
+  const b={id:'bin_'+uid(),lat,lng,name:'Bin '+(S.bins.length+1),diam:48,ringCount:8,ringIn:42,roofDeg:DEFAULT_ROOF_DEG,roofAuto:true,roofFt:roofHtFromAngle(48,DEFAULT_ROOF_DEG),stiffened:false,
     foundFt:0,foundDiamFt:0,fanAng:180,showFan:true,fans:[],unloadAng:0,showUnload:true,unloadExtFt:4,
     showSideDraw:false,sideDrawHt:10,sideDrawBearing:90,
     showSideDraw2:false,sideDrawHt2:10,sideDrawBearing2:270,
@@ -2415,8 +2425,14 @@ function binHTML(bin) {
   <div class="fr"><label>Diameter (ft)</label><input type="number" id="pd" value="${bin.diam}" min="12" max="156" step="6"/></div>
   <div class="fr"><label>Ring Height (in)</label><input type="number" id="prh" value="${bin.ringIn}" min="24" max="72" step="6"/></div>
   <div class="fr"><label>Ring Count</label><input type="number" id="prc" value="${bin.ringCount}" min="1" max="32"/></div>
-  <div class="fr"><label>Total Height (ground → peak, ft)</label><input type="number" id="ptot" value="${peakHt(bin).toFixed(1)}" min="8" max="250" step="0.5"/></div>
-  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Enter the manufacturer's overall peak height. Roof height is calculated: ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${bin.roofFt.toFixed(1)}′ roof</b>.</p>
+  <div class="fr"><label>Roof Angle (°)</label>
+    <input type="number" id="proofdeg" value="${roofDegOf(bin).toFixed(1).replace(/\.0$/,'')}" min="10" max="50" step="0.5" ${isRoofAuto(bin)?'':'disabled style="opacity:0.55"'}/>
+    <label style="display:flex;align-items:center;gap:3px;font-size:0.72em;color:#9ca3af;margin-left:5px;cursor:pointer"><input type="checkbox" id="proofauto" ${isRoofAuto(bin)?'checked':''}/>Auto</label>
+  </div>
+  <div class="fr"><label>Total Height (ground → peak, ft)</label><input type="number" id="ptot" value="${peakHt(bin).toFixed(1)}" min="8" max="250" step="0.5" ${isRoofAuto(bin)?'disabled style="opacity:0.55"':''}/></div>
+  ${isRoofAuto(bin)
+    ?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Roof height is calculated from the diameter: ${(bin.diam/2).toFixed(1)}′ radius × tan(${roofDegOf(bin).toFixed(1).replace(/\.0$/,'')}°) = <b>${roofHt(bin).toFixed(1)}′ roof</b>, giving a ${peakHt(bin).toFixed(1)}′ peak over the ${eaveHt(bin).toFixed(1)}′ eave. Uncheck Auto to enter the manufacturer's overall peak height instead.</p>`
+    :`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Manual: roof height is ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${roofHt(bin).toFixed(1)}′ roof</b> (≈${roofDegOf(bin).toFixed(1)}° pitch). Check Auto to size the roof from the diameter at a set angle.</p>`}
   <div class="fr"><label>Sidewall Type</label><select id="pstiff">
     <option value="0"${!bin.stiffened?' selected':''}>Unstiffened (corrugated only)</option>
     <option value="1"${bin.stiffened?' selected':''}>Stiffened (vertical stiffener channels)</option>
@@ -2484,6 +2500,7 @@ function binHTML(bin) {
     ${isCone?`<div class="crow"><span class="lbl">Hopper Clearance</span><span class="val">${legH.toFixed(1)} ft (${Math.round(legH*12)}″)</span></div><div class="crow"><span class="lbl">Hopper Angle</span><span class="val">${bin.coneAngleDeg||45}°</span></div><div class="crow"><span class="lbl">Hopper Height</span><span class="val">${cH.toFixed(2)} ft</span></div>`:''}
     <div class="crow"><span class="lbl">Sidewall Height</span><span class="val">${((bin.ringCount*bin.ringIn)/12).toFixed(2)} ft</span></div>
     <div class="crow"><span class="lbl">Eave Height</span><span class="val">${eh.toFixed(2)} ft</span></div>
+    <div class="crow"><span class="lbl">Roof Height / Angle</span><span class="val">${roofHt(bin).toFixed(2)} ft · ${roofDegOf(bin).toFixed(1)}°</span></div>
     <div class="crow"><span class="lbl">Roof Peak</span><span class="val">${ph.toFixed(2)} ft</span></div>
     <div class="crow"><span class="lbl">Diameter</span><span class="val">${bin.diam} ft</span></div>
     <div class="crow"><span class="lbl">Footprint</span><span class="val">${Math.round(fp).toLocaleString()} sq ft</span></div>
@@ -2522,14 +2539,23 @@ function bindBin(bin) {
     // Read extra fan bearings + HP
     document.querySelectorAll('.xfan').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].bearing=+el.value||0; });
     document.querySelectorAll('.xfanhp').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].hp=+el.value||0; });
+    // Roof: Auto sizes the roof from diameter × tan(angle), so a diameter change re-derives it.
+    const wasAuto=isRoofAuto(bin);
+    bin.roofAuto=document.getElementById('proofauto')?.checked??wasAuto;
+    if(bin.roofAuto){
+      // Only read the angle box if it was editable; re-checking Auto returns to the stored angle (30° default)
+      const deg=wasAuto?+document.getElementById('proofdeg')?.value:0;
+      bin.roofDeg=(deg>0)?deg:(+bin.roofDeg||DEFAULT_ROOF_DEG);
+      bin.roofFt=roofHt(bin); // keep roofFt in sync for anything reading it directly
+    }
     renderBin(bin); renderProperties(); autoSave();
   }
-  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puext','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
-  // Total Height edits derive the roof height (total − eave). Ring/foundation edits
+  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puext','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang','proofdeg','proofauto'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  // Manual mode only: Total Height edits derive the roof height (total − eave). Ring/foundation edits
   // deliberately do NOT re-derive — adding a ring raises the peak, keeping the roof.
   document.getElementById('ptot')?.addEventListener('change',e=>{
     const tot=+e.target.value||0;
-    if(tot>0) bin.roofFt=Math.max(1,Math.round((tot-eaveHt(bin))*10)/10);
+    if(tot>0){ bin.roofAuto=false; bin.roofFt=Math.max(1,Math.round((tot-eaveHt(bin))*10)/10); }
     renderBin(bin); renderProperties(); autoSave();
   });
   ['psf','psu','pssd','pssd2','pss','bpsrc'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
@@ -3532,6 +3558,15 @@ window.openProjectsModal = openProjectsModal;
 function hydrateData(data) {
   clearAllLayers();
   S.bins=data.bins||[]; S.legs=data.legs||[]; S.conveyors=data.conveyors||[];
+  // Roof migration: bins saved before the roof-angle option carried only roofFt (old default 10′).
+  // Untouched defaults move to Auto 30°; a bin with an entered peak height keeps it as a manual roof.
+  S.bins.forEach(b=>{
+    if(b.roofAuto===undefined){
+      b.roofAuto=(b.roofFt==null||+b.roofFt===10);
+      b.roofDeg=b.roofDeg||DEFAULT_ROOF_DEG;
+      if(b.roofAuto) b.roofFt=roofHt(b);
+    }
+  });
   S.pits=data.pits||[]; S.dryers=data.dryers||[]; S.trucks=data.trucks||[];
   S.loadouts=data.loadouts||[]; S.structures=data.structures||[]; S.bends=data.bends||[]; S.walkways=data.walkways||[]; S.portaugers=data.portaugers||[]; S.propanetanks=data.propanetanks||[]; S.generators=data.generators||[];
   S.power=data.power||{utilAmps:800,utilVolts:240,utilPhase:1,activeMode:'all'};
@@ -3803,7 +3838,7 @@ function populate3D(){
   // BINS
   S.bins.forEach(bin=>{
     if(S.typeHidden3d['bins']||bin.hidden) return;
-    const{x,z}=toXZ(bin.lat,bin.lng),r=bin.diam/2,ev=eaveHt(bin),rf=bin.roofFt,foundH=bin.foundFt||0,col=new THREE.Color(bin.color);
+    const{x,z}=toXZ(bin.lat,bin.lng),r=bin.diam/2,ev=eaveHt(bin),rf=roofHt(bin),foundH=bin.foundFt||0,col=new THREE.Color(bin.color);
     const isCone3=(bin.bottomType||'flat')==='cone';
     // Shared derived values
     const sideHt=(bin.ringCount*bin.ringIn)/12; // pure sidewall height (rings only)
