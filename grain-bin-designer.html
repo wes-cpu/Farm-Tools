@@ -3670,11 +3670,15 @@ function init3D(){
   scene3.add(new THREE.AmbientLight(0xffffff,0.6));scene3.add(new THREE.HemisphereLight(0x87ceeb,0x3d6e2a,0.4));
   const sun=new THREE.DirectionalLight(0xfff4e0,1.0);sun.position.set(300,500,200);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.near=1;sun.shadow.camera.far=3000;sun.shadow.camera.left=sun.shadow.camera.bottom=-800;sun.shadow.camera.right=sun.shadow.camera.top=800;scene3.add(sun);
   const gnd=new THREE.Mesh(new THREE.PlaneGeometry(8000,8000),new THREE.MeshLambertMaterial({color:0x4a7c3f}));gnd.rotation.x=-Math.PI/2;gnd.receiveShadow=true;scene3.add(gnd);scene3._gnd=gnd;
+  // Object drag must be wired with POINTER events and BEFORE OrbitControls is created: OrbitControls
+  // calls preventDefault() on pointerdown, which suppresses the browser's compatibility mousedown /
+  // mouseup events entirely, and it must see our handler first so a grab can stop it orbiting.
+  cv.addEventListener('pointerdown', on3DMouseDown);
+  cv.addEventListener('pointermove', on3DMouseMove);
+  cv.addEventListener('pointerup', on3DMouseUp);
+  window.addEventListener('pointerup', on3DMouseUp); // release outside the canvas still ends a drag
   ctrl3=new THREE.OrbitControls(cam3,cv);ctrl3.enableDamping=true;ctrl3.dampingFactor=0.07;ctrl3.screenSpacePanning=true;ctrl3.minDistance=15;ctrl3.maxDistance=2500;ctrl3.maxPolarAngle=Math.PI/2.05;
   cv.addEventListener('click', on3DCanvasClick);
-  cv.addEventListener('mousedown', on3DMouseDown);
-  cv.addEventListener('mousemove', on3DMouseMove);
-  cv.addEventListener('mouseup', on3DMouseUp);
   window.addEventListener('resize',on3DResize);
 }
 function animate3D(){animId3=requestAnimationFrame(animate3D);ctrl3.update();ren3.render(scene3,cam3);}
@@ -3683,7 +3687,14 @@ function on3DResize(){if(!ren3)return;const el=document.getElementById('view3d')
 let _rLat,_rLng;
 function toXZ(lat,lng){const F=364567,FL=F*Math.cos(_rLat*Math.PI/180);return{x:(lng-_rLng)*FL,z:-(lat-_rLat)*F};}
 function fromXZ(x,z){const F=364567,FL=F*Math.cos(_rLat*Math.PI/180);return{lat:_rLat-z/F,lng:_rLng+x/FL};}
-function add3(o){scene3.add(o);objs3.push(o);}
+// _tag3 names the site object currently being built; add3 stamps it onto every mesh (roofs, seams,
+// labels, stiffeners…) that wasn't tagged explicitly, so clicking any part of a bin picks the bin.
+let _tag3=null;
+function add3(o){
+  if(_tag3) o.traverse(c=>{ if(!c.userData.siteId){ c.userData.siteId=_tag3.siteId; c.userData.siteType=_tag3.siteType; } });
+  scene3.add(o);objs3.push(o);
+}
+function siteOf3(obj){ for(let o=obj;o;o=o.parent){ if(o.userData&&o.userData.siteId) return o.userData; } return null; }
 
 // ── REALISTIC BIN SHELL DETAILS ──────────────────────────────
 // Corrugation seam rings at every ring joint, plus vertical stiffener channels
@@ -3720,7 +3731,16 @@ function addBinRoof3(bin,x,z,r,ev,rf,col){
 }
 
 // ── 3D DRAG STATE ─────────────────────────────────────────────
-let _drag3={active:false,siteType:null,siteId:null,lastPt:null};
+let _drag3={active:false,siteType:null,siteId:null,lastPt:null,offX:0,offZ:0,raf:null};
+const DRAG3_MAPS=()=>({bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
+  conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
+  generator:S.generators||[],propanetank:S.propanetanks||[],portauger:S.portaugers});
+function drag3Obj(){ const arr=DRAG3_MAPS()[_drag3.siteType]; return arr?arr.find(o=>o.id===_drag3.siteId):null; }
+// Rebuild the scene at most once per frame while dragging
+function drag3Rebuild(){
+  if(_drag3.raf) return;
+  _drag3.raf=requestAnimationFrame(()=>{ _drag3.raf=null; _drag3Mode=true; populate3D(); _drag3Mode=false; });
+}
 let _drag3Mode=false;  // suppress camera re-fit during drag
 let _drag3Dirty=false;
 let _edit3Mode=false;  // suppress camera re-fit during property edits
@@ -3733,26 +3753,39 @@ function on3DMouseDown(e){
   const ray=new THREE.Raycaster();ray.setFromCamera(mouse,cam3);
   const hits=ray.intersectObjects(objs3,true);
   for(const hit of hits){
-    const ud=hit.object.userData;
+    const ud=siteOf3(hit.object);
     if(ud&&ud.siteId){
       _drag3.active=true;_drag3.siteType=ud.siteType;_drag3.siteId=ud.siteId;_drag3.lastPt=null;_drag3Dirty=false;
+      // Remember where on the ground the grab happened relative to the object's anchor, so the
+      // object follows the cursor without jumping its center under the pointer.
+      const gp=get3DGroundPoint(e), obj=drag3Obj();
+      _drag3.offX=0;_drag3.offZ=0;
+      if(gp&&obj&&ud.siteType!=='conveyor'){ const a=toXZ(obj.lat,obj.lng); _drag3.offX=a.x-gp.x; _drag3.offZ=a.z-gp.z; }
+      if(gp) _drag3.lastPt=gp.clone();
       ctrl3.enabled=false;cv.style.cursor='grabbing';
-      e.stopPropagation();
+      e.stopImmediatePropagation(); // keep OrbitControls from starting an orbit on this press
+      e.preventDefault();
       return;
     }
   }
 }
 function on3DMouseMove(e){
-  if(!_drag3.active) return;
-  const pt=get3DPoint(e);if(!pt) return;
-  const{lat,lng}=fromXZ(pt.x,pt.z);
-  const maps={bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
-    conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
-    generator:S.generators,propanetank:S.propanetanks,portauger:S.portaugers};
-  const arr=maps[_drag3.siteType];if(!arr) return;
-  const obj=arr.find(o=>o.id===_drag3.siteId);if(!obj) return;
+  if(!_drag3.active){
+    // Hover feedback: show a grab cursor over anything that can be moved
+    if(S.meas3Active||_tool3d||!objs3.length) return;
+    const cv=document.getElementById('canvas3d'),rect=cv.getBoundingClientRect();
+    const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
+    const ray=new THREE.Raycaster();ray.setFromCamera(mouse,cam3);
+    const hit=ray.intersectObjects(objs3,true).find(h=>siteOf3(h.object));
+    cv.style.cursor=hit?'grab':'';
+    return;
+  }
+  // Always track the cursor on the ground plane — never on the object being dragged
+  const pt=get3DGroundPoint(e);if(!pt) return;
+  const obj=drag3Obj();if(!obj) return;
   if(_drag3.siteType==='conveyor'){
     if(!_drag3.lastPt){_drag3.lastPt=pt.clone();return;}
+    const{lat,lng}=fromXZ(pt.x,pt.z);
     const{lat:pLat,lng:pLng}=fromXZ(_drag3.lastPt.x,_drag3.lastPt.z);
     const dLat=lat-pLat,dLng=lng-pLng;
     // Endpoints attached to grain-flow connections stay pinned; free nodes move
@@ -3763,18 +3796,21 @@ function on3DMouseMove(e){
       nd.lat+=dLat;nd.lng+=dLng;
     });
   } else {
+    const{lat,lng}=fromXZ(pt.x+_drag3.offX,pt.z+_drag3.offZ);
+    if(Math.abs(lat-obj.lat)<1e-9&&Math.abs(lng-obj.lng)<1e-9) return;
     obj.lat=lat;obj.lng=lng;
   }
   _drag3.lastPt=pt.clone();_drag3Dirty=true;
   // Connected conveyors follow live while dragging (skip when the conveyor itself is being dragged)
   if(_drag3.siteType!=='conveyor') autoSnapAllConveyors();
-  _drag3Mode=true;populate3D();_drag3Mode=false;
+  drag3Rebuild();
 }
 function on3DMouseUp(e){
   if(!_drag3.active) return;
   const wasDrag=_drag3Dirty;
   const capturedType=_drag3.siteType, capturedId=_drag3.siteId;
   _drag3.active=false; ctrl3.enabled=true;
+  if(_drag3.raf){ cancelAnimationFrame(_drag3.raf); _drag3.raf=null; }
   document.getElementById('canvas3d').style.cursor='';
   if(!wasDrag && capturedId){
     // Pure click — no drag movement — select object for editing
@@ -3784,17 +3820,20 @@ function on3DMouseUp(e){
   }
   if(wasDrag){
     _drag3Dirty=false;
+    _drag3.suppressClick=true; // the browser fires 'click' after this release — don't re-select under the cursor
     const rfns={bin:renderBin,leg:renderLeg,conveyor:renderConveyor,dryer:renderDryer,
       pit:renderPit,bend:renderBend,structure:renderStructure,loadout:renderLoadout,truck:renderTruck,
       generator:renderGenerator,propanetank:renderPropaneTank,portauger:renderPortAuger};
     const rfn=rfns[capturedType];
-    const maps={bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
-      conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
-      generator:S.generators,propanetank:S.propanetanks,portauger:S.portaugers};
-    const arr=maps[capturedType];
+    const arr=DRAG3_MAPS()[capturedType];
     const obj=arr&&arr.find(o=>o.id===capturedId);
     if(rfn&&obj) rfn(obj);
-    populate3D(); autoSave();
+    // Re-draw connected conveyors on the map too (they were re-snapped during the drag)
+    if(capturedType!=='conveyor') S.conveyors.forEach(renderConveyor);
+    // Keep the moved object selected; rebuild in edit mode so the camera stays put
+    _edit3Mode=true; populate3D(); _edit3Mode=false;
+    select(capturedType, capturedId); show3DSelectionRing(capturedType, capturedId);
+    autoSave();
   }
 }
 
@@ -3811,8 +3850,11 @@ function populate3D(){
   }
   const all=[...S.bins,...S.legs,...S.conveyors.map(c=>{ const nds=convNodes(c); return {lat:(nds[0].lat+nds[nds.length-1].lat)/2,lng:(nds[0].lng+nds[nds.length-1].lng)/2}; }),...S.pits,...S.dryers,...S.trucks,...S.loadouts,...S.bends];
   if(!all.length)return;
-  _rLat=all.reduce((s,o)=>s+o.lat,0)/all.length;
-  _rLng=all.reduce((s,o)=>s+o.lng,0)/all.length;
+  _tag3=null;
+  if(!_drag3Mode||_rLat==null){
+    _rLat=all.reduce((s,o)=>s+o.lat,0)/all.length;
+    _rLng=all.reduce((s,o)=>s+o.lng,0)/all.length;
+  }
 
   // ── SATELLITE GROUND TEXTURE ──────────────────────────────
   if(scene3._gnd&&!_drag3Mode){
@@ -3852,6 +3894,7 @@ function populate3D(){
   // BINS
   S.bins.forEach(bin=>{
     if(S.typeHidden3d['bins']||bin.hidden) return;
+    _tag3={siteId:bin.id,siteType:'bin'};
     const{x,z}=toXZ(bin.lat,bin.lng),r=bin.diam/2,ev=eaveHt(bin),rf=roofHt(bin),foundH=bin.foundFt||0,col=new THREE.Color(bin.color);
     const isCone3=(bin.bottomType||'flat')==='cone';
     // Shared derived values
@@ -4022,6 +4065,7 @@ function populate3D(){
   // LEGS
   S.legs.forEach(leg=>{
     if(S.typeHidden3d['legs']||leg.hidden) return;
+    _tag3={siteId:leg.id,siteType:'leg'};
     const{x,z}=toXZ(leg.lat,leg.lng),h=legEffHt(leg),foundH=leg.foundFt||0;
     const sm=new THREE.MeshLambertMaterial({color:0xb0bec5}),dm=new THREE.MeshLambertMaterial({color:0x78909c});
     if(foundH>0){
@@ -4103,6 +4147,7 @@ function populate3D(){
   // CONVEYORS (auger=round tube, drag/high-flight=rectangular box)
   S.conveyors.forEach(cv=>{
     if(S.typeHidden3d['conveyors']||cv.hidden) return;
+    _tag3={siteId:cv.id,siteType:'conveyor'};
     const nodes=convNodes(cv);
     // Phase/custom color wins; fall back to the type's default color
     const clr3=new THREE.Color(cv.color||convTypeColor(cv.type)).getHex();
@@ -4165,6 +4210,7 @@ function populate3D(){
   // BENDS / TRANSFER POINTS
   S.bends.forEach(bd=>{
     if(S.typeHidden3d['bends']||bd.hidden) return;
+    _tag3={siteId:bd.id,siteType:'bend'};
     const{x,z}=toXZ(bd.lat,bd.lng);
     const clr3={'head':0xa78bfa,'boot':0xf59e0b,'transfer':0x06b6d4,'inlet':0x10b981,'loadout':0x34d399}[bd.bendType]||0xa78bfa;
     const mat=new THREE.MeshLambertMaterial({color:clr3});
@@ -4221,6 +4267,7 @@ function populate3D(){
   // DUMP PITS — direct-burial (deep concrete hopper) or drive-over (Sudenga SDDO-style)
   S.pits.forEach(pit=>{
     if(S.typeHidden3d['pits']||pit.hidden) return;
+    _tag3={siteId:pit.id,siteType:'pit'};
     const{x,z}=toXZ(pit.lat,pit.lng);
     const hRad=-(pit.headDeg*Math.PI/180);
     const concMat=new THREE.MeshLambertMaterial({color:0x9ca3af});
@@ -4335,6 +4382,7 @@ function populate3D(){
   // GRAIN DRYERS
   S.dryers.forEach(dr=>{
     if(S.typeHidden3d['dryers']||dr.hidden) return;
+    _tag3={siteId:dr.id,siteType:'dryer'};
     const{x,z}=toXZ(dr.lat,dr.lng),col=new THREE.Color(dr.color),hRad=-(dr.headDeg*Math.PI/180);
     let body=null;
     if(dr.shape==='rect'){
@@ -4472,6 +4520,7 @@ function populate3D(){
   // TRUCKS
   S.trucks.forEach(truck=>{
     if(S.typeHidden3d['trucks']||truck.hidden) return;
+    _tag3={siteId:truck.id,siteType:'truck'};
     const{x,z}=toXZ(truck.lat,truck.lng),tl=truck.lenFt,tw=truck.widFt;
     const grp=new THREE.Group();
     const truckClr=new THREE.Color(truck.color||'#6b7280');
@@ -4527,6 +4576,7 @@ function populate3D(){
   // SUPPORT STRUCTURES
   S.structures.forEach(st=>{
     if(S.typeHidden3d['structures']||st.hidden) return;
+    _tag3={siteId:st.id,siteType:'structure'};
     const{x,z}=toXZ(st.lat,st.lng),hRad=-(st.headDeg*Math.PI/180),col=new THREE.Color(st.color);
     const hw=st.widFt/2, hl=st.lenFt/2, ph=Math.max(0.5,st.postHt);
     const numBays=Math.max(1,Math.round(st.lenFt/Math.max(1,st.bayFt)));
@@ -4630,6 +4680,7 @@ function populate3D(){
   // OVERHEAD LOAD-OUTS
   S.loadouts.forEach(lo=>{
     if(S.typeHidden3d['loadouts']||lo.hidden) return;
+    _tag3={siteId:lo.id,siteType:'loadout'};
     const{x,z}=toXZ(lo.lat,lo.lng),col=new THREE.Color(lo.color);
     const sh=lo.supportHt, hh=lo.hopperHtFt;
     const r=Math.max(lo.hopperWidFt,lo.hopperLenFt)/2; // use largest dimension as radius
@@ -4676,6 +4727,7 @@ function populate3D(){
   // PROPANE TANKS — horizontal cylinder on saddle supports
   (S.propanetanks||[]).forEach(pt=>{
     if(S.typeHidden3d['propanetanks']||pt.hidden) return;
+    _tag3={siteId:pt.id,siteType:'propanetank'};
     const{x,z}=toXZ(pt.lat,pt.lng);
     const hRad=-(pt.headingDeg||0)*Math.PI/180;
     const len=pt.lengthFt, r=(pt.diamFt||4)/2;
@@ -4721,6 +4773,7 @@ function populate3D(){
   // GENERATORS — enclosure box on a skid with radiator end and exhaust stack
   (S.generators||[]).forEach(g=>{
     if(S.typeHidden3d['generators']||g.hidden) return;
+    _tag3={siteId:g.id,siteType:'generator'};
     const{x,z}=toXZ(g.lat,g.lng);
     const hRad=-(g.headingDeg||0)*Math.PI/180;
     const gl=g.lenFt||12, gw=g.widFt||5, gh=g.htFt||6;
@@ -4745,6 +4798,7 @@ function populate3D(){
   // PORTABLE AUGERS
   S.portaugers.forEach(pa=>{
     if(S.typeHidden3d['portaugers']||pa.hidden) return;
+    _tag3={siteId:pa.id,siteType:'portauger'};
     const ep=paEndpoints(pa);
     const b3=toXZ(ep.bootLL.lat,ep.bootLL.lng), d3=toXZ(ep.disLL.lat,ep.disLL.lng);
     const bootY=Math.max(0.5,ep.bootHt), disY=Math.max(0.5,ep.disHt);
@@ -4813,6 +4867,7 @@ function populate3D(){
   });
 
   // WALKWAYS
+  _tag3=null; // walkways are fixed between bins — not draggable
   S.walkways.forEach(ww=>{
     if(ww.hidden) return;
     const b1=S.bins.find(b=>b.id===ww.binId1), b2=S.bins.find(b=>b.id===ww.binId2);
@@ -5146,7 +5201,8 @@ function get3DPoint(event) {
   // Fall back to ground plane y=0
   const gndPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
   const pt = new THREE.Vector3();
-  ray.ray.intersectPlane(gndPlane, pt);
+  // intersectPlane returns null when the ray never meets the ground (pointing at the sky)
+  if (!ray.ray.intersectPlane(gndPlane, pt)) return null;
   return pt.y > -1 ? pt : null;
 }
 function add3DMark(pt, color=0xf59e0b) {
@@ -5202,7 +5258,8 @@ function get3DGroundPoint(event) {
   const ray = new THREE.Raycaster(); ray.setFromCamera(mouse, cam3);
   const gndPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
   const pt = new THREE.Vector3();
-  ray.ray.intersectPlane(gndPlane, pt);
+  // intersectPlane returns null when the ray never meets the ground (pointing at the sky)
+  if (!ray.ray.intersectPlane(gndPlane, pt)) return null;
   return pt.y > -1 ? pt : null;
 }
 
@@ -5254,6 +5311,7 @@ function place3DObject(type, lat, lng) {
   populate3D();
 }
 function on3DCanvasClick(e) {
+  if (_drag3.suppressClick) { _drag3.suppressClick=false; return; } // tail of a drag, not a click
   // ── MEASURE MODE ──
   if (S.meas3Active) {
     e.stopPropagation();
