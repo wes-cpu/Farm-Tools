@@ -690,9 +690,9 @@ function renderBin(bin) {
   });
   let fanMk=null, unloadMk=null, sdMk=null, sdMk2=null, stairArc=null, stairLandMk=null, stairEntryMk=null;
   const xfanMks=[];
-  if(bin.showFan) { fanMk=L.marker(bearingOffset(ll,rM+2,bin.fanAng),{icon:dotIcon('F','#3b82f6'),interactive:false}).addTo(map); }
+  if(bin.showFan) { fanMk=L.marker(bearingOffset(ll,rM+2,bin.fanAng),{icon:dotIcon('F','#3b82f6'),interactive:false,zIndexOffset:400}).addTo(map); }
   // Extra fans from fans[] array — tracked in xfanMks so removeBinLyr can clean them up
-  (bin.fans||[]).forEach((f,i)=>{ xfanMks.push(L.marker(bearingOffset(ll,rM+2,f.bearing),{icon:dotIcon(`F${i+2}`,'#60a5fa'),interactive:false}).addTo(map)); });
+  (bin.fans||[]).forEach((f,i)=>{ xfanMks.push(L.marker(bearingOffset(ll,rM+2,f.bearing),{icon:dotIcon(`F${i+2}`,'#60a5fa'),interactive:false,zIndexOffset:400}).addTo(map)); });
   let unldLn=null;
   if(bin.showUnload) {
     const extFt=Math.max(0,bin.unloadExtFt!=null?+bin.unloadExtFt:4);
@@ -1097,7 +1097,14 @@ function visRowHTML(obj, type) {
 function addBinFan(binId) {
   const bin=S.bins.find(b=>b.id===binId); if(!bin) return;
   if(!bin.fans) bin.fans=[];
-  bin.fans.push({bearing:0});
+  // Put the new fan on a free stretch of wall: step round from the primary fan and skip anything
+  // already on the perimeter (unloader, other fans, side draws, stair landing) by at least 30°.
+  const taken=[bin.unloadAng||0, ...(bin.showFan?[bin.fanAng||0]:[]), ...bin.fans.map(f=>+f.bearing||0),
+    ...(bin.showSideDraw?[bin.sideDrawBearing||90]:[]), ...(bin.showSideDraw2?[bin.sideDrawBearing2||270]:[]), ...(bin.showStairs?[bin.stairsLandDeg||0]:[])];
+  const gap=(a,b)=>{ const d=Math.abs(((a-b)%360+540)%360-180); return d; };
+  let bearing=((bin.fanAng||0)+90)%360;
+  for(let k=1;k<=12;k++){ const cand=((bin.fanAng||0)+30*k)%360; if(taken.every(t=>gap(cand,t)>=30)){ bearing=cand; break; } }
+  bin.fans.push({bearing});
   renderBin(bin); renderProperties(); autoSave();
 }
 function removeBinFan(binId, idx) {
@@ -3926,6 +3933,32 @@ function addBinShellDetail3(bin,x,z,r,baseY,sideHt,col){
     }
   }
 }
+// Aeration fan at grade on the outside of the sidewall: transition duct through the wall,
+// round centrifugal housing with inlet cone, motor on the back. Sized so it reads at site scale.
+function addBinFan3(x,z,r,baseY,bearingDeg,colorHex){
+  const bR=bearingDeg*Math.PI/180, ux=Math.sin(bR), uz=-Math.cos(bR); // radial unit vector (0°=N)
+  const yUp=new THREE.Vector3(0,1,0), radial=new THREE.Vector3(ux,0,uz);
+  const q=new THREE.Quaternion().setFromUnitVectors(yUp,radial); // cylinders along the radial axis
+  const bodyMat=new THREE.MeshLambertMaterial({color:colorHex});
+  const darkMat=new THREE.MeshLambertMaterial({color:0x1f2937});
+  const steel=new THREE.MeshLambertMaterial({color:0x9ca3af});
+  const at=(d,y)=>new THREE.Vector3(x+ux*(r+d),baseY+y,z+uz*(r+d));
+  // Transition duct: square box from the wall out to the fan housing
+  const duct=new THREE.Mesh(new THREE.BoxGeometry(2.4,2.4,2.2),steel);
+  duct.position.copy(at(1.0,1.5)); duct.rotation.y=-bR; duct.castShadow=true; add3(duct);
+  // Fan housing (round), axis pointing out from the bin
+  const housing=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.7,2.6,20),bodyMat);
+  housing.setRotationFromQuaternion(q); housing.position.copy(at(3.4,1.9)); housing.castShadow=true; add3(housing);
+  // Inlet cone / guard on the outer face
+  const cone=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.7,0.8,20),darkMat);
+  cone.setRotationFromQuaternion(q); cone.position.copy(at(5.1,1.9)); add3(cone);
+  // Motor on top-back of the housing + small legs
+  const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.6,12),darkMat);
+  motor.setRotationFromQuaternion(q); motor.position.copy(at(3.4,3.9)); add3(motor);
+  [-0.9,0.9].forEach(sgn=>{ const px=-uz*sgn, pz=ux*sgn; // perpendicular offsets
+    const leg=new THREE.Mesh(new THREE.BoxGeometry(0.2,1.9,0.2),steel);
+    leg.position.set(x+ux*(r+3.4)+px,baseY+0.95,z+uz*(r+3.4)+pz); add3(leg); });
+}
 // Paneled roof (faceted like real roof sheets) + peak collar cap
 function addBinRoof3(bin,x,z,r,ev,rf,col){
   const roofMat=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.65),flatShading:true});
@@ -4166,8 +4199,8 @@ function populate3D(){
       // Eave ring at bottom of body
       const eaveRing=new THREE.Mesh(new THREE.TorusGeometry(r,0.4,8,48),new THREE.MeshLambertMaterial({color:0x1f2937}));eaveRing.rotation.x=Math.PI/2;eaveRing.position.set(x,binFloorY+0.2,z);add3(eaveRing);
       // Fan & unload markers at grade (cone bottom — fans at perimeter, unload at center)
-      if(bin.showFan){const bR=bin.fanAng*Math.PI/180,fm=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,8),new THREE.MeshLambertMaterial({color:0x3b82f6}));fm.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(fm);}
-      (bin.fans||[]).forEach(f=>{const bR=f.bearing*Math.PI/180,fm=new THREE.Mesh(new THREE.SphereGeometry(1.5,8,8),new THREE.MeshLambertMaterial({color:0x60a5fa}));fm.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(fm);});
+      if(bin.showFan) addBinFan3(x,z,r,foundH,bin.fanAng,0x3b82f6);
+      (bin.fans||[]).forEach(f=>addBinFan3(x,z,r,foundH,f.bearing,0x60a5fa));
       if(bin.showUnload){
         const uext=Math.max(0,bin.unloadExtFt!=null?+bin.unloadExtFt:0);
         const uMat=new THREE.MeshLambertMaterial({color:0xf97316});
@@ -4226,7 +4259,8 @@ function populate3D(){
       addBinRoof3(bin,x,z,r,ev,rf,col);
       addBinShellDetail3(bin,x,z,r,foundH,totalSideHt,col);
       const ring=new THREE.Mesh(new THREE.TorusGeometry(r,0.4,8,48),new THREE.MeshLambertMaterial({color:0x1f2937}));ring.rotation.x=Math.PI/2;ring.position.set(x,foundH+0.2,z);add3(ring);
-      if(bin.showFan){const bR=bin.fanAng*Math.PI/180,fm=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,8),new THREE.MeshLambertMaterial({color:0x3b82f6}));fm.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(fm);}
+      if(bin.showFan) addBinFan3(x,z,r,foundH,bin.fanAng,0x3b82f6);
+      (bin.fans||[]).forEach(f=>addBinFan3(x,z,r,foundH,f.bearing,0x60a5fa));
       if(bin.showUnload){
         const bR=bin.unloadAng*Math.PI/180;
         const uext=Math.max(0,bin.unloadExtFt!=null?+bin.unloadExtFt:4);
@@ -4261,7 +4295,6 @@ function populate3D(){
         const lx=x+(r+1)*Math.sin(landRad),lz2=z-(r+1)*Math.cos(landRad);
         const landing=new THREE.Mesh(new THREE.BoxGeometry(3.5,0.3,3.5),stepMat);landing.position.set(lx,ev,lz2);landing.castShadow=true;add3(landing);
       }
-      (bin.fans||[]).forEach(f=>{const bR=f.bearing*Math.PI/180,fm=new THREE.Mesh(new THREE.SphereGeometry(1.5,8,8),new THREE.MeshLambertMaterial({color:0x60a5fa}));fm.position.set(x+r*Math.sin(bR),foundH+1.8,z-r*Math.cos(bR));add3(fm);});
       if(bin.showSideDraw){
         const bR=-(bin.sideDrawBearing||90)*Math.PI/180,sdY=bin.sideDrawHt||10;
         const sv1=new THREE.Vector3(x+r*Math.sin(-bR),sdY+3,z-r*Math.cos(-bR));
