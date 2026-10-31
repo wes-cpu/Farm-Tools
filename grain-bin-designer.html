@@ -2024,6 +2024,30 @@ function paEndpoints(pa) {
   }
   return {bootLL,disLL,bootHt,disHt,runFt,bin,mode:effMode,angDeg,short,problem,needFt,aMax,headHt,hopperLL,swingBearing,truckLL,truckHead,truckAt};
 }
+// Drop-to-connect: a free-standing auger whose discharge end lands over a bin starts loading it;
+// one whose boot lands at a bin's unloader starts unloading it. Returns true when it connected.
+function paTrySnapToBin(pa){
+  if((pa.paMode||'standalone')!=='standalone') return false;
+  const ep=paEndpoints(pa);
+  for(const b of S.bins){
+    const bll=L.latLng(b.lat,b.lng);
+    if(distFt(ep.disLL,bll)<=b.diam/2+3){
+      pa.paMode='fill'; pa.connBinId=b.id; pa.truckDeg=null;
+      pa.headingDeg=Math.round(bearingTo(ep.bootLL,bll));
+      showToast(`✓ ${pa.name} now loads ${b.name} — drag the boot or hopper to put the truck where you want it`);
+      return true;
+    }
+  }
+  for(const b of S.bins){
+    const up=getUnloadPoint(b.id,'bin'); if(!up) continue;
+    if(distFt(ep.bootLL,L.latLng(up.lat,up.lng))<=10){
+      pa.paMode='reclaim'; pa.connBinId=b.id; pa.truckDeg=null;
+      showToast(`✓ ${pa.name} now unloads ${b.name} — drag the discharge end to put the truck where you want it`);
+      return true;
+    }
+  }
+  return false;
+}
 // Rotated rectangle (lat/lng corners) for truck outlines
 function rectCorners(ll,lenFt,widFt,headDeg){
   const f=bearingOffset(ll,lenFt/2*FT2M,headDeg), b=bearingOffset(ll,lenFt/2*FT2M,headDeg+180);
@@ -2043,7 +2067,11 @@ function renderPortAuger(pa) {
     if(S.tool!=='select') return;
     L.DomEvent.stopPropagation(e); map.dragging.disable(); sel();
     function onMove(e2){ fn(e2.latlng); renderPortAuger(pa); }
-    function onUp(){ map.dragging.enable(); map.off('mousemove',onMove); map.off('mouseup',onUp); renderPortAuger(pa); sel(); autoSave(); }
+    function onUp(){
+      map.dragging.enable(); map.off('mousemove',onMove); map.off('mouseup',onUp);
+      paTrySnapToBin(pa); // free-standing auger dropped on a bin → connects to it
+      renderPortAuger(pa); sel(); autoSave();
+    }
     map.on('mousemove',onMove); map.on('mouseup',onUp);
   });
   // Boot (intake). Standalone: drags the whole auger. Load In: drags the truck end around the bin
@@ -2051,12 +2079,17 @@ function renderPortAuger(pa) {
   const bootFree=mode!=='reclaim';
   const bootMk=L.circleMarker(bootLL,{radius:6,fillColor:'#1f2937',fillOpacity:1,color:pa.color,weight:2,interactive:bootFree}).addTo(map);
   bootMk.on('click',onClick); layers.push(bootMk);
-  if(mode==='standalone') dragWith(bootMk,ll=>{ pa.lat=ll.lat; pa.lng=ll.lng; });
+  if(mode==='standalone'){ bootMk.bindTooltip('Boot — drag to move the auger; drop at a bin unloader to unload it',{direction:'top',offset:[0,-6]}); dragWith(bootMk,ll=>{ pa.lat=ll.lat; pa.lng=ll.lng; }); }
   else if(mode==='fill') dragWith(bootMk,ll=>{ pa.headingDeg=Math.round(bearingTo(ll,disLL)); });
   // Discharge. Load Out: drags the truck-loading end around the bin (sets the heading).
-  const disFree=mode==='reclaim';
+  // Standalone: swings the auger around its boot — drop it over a bin to start loading that bin.
+  const disFree=mode!=='fill';
   const disMk=L.circleMarker(disLL,{radius:disFree?6:5,fillColor:pa.color,fillOpacity:1,color:'#fff',weight:disFree?2:1,interactive:disFree}).addTo(map);
-  if(disFree){ disMk.on('click',onClick); dragWith(disMk,ll=>{ pa.headingDeg=Math.round(bearingTo(bootLL,ll)); }); }
+  if(disFree){
+    disMk.on('click',onClick);
+    if(mode==='standalone') disMk.bindTooltip('Discharge — drag to swing; drop over a bin to load it',{direction:'top',offset:[0,-6]});
+    dragWith(disMk,ll=>{ pa.headingDeg=Math.round(bearingTo(bootLL,ll)); });
+  }
   layers.push(disMk);
   // Swing-away hopper: short tube + hopper square; drag the hopper to swing it around the boot
   if(hopperLL){
@@ -2109,7 +2142,8 @@ function portAugerHTML(pa) {
     <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">${pa.paMode==='fill'
       ?'Discharge pins over the bin peak and the angle is set by what this tube length needs to reach it. <b>Drag the boot or hopper on the map</b> (or set Heading) to put the truck end where the truck will dump.'
       :'Boot pins to the bin’s unload point. <b>Drag the discharge end on the map</b> (or set Heading) to put it where the truck will load.'}</p>`
-    :`<p style="font-size:0.7em;color:#f59e0b;margin-bottom:3px">Add a grain bin first, then connect this auger to it.</p>`):''}
+    :`<p style="font-size:0.7em;color:#f59e0b;margin-bottom:3px">Add a grain bin first, then connect this auger to it.</p>`)
+    :`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Free-standing. <b>Drag the boot</b> to move the auger and <b>drag the discharge end</b> to swing it. Drop the discharge over a bin to start loading that bin, or drop the boot at a bin's unloader to start unloading it — or pick a mode above.</p>`}
   ${ep.problem==='short'?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">⚠ <b>Auger too short:</b> ${pa.lengthFt}′ at ${PA_MAX_ANG}° reaches ${htFt.toFixed(1)}′ but the spout needs to hang ${ep.headHt.toFixed(1)}′ (${escH(bin.name)} peak + ${PA_SPOUT_CLEAR}′). Needs about <b>${ep.needFt}′</b> of tube.</div>`
     :ep.problem==='steep'?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">⚠ <b>Auger too steep for the roof:</b> ${pa.lengthFt}′ has to stand at ${ep.angDeg.toFixed(1)}° to reach the peak, but anything over ${ep.aMax.toFixed(1)}° cuts through ${escH(bin.name)}'s ${roofDegOf(bin).toFixed(0)}° roof at the eave. Needs about <b>${ep.needFt}′</b> of tube to lay flat enough.</div>`:''}
   <div class="ph">Auger Specs</div>
@@ -4010,6 +4044,7 @@ function on3DMouseUp(e){
     const rfn=rfns[capturedType];
     const arr=DRAG3_MAPS()[capturedType];
     const obj=arr&&arr.find(o=>o.id===capturedId);
+    if(capturedType==='portauger'&&obj) paTrySnapToBin(obj); // dropped over a bin → connects
     if(rfn&&obj) rfn(obj);
     // Re-draw connected conveyors on the map too (they were re-snapped during the drag)
     if(capturedType!=='conveyor') S.conveyors.forEach(renderConveyor);
