@@ -1324,6 +1324,55 @@ function getCenterPoint(id, type, binTopConnect) {
 
 // Core snap: moves a conveyor's boot/head onto its grain-flow connections.
 // Returns true if any endpoint actually changed position. No rendering/saving here.
+// The points a conveyor's ends snap to, from its grain-flow connections (null when unconnected)
+function convEndTargets(cv) {
+  const nodes = convNodes(cv);
+  let boot = null, head = null;
+  if (cv.feedsFrom && cv.feedsFrom.length > 0) {
+    const src = cv.feedsFrom[0];
+    const srcMode = cv.srcSnapMode || 'unload';
+    if (src.type === 'conveyor') {
+      // Receiving from another conveyor: inlet sits directly UNDER its discharging head
+      const sc = S.conveyors.find(x=>x.id===src.id);
+      if (sc) { const snds=convNodes(sc), h=snds[snds.length-1];
+        boot = { lat:h.lat, lng:h.lng, htFt:Math.max(0, h.htFt - convStackOffset(cv)) }; }
+    } else {
+      boot = getSnapPoint(src.id, src.type, srcMode);
+    }
+  }
+  if (cv.feedsTo && cv.feedsTo.length > 0) {
+    const dst = cv.feedsTo[0];
+    // Dryers are always loaded from the top, so default the head to the load point
+    const dstMode = cv.dstSnapMode || (dst.type === 'dryer' ? 'peak' : (cv.binTopConnect ? 'peak' : 'unload'));
+    // Delivering INTO a leg always means the boot inlet near grade — never the head
+    const pt = dst.type === 'leg' ? getCenterPoint(dst.id,'leg') : getSnapPoint(dst.id, dst.type, dstMode);
+    if (pt) {
+      const inlet = (cv.legInletHt!=null) ? +cv.legInletHt : 6;
+      head = { lat:pt.lat, lng:pt.lng, htFt: dst.type === 'leg' ? pt.htFt + inlet : pt.htFt };
+    }
+  }
+  return { boot, head, nodes };
+}
+// Spouts: when a connected end was given its own height, the gap to the connection point is
+// bridged by a vertical drop spout. Head above its target → spout down into the target.
+// Source above the boot → spout down into the boot. The other way round can't gravity-feed,
+// so it is reported as a problem instead.
+const SPOUT_MIN_FT = 0.5;
+function convSpouts(cv) {
+  const { boot, head, nodes } = convEndTargets(cv);
+  const out = { boot:null, head:null, problems:[] };
+  if (boot) {
+    const nd = nodes[0], gap = boot.htFt - (+nd.htFt||0);
+    if (gap > SPOUT_MIN_FT) out.boot = { lat:nd.lat, lng:nd.lng, topHt:boot.htFt, botHt:+nd.htFt||0, dropFt:gap };
+    else if (gap < -SPOUT_MIN_FT) out.problems.push(`Boot sits ${(-gap).toFixed(1)}′ above the source discharge — grain can't climb into it.`);
+  }
+  if (head) {
+    const nd = nodes[nodes.length-1], gap = (+nd.htFt||0) - head.htFt;
+    if (gap > SPOUT_MIN_FT) out.head = { lat:nd.lat, lng:nd.lng, topHt:+nd.htFt||0, botHt:head.htFt, dropFt:gap };
+    else if (gap < -SPOUT_MIN_FT) out.problems.push(`Head is ${(-gap).toFixed(1)}′ below the ${((cv.feedsTo||[])[0]||{}).type==='leg'?'leg inlet':'fill point'} it feeds — raise it or clear the manual height.`);
+  }
+  return out;
+}
 function snapConvCore(cv) {
   if(!cv.nodes) cv.nodes = convNodes(cv);
   const nodes = cv.nodes;
@@ -1335,34 +1384,9 @@ function snapConvCore(cv) {
       nd.lat=pt.lat; nd.lng=pt.lng; nd.htFt=ht; changed=true;
     }
   };
-  // BOOT (node[0])
-  if (cv.feedsFrom && cv.feedsFrom.length > 0) {
-    const src = cv.feedsFrom[0];
-    const srcMode = cv.srcSnapMode || 'unload';
-    let pt;
-    if (src.type === 'conveyor') {
-      // Receiving from another conveyor: inlet sits directly UNDER its discharging head
-      const sc = S.conveyors.find(x=>x.id===src.id);
-      if (sc) { const snds=convNodes(sc), head=snds[snds.length-1];
-        pt = { lat:head.lat, lng:head.lng, htFt:Math.max(0, head.htFt - convStackOffset(cv)) }; }
-    } else {
-      pt = getSnapPoint(src.id, src.type, srcMode);
-    }
-    if (pt) apply(nodes[0],pt);
-  }
-  // HEAD (last node)
-  if (cv.feedsTo && cv.feedsTo.length > 0) {
-    const dst = cv.feedsTo[0];
-    // Dryers are always loaded from the top, so default the head to the load point
-    const dstMode = cv.dstSnapMode || (dst.type === 'dryer' ? 'peak' : (cv.binTopConnect ? 'peak' : 'unload'));
-    // Delivering INTO a leg always means the boot inlet near grade — never the head
-    const pt = dst.type === 'leg' ? getCenterPoint(dst.id,'leg') : getSnapPoint(dst.id, dst.type, dstMode);
-    if (pt) {
-      const inlet = (cv.legInletHt!=null) ? +cv.legInletHt : 6;
-      const ht = dst.type === 'leg' ? pt.htFt + inlet : pt.htFt;
-      apply(nodes[nodes.length-1],{lat:pt.lat,lng:pt.lng,htFt:ht});
-    }
-  }
+  const { boot, head } = convEndTargets(cv);
+  if (boot) apply(nodes[0], boot);
+  if (head) apply(nodes[nodes.length-1], head);
   return changed;
 }
 // Auto-follow: every conveyor with grain-flow connections re-snaps whenever anything
@@ -1480,11 +1504,19 @@ function renderConveyor(cv) {
     lbls.push(lbl);
   }
 
+  // Drop spouts where a manual-height end sits above / below its connection point
+  const spouts=convSpouts(cv);
+  [spouts.boot,spouts.head].forEach((sp,k)=>{
+    if(!sp) return;
+    const m=L.marker(L.latLng(sp.lat,sp.lng),{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${clr};color:${clr};font-size:9px">↓ ${sp.dropFt.toFixed(0)}′ spout${k===0?' in':''}</div>`,className:'',iconAnchor:[k===0?64:-8,-8]}),interactive:false}).addTo(map);
+    lbls.push(m);
+  });
   // Draggable endpoint circle for each node
   nodes.forEach((nd,i)=>{
     const epLL=L.latLng(nd.lat,nd.lng);
-    // Linked bends get a slightly larger marker
-    const r=nd.bendId?7:5;
+    // Linked bends get a slightly larger marker; spouted ends a touch larger too
+    const hasSpout=(i===0&&spouts.boot)||(i===nodes.length-1&&spouts.head);
+    const r=nd.bendId?7:hasSpout?6:5;
     // Endpoints attached to a grain-flow connection are pinned (they follow the object instead)
     const pinned=(i===0&&cv.feedsFrom&&cv.feedsFrom.length>0)||(i===nodes.length-1&&cv.feedsTo&&cv.feedsTo.length>0);
     const ep=L.circleMarker(epLL,{radius:r,fillColor:pinned?'#111827':clr,fillOpacity:1,color:pinned?clr:'#fff',weight:pinned?2:1}).addTo(map);
@@ -3033,10 +3065,12 @@ function convHTML(cv) {
   let nodeRows='';
   let maxSegAng=0, minSegAng=0, dblAngBad=false;
   const bootLinked=(cv.feedsFrom||[]).length>0, headLinked=(cv.feedsTo||[]).length>0;
+  const spouts=convSpouts(cv);
   nodes.forEach((nd,i)=>{
     const isEndpoint=i===0||i===nodes.length-1;
     const linked=(i===0&&bootLinked)||(i===nodes.length-1&&headLinked);
-    let segInfo='';
+    const sp=i===0?spouts.boot:(i===nodes.length-1?spouts.head:null);
+    let segInfo=sp?`<span style="color:#9ca3af;font-size:0.8em;white-space:nowrap">↓ ${sp.dropFt.toFixed(1)}′ spout${i===0?' in':''}</span> `:'';
     if(i<nodes.length-1){
       const n1=nodes[i+1];
       const d=distFt(L.latLng(nd.lat,nd.lng),L.latLng(n1.lat,n1.lng));
@@ -3083,8 +3117,9 @@ function convHTML(cv) {
     ${declining?` ${minSegAng.toFixed(1)}° segment runs downhill — double-runs operate at ${DBLRUN_RANGE_LBL}; the head must be level with or above the boot.`:''}
   </div>`:'';
 
+  const spoutWarn=spouts.problems.length?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">⚠ ${spouts.problems.join('<br>⚠ ')}</div>`:'';
   return `<div class="ph">${typeName} — ${cv.name}</div>
-  ${dblWarn}
+  ${dblWarn}${spoutWarn}
   <div class="fr"><label>Name</label><input type="text" id="cvn" value="${escH(cv.name)}"/></div>
   ${isDblCv
     ?`<div class="fr"><label>Size (diameter)</label><select id="cvdiam">${dblSizeOpts}</select></div>
@@ -3124,7 +3159,7 @@ function convHTML(cv) {
   <button class="pbtn${addNodeActive?' ok':''}" onclick="beginAddConvNode('${cv.id}')">
     ${addNodeActive?'✓ Click map to insert node (Esc to stop)':'+ Add Node / Segment'}
   </button>
-  <p style="font-size:0.69em;color:#6b7280;margin:4px 0 8px">Nodes between Boot and Head create angle changes — like a weld or change in incline. Link to a Bend to snap the height automatically.${(bootLinked||headLinked)?' A connected Boot/Head normally follows its grain-flow object\'s height — type a height to override it (shown with 🔒; click <b>auto</b> to follow again).':''}</p>
+  <p style="font-size:0.69em;color:#6b7280;margin:4px 0 8px">Nodes between Boot and Head create angle changes — like a weld or change in incline. Link to a Bend to snap the height automatically.${(bootLinked||headLinked)?' A connected Boot/Head normally follows its grain-flow object\'s height — type a height to override it (shown with 🔒; click <b>auto</b> to follow again). A head set above its fill point drops in through a spout, shown on the map and in 3D.':''}</p>
   ${convFlowHTML(cv)}
   <div class="ph">Endpoint Connection Points</div>
   <div class="fr"><label>Boot connects at</label>
@@ -4348,6 +4383,18 @@ function populate3D(){
         ? new THREE.Mesh(new THREE.BoxGeometry(Math.max(1,(cv.boxWidIn||12)/12)*1.15,Math.max(1,(cv.boxHtIn||12)/12)*1.15,Math.max(1,(cv.boxWidIn||12)/12)*1.15),mat)
         : new THREE.Mesh(new THREE.BoxGeometry(cvW*1.1,cvW*0.7,cvW*1.1),mat);
       joint.position.copy(v);add3(joint);
+    });
+    // Drop spouts: a vertical downspout bridges a manual-height end to its connection point
+    const sp3=convSpouts(cv);
+    const spoutMat=new THREE.MeshLambertMaterial({color:new THREE.Color(clr3).multiplyScalar(0.7).getHex()});
+    [sp3.boot,sp3.head].forEach(sp=>{
+      if(!sp) return;
+      const p=toXZ(sp.lat,sp.lng), r=Math.max(0.35,cvW*0.4), h=sp.topHt-sp.botHt;
+      const tube=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,10),spoutMat);
+      tube.position.set(p.x,sp.botHt+h/2,p.z); tube.castShadow=true; add3(tube);
+      // Flared transition at the top where the spout hangs off the head / source
+      const flare=new THREE.Mesh(new THREE.CylinderGeometry(r*1.6,r,Math.min(2,h*0.4),10),spoutMat);
+      flare.position.set(p.x,sp.topHt-Math.min(2,h*0.4)/2,p.z); add3(flare);
     });
     const midIdx=Math.floor(nodes.length/2);
     const mp=toXZ(nodes[midIdx].lat,nodes[midIdx].lng);
