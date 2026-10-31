@@ -555,13 +555,23 @@ function eaveHt(bin) {
   return (bin.foundFt||0) + sw;
 }
 function legEffHt(leg) { return leg.ht + (leg.foundFt||0); }
-function peakHt(bin)  { return eaveHt(bin)+bin.roofFt; }
+// Roof: default 30° pitch, height derived from the diameter (rise = radius × tan θ).
+// roofAuto=false means the user entered a manufacturer peak height and roofFt is kept as-is.
+const DEFAULT_ROOF_DEG=30;
+function isRoofAuto(bin) { return bin.roofAuto!==false; }
+function roofHtFromAngle(diam,deg) { return (diam/2)*Math.tan(((+deg||DEFAULT_ROOF_DEG)*Math.PI)/180); }
+function roofHt(bin) {
+  if(!isRoofAuto(bin)) return +bin.roofFt||0;
+  return Math.round(roofHtFromAngle(bin.diam,bin.roofDeg)*100)/100;
+}
+function roofDegOf(bin) { return isRoofAuto(bin)?(+bin.roofDeg||DEFAULT_ROOF_DEG):Math.atan2(+bin.roofFt||0,bin.diam/2)*180/Math.PI; }
+function peakHt(bin)  { return eaveHt(bin)+roofHt(bin); }
 function sidewallHt(bin) { return (bin.ringCount*bin.ringIn)/12; }
 function bushels(bin,gt) {
   const r=bin.diam/2, h=sidewallHt(bin);
   // Hopper-bottom tanks also hold grain in the cone (full cone volume)
   const coneVol=(bin.bottomType||'flat')==='cone' ? (1/3)*Math.PI*r*r*coneHtCalc(bin) : 0;
-  return (Math.PI*r*r*h + (1/3)*Math.PI*r*r*bin.roofFt*0.65 + coneVol) / (GRAIN_DENS[gt]||1.2445);
+  return (Math.PI*r*r*h + (1/3)*Math.PI*r*r*roofHt(bin)*0.65 + coneVol) / (GRAIN_DENS[gt]||1.2445);
 }
 function legAngle(legHt,binPeak,d) { const dh=legHt-binPeak; return dh<=0?null:Math.atan2(dh,d)*180/Math.PI; }
 function reqLegHt(peak,d,ang=TARGET_ANG) { return peak+d*Math.tan(ang*Math.PI/180); }
@@ -631,7 +641,7 @@ window.setSelRemovedPhase = function(ph) {
 
 // ── BINS ─────────────────────────────────────────────────────
 function addBin(lat,lng) {
-  const b={id:'bin_'+uid(),lat,lng,name:'Bin '+(S.bins.length+1),diam:48,ringCount:8,ringIn:42,roofFt:10,stiffened:false,
+  const b={id:'bin_'+uid(),lat,lng,name:'Bin '+(S.bins.length+1),diam:48,ringCount:8,ringIn:42,roofDeg:DEFAULT_ROOF_DEG,roofAuto:true,roofFt:roofHtFromAngle(48,DEFAULT_ROOF_DEG),stiffened:false,
     foundFt:0,foundDiamFt:0,fanAng:180,showFan:true,fans:[],unloadAng:0,showUnload:true,unloadExtFt:4,
     showSideDraw:false,sideDrawHt:10,sideDrawBearing:90,
     showSideDraw2:false,sideDrawHt2:10,sideDrawBearing2:270,
@@ -981,7 +991,11 @@ const HIFLIGHT_SIZES = [
   {w:32,h:20,bph:17000},{w:26,h:26,bph:18000},{w:32,h:26,bph:22100},{w:32,h:32,bph:28800},{w:36,h:32,bph:30600}
 ];
 const DBLRUN_MAX_LEN = 325;  // ft — max stretched length per double-run
-const DBLRUN_MAX_ANG = 60;   // ° — max incline angle
+const DBLRUN_MIN_ANG = 0;    // ° — double-runs operate level or inclined, never declining
+const DBLRUN_MAX_ANG = 35;   // ° — max incline angle for operation
+const DBLRUN_RANGE_LBL = `${DBLRUN_MIN_ANG}°–${DBLRUN_MAX_ANG}°`;
+// A segment is in range when it sits between level and the max incline (tiny negative = rounding noise)
+function dblAngOk(ang){ return ang>=DBLRUN_MIN_ANG-0.05 && ang<=DBLRUN_MAX_ANG; }
 function convTypeColor(type) {
   return type==='auger'?'#f97316':type==='highflight'?'#eab308':type==='doublerun'?'#a855f7':'#06b6d4';
 }
@@ -1011,7 +1025,12 @@ function cancelConv() {
 }
 function addConveyor(ll1, ll2, type, options={}) {
   const fromHt = (options.fromHt != null) ? options.fromHt : 0;
-  const toHt   = (options.toHt   != null) ? options.toHt   : (type==='drag'?0:(type==='highflight'||type==='doublerun')?30:peakNearestBin(ll2));
+  let   toHt   = (options.toHt   != null) ? options.toHt   : (type==='drag'?0:(type==='highflight'||type==='doublerun')?30:peakNearestBin(ll2));
+  if(type==='doublerun' && options.toHt==null){
+    // Default head height can't exceed what the 0–35° operating range allows over this horizontal run
+    const maxRise=distFt(ll1,ll2)*Math.tan(DBLRUN_MAX_ANG*Math.PI/180);
+    toHt=Math.max(fromHt, Math.min(toHt, Math.floor((fromHt+maxRise)*2)/2));
+  }
   const name = convTypeName(type)+' '+(S.conveyors.filter(x=>x.type===type).length+1);
   const c={
     id:'conv_'+uid(), name, type, bootType:'flat', color:convTypeColor(type),
@@ -1305,31 +1324,22 @@ function getCenterPoint(id, type, binTopConnect) {
 
 // Core snap: moves a conveyor's boot/head onto its grain-flow connections.
 // Returns true if any endpoint actually changed position. No rendering/saving here.
-function snapConvCore(cv) {
-  if(!cv.nodes) cv.nodes = convNodes(cv);
-  const nodes = cv.nodes;
-  let changed = false;
-  const apply=(nd,pt)=>{
-    if(Math.abs(nd.lat-pt.lat)>1e-9||Math.abs(nd.lng-pt.lng)>1e-9||Math.abs((nd.htFt||0)-pt.htFt)>1e-6){
-      nd.lat=pt.lat; nd.lng=pt.lng; nd.htFt=pt.htFt; changed=true;
-    }
-  };
-  // BOOT (node[0])
+// The points a conveyor's ends snap to, from its grain-flow connections (null when unconnected)
+function convEndTargets(cv) {
+  const nodes = convNodes(cv);
+  let boot = null, head = null;
   if (cv.feedsFrom && cv.feedsFrom.length > 0) {
     const src = cv.feedsFrom[0];
     const srcMode = cv.srcSnapMode || 'unload';
-    let pt;
     if (src.type === 'conveyor') {
       // Receiving from another conveyor: inlet sits directly UNDER its discharging head
       const sc = S.conveyors.find(x=>x.id===src.id);
-      if (sc) { const snds=convNodes(sc), head=snds[snds.length-1];
-        pt = { lat:head.lat, lng:head.lng, htFt:Math.max(0, head.htFt - convStackOffset(cv)) }; }
+      if (sc) { const snds=convNodes(sc), h=snds[snds.length-1];
+        boot = { lat:h.lat, lng:h.lng, htFt:Math.max(0, h.htFt - convStackOffset(cv)) }; }
     } else {
-      pt = getSnapPoint(src.id, src.type, srcMode);
+      boot = getSnapPoint(src.id, src.type, srcMode);
     }
-    if (pt) apply(nodes[0],pt);
   }
-  // HEAD (last node)
   if (cv.feedsTo && cv.feedsTo.length > 0) {
     const dst = cv.feedsTo[0];
     // Dryers are always loaded from the top, so default the head to the load point
@@ -1338,10 +1348,45 @@ function snapConvCore(cv) {
     const pt = dst.type === 'leg' ? getCenterPoint(dst.id,'leg') : getSnapPoint(dst.id, dst.type, dstMode);
     if (pt) {
       const inlet = (cv.legInletHt!=null) ? +cv.legInletHt : 6;
-      const ht = dst.type === 'leg' ? pt.htFt + inlet : pt.htFt;
-      apply(nodes[nodes.length-1],{lat:pt.lat,lng:pt.lng,htFt:ht});
+      head = { lat:pt.lat, lng:pt.lng, htFt: dst.type === 'leg' ? pt.htFt + inlet : pt.htFt };
     }
   }
+  return { boot, head, nodes };
+}
+// Spouts: when a connected end was given its own height, the gap to the connection point is
+// bridged by a vertical drop spout. Head above its target → spout down into the target.
+// Source above the boot → spout down into the boot. The other way round can't gravity-feed,
+// so it is reported as a problem instead.
+const SPOUT_MIN_FT = 0.5;
+function convSpouts(cv) {
+  const { boot, head, nodes } = convEndTargets(cv);
+  const out = { boot:null, head:null, problems:[] };
+  if (boot) {
+    const nd = nodes[0], gap = boot.htFt - (+nd.htFt||0);
+    if (gap > SPOUT_MIN_FT) out.boot = { lat:nd.lat, lng:nd.lng, topHt:boot.htFt, botHt:+nd.htFt||0, dropFt:gap };
+    else if (gap < -SPOUT_MIN_FT) out.problems.push(`Boot sits ${(-gap).toFixed(1)}′ above the source discharge — grain can't climb into it.`);
+  }
+  if (head) {
+    const nd = nodes[nodes.length-1], gap = (+nd.htFt||0) - head.htFt;
+    if (gap > SPOUT_MIN_FT) out.head = { lat:nd.lat, lng:nd.lng, topHt:+nd.htFt||0, botHt:head.htFt, dropFt:gap };
+    else if (gap < -SPOUT_MIN_FT) out.problems.push(`Head is ${(-gap).toFixed(1)}′ below the ${((cv.feedsTo||[])[0]||{}).type==='leg'?'leg inlet':'fill point'} it feeds — raise it or clear the manual height.`);
+  }
+  return out;
+}
+function snapConvCore(cv) {
+  if(!cv.nodes) cv.nodes = convNodes(cv);
+  const nodes = cv.nodes;
+  let changed = false;
+  // A node the user typed a height into (htManual) keeps that height; only its position follows.
+  const apply=(nd,pt)=>{
+    const ht=nd.htManual?(+nd.htFt||0):pt.htFt;
+    if(Math.abs(nd.lat-pt.lat)>1e-9||Math.abs(nd.lng-pt.lng)>1e-9||Math.abs((nd.htFt||0)-ht)>1e-6){
+      nd.lat=pt.lat; nd.lng=pt.lng; nd.htFt=ht; changed=true;
+    }
+  };
+  const { boot, head } = convEndTargets(cv);
+  if (boot) apply(nodes[0], boot);
+  if (head) apply(nodes[nodes.length-1], head);
   return changed;
 }
 // Auto-follow: every conveyor with grain-flow connections re-snaps whenever anything
@@ -1454,16 +1499,24 @@ function renderConveyor(cv) {
     const mid=L.latLng((n0.lat+n1.lat)/2,(n0.lng+n1.lng)/2);
     const inC=(cv.feedsFrom||[]).length, outC=(cv.feedsTo||[]).length;
     const flowNote=(inC||outC)?`<br><span style="font-size:8px;opacity:0.85">${inC?'←'+inC:''}${inC&&outC?' ':' '}${outC?outC+'→':''}</span>`:'';
-    const dblBad=isDbl&&(ang>DBLRUN_MAX_ANG||dblTotLen>DBLRUN_MAX_LEN);
+    const dblBad=isDbl&&(!dblAngOk(ang)||dblTotLen>DBLRUN_MAX_LEN);
     const lbl=L.marker(mid,{icon:L.divIcon({html:`<div class="conv-lbl"${dblBad?' style="border-color:#ef4444;color:#ef4444"':''}>${dblBad?'⚠ ':''}${ang.toFixed(1)}° · ${len.toFixed(0)}′${flowNote}</div>`,className:'',iconAnchor:[32,-4]}),interactive:false}).addTo(map);
     lbls.push(lbl);
   }
 
+  // Drop spouts where a manual-height end sits above / below its connection point
+  const spouts=convSpouts(cv);
+  [spouts.boot,spouts.head].forEach((sp,k)=>{
+    if(!sp) return;
+    const m=L.marker(L.latLng(sp.lat,sp.lng),{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${clr};color:${clr};font-size:9px">↓ ${sp.dropFt.toFixed(0)}′ spout${k===0?' in':''}</div>`,className:'',iconAnchor:[k===0?64:-8,-8]}),interactive:false}).addTo(map);
+    lbls.push(m);
+  });
   // Draggable endpoint circle for each node
   nodes.forEach((nd,i)=>{
     const epLL=L.latLng(nd.lat,nd.lng);
-    // Linked bends get a slightly larger marker
-    const r=nd.bendId?7:5;
+    // Linked bends get a slightly larger marker; spouted ends a touch larger too
+    const hasSpout=(i===0&&spouts.boot)||(i===nodes.length-1&&spouts.head);
+    const r=nd.bendId?7:hasSpout?6:5;
     // Endpoints attached to a grain-flow connection are pinned (they follow the object instead)
     const pinned=(i===0&&cv.feedsFrom&&cv.feedsFrom.length>0)||(i===nodes.length-1&&cv.feedsTo&&cv.feedsTo.length>0);
     const ep=L.circleMarker(epLL,{radius:r,fillColor:pinned?'#111827':clr,fillOpacity:1,color:pinned?clr:'#fff',weight:pinned?2:1}).addTo(map);
@@ -1876,92 +1929,229 @@ function bindLoadout(lo) {
 function addPortAuger(lat,lng) {
   const pa={id:'pa_'+uid(),lat,lng,name:'Auger '+(S.portaugers.length+1),
     lengthFt:60,angleDeg:35,headingDeg:0,diamIn:8,capBph:0,color:'#f97316',phase:0,
-    paMode:'standalone',connBinId:null,hpAuto:true,cost:0,infraItems:[]};
+    paMode:'standalone',connBinId:null,hpAuto:true,cost:0,infraItems:[],
+    swingAway:true,swingLenFt:12,swingDeg:90,showTruck:true,truckDeg:null,truckLenFt:70,truckWidFt:8.5};
   pa.motorHp=estimatePaHp(pa); // auto-filled from diameter/length/angle
   S.portaugers.push(pa); renderPortAuger(pa); select('portauger',pa.id); autoSave();
 }
-function paDischarge(pa) {
-  const runFt=pa.lengthFt*Math.cos(pa.angleDeg*Math.PI/180);
-  const htFt=pa.lengthFt*Math.sin(pa.angleDeg*Math.PI/180);
-  const disLL=bearingOffset(L.latLng(pa.lat,pa.lng),runFt*FT2M,pa.headingDeg);
-  return {ll:disLL, htFt};
+// Fill in fields that augers saved before the swing-away / truck options didn't carry
+function paNorm(pa){
+  if(pa.swingAway===undefined) pa.swingAway=true;
+  if(!(pa.swingLenFt>0)) pa.swingLenFt=12;
+  if(pa.swingDeg==null||isNaN(+pa.swingDeg)) pa.swingDeg=90;
+  if(pa.showTruck===undefined) pa.showTruck=true;
+  if(!(pa.truckLenFt>0)) pa.truckLenFt=70;
+  if(!(pa.truckWidFt>0)) pa.truckWidFt=8.5;
+  return pa;
 }
-// Resolve the boot (intake) and discharge endpoints for an auger, honoring its
-// connection mode: 'fill' pins the discharge to the top of a bin, 'reclaim' pins
-// the boot to a bin's unload (base center), 'standalone' floats free at lat/lng.
+const PA_MAX_ANG=75, PA_MIN_ANG=5;
+const PA_SPOUT_CLEAR=3;  // ft the discharge spout hangs above the roof peak when filling
+const PA_EAVE_CLEAR=1;   // ft the tube must clear the eave where it crosses the bin wall
+function normDeg(d){ return ((d%360)+360)%360; }
+function relDeg(d){ d=normDeg(d); return d>180?d-360:d; }
+// Does this auger carry a swing-away hopper? (Load Out augers sit under the bin unload — no hopper)
+function paHasSwing(pa){ return !!pa.swingAway && (pa.paMode||'standalone')!=='reclaim'; }
+function paDischarge(pa) {
+  const ep=paEndpoints(pa);
+  return {ll:ep.disLL, htFt:ep.disHt};
+}
+// Resolve every point of a portable auger, honoring its mode:
+//   'fill'    (Load In)  — discharge pinned over the bin's roof peak; the angle is whatever it
+//                          takes for this tube length to reach the peak; the boot + swing hopper
+//                          (where the truck dumps) swing around the bin on the heading.
+//   'reclaim' (Load Out) — boot pinned to the bin's unload point; the discharge end (where the
+//                          truck loads) swings around it on the heading.
+//   'standalone'         — floats free at lat/lng.
 function paEndpoints(pa) {
-  const angRad=pa.angleDeg*Math.PI/180;
-  const runFt=pa.lengthFt*Math.cos(angRad);
-  const angHt=pa.lengthFt*Math.sin(angRad);
+  paNorm(pa);
   const mode=pa.paMode||'standalone';
   const bin=(mode!=='standalone'&&pa.connBinId)?S.bins.find(b=>b.id===pa.connBinId):null;
+  const len=+pa.lengthFt||60;
+  let angDeg=Math.min(PA_MAX_ANG,Math.max(PA_MIN_ANG,+pa.angleDeg||35));
+  let bootLL,disLL,bootHt=0,disHt,short=false,needFt=0,problem=null,aMax=PA_MAX_ANG,headHt=0;
   if(bin && mode==='fill'){
-    const disLL=L.latLng(bin.lat,bin.lng);
-    const bootLL=bearingOffset(disLL,runFt*FT2M,(pa.headingDeg+180)%360);
-    return {bootLL,disLL,bootHt:0,disHt:peakHt(bin),runFt,bin,mode};
+    // Spout hangs PA_SPOUT_CLEAR ft over the roof peak. The tube must also clear the eave where it
+    // crosses the bin wall, which caps the angle at roughly the roof pitch — steeper and it cuts
+    // through the roof. So: angle = asin(head height / length), limited by the roof-clearance angle.
+    const peak=peakHt(bin), r=bin.diam/2;
+    headHt=peak+PA_SPOUT_CLEAR;
+    aMax=Math.min(PA_MAX_ANG,Math.atan((roofHt(bin)+PA_SPOUT_CLEAR-PA_EAVE_CLEAR)/r)*180/Math.PI);
+    const sinReq=headHt/len;
+    if(sinReq>=1){ problem='short'; angDeg=PA_MAX_ANG; }
+    else { angDeg=Math.asin(sinReq)*180/Math.PI; if(angDeg>aMax+1e-6) problem='steep'; }
+    angDeg=Math.max(PA_MIN_ANG,angDeg);
+    short=!!problem;
+    needFt=Math.ceil(headHt/Math.sin(aMax*Math.PI/180));
+    pa.angleDeg=Math.round(angDeg*10)/10; // derived — keeps HP estimate and reports honest
+    const angRad=angDeg*Math.PI/180, runFt=len*Math.cos(angRad);
+    disHt=len*Math.sin(angRad);
+    disLL=L.latLng(bin.lat,bin.lng);
+    bootLL=bearingOffset(disLL,runFt*FT2M,normDeg(pa.headingDeg+180));
+  } else if(bin && mode==='reclaim'){
+    const up=getUnloadPoint(bin.id,'bin');
+    bootLL=L.latLng(up.lat,up.lng); bootHt=up.htFt||0;
+    const angRad=angDeg*Math.PI/180, runFt=len*Math.cos(angRad);
+    disHt=bootHt+len*Math.sin(angRad);
+    disLL=bearingOffset(bootLL,runFt*FT2M,normDeg(pa.headingDeg));
+  } else {
+    bootLL=L.latLng(pa.lat,pa.lng);
+    const angRad=angDeg*Math.PI/180, runFt=len*Math.cos(angRad);
+    disHt=len*Math.sin(angRad);
+    disLL=bearingOffset(bootLL,runFt*FT2M,normDeg(pa.headingDeg));
   }
-  if(bin && mode==='reclaim'){
-    const bootLL=L.latLng(bin.lat,bin.lng);
-    const disLL=bearingOffset(bootLL,runFt*FT2M,pa.headingDeg);
-    return {bootLL,disLL,bootHt:0,disHt:angHt,runFt,bin,mode};
+  const runFt=len*Math.cos(angDeg*Math.PI/180);
+  const effMode=bin?mode:'standalone';
+  // Swing-away hopper: short tube out of the boot at swingDeg from the main tube (0 = folded
+  // forward under the tube, ±90 = straight out to the side, 180 = straight back)
+  let hopperLL=null, swingBearing=null;
+  if(paHasSwing(pa)){
+    swingBearing=normDeg(pa.headingDeg+pa.swingDeg);
+    hopperLL=bearingOffset(bootLL,pa.swingLenFt*FT2M,swingBearing);
   }
-  const bootLL=L.latLng(pa.lat,pa.lng);
-  const disLL=bearingOffset(bootLL,runFt*FT2M,pa.headingDeg);
-  return {bootLL,disLL,bootHt:0,disHt:angHt,runFt,bin:null,mode:'standalone'};
+  // Truck: Load In → straddles the swing hopper (or the boot) driving along the hopper tube;
+  //        Load Out → parked under the discharge spout, across the tube by default.
+  let truckLL=null, truckHead=null, truckAt=null;
+  if(pa.showTruck && effMode!=='standalone'){
+    const rel=(pa.truckDeg==null)?(effMode==='fill'?0:90):+pa.truckDeg;
+    if(effMode==='fill'){
+      truckAt=hopperLL||bootLL;
+      truckHead=normDeg((hopperLL?swingBearing:normDeg(pa.headingDeg+180))+rel);
+      // the rear hopper of the trailer sits over the dump hopper, so the truck centre is ahead of it
+      truckLL=bearingOffset(truckAt,pa.truckLenFt*0.28*FT2M,truckHead);
+    } else {
+      truckAt=disLL; truckHead=normDeg(pa.headingDeg+rel); truckLL=disLL;
+    }
+  }
+  return {bootLL,disLL,bootHt,disHt,runFt,bin,mode:effMode,angDeg,short,problem,needFt,aMax,headHt,hopperLL,swingBearing,truckLL,truckHead,truckAt};
+}
+// Drop-to-connect: a free-standing auger whose discharge end lands over a bin starts loading it;
+// one whose boot lands at a bin's unloader starts unloading it. Returns true when it connected.
+function paTrySnapToBin(pa){
+  if((pa.paMode||'standalone')!=='standalone') return false;
+  const ep=paEndpoints(pa);
+  for(const b of S.bins){
+    const bll=L.latLng(b.lat,b.lng);
+    if(distFt(ep.disLL,bll)<=b.diam/2+3){
+      pa.paMode='fill'; pa.connBinId=b.id; pa.truckDeg=null;
+      pa.headingDeg=Math.round(bearingTo(ep.bootLL,bll));
+      showToast(`✓ ${pa.name} now loads ${b.name} — drag the boot or hopper to put the truck where you want it`);
+      return true;
+    }
+  }
+  for(const b of S.bins){
+    const up=getUnloadPoint(b.id,'bin'); if(!up) continue;
+    if(distFt(ep.bootLL,L.latLng(up.lat,up.lng))<=10){
+      pa.paMode='reclaim'; pa.connBinId=b.id; pa.truckDeg=null;
+      showToast(`✓ ${pa.name} now unloads ${b.name} — drag the discharge end to put the truck where you want it`);
+      return true;
+    }
+  }
+  return false;
+}
+// Rotated rectangle (lat/lng corners) for truck outlines
+function rectCorners(ll,lenFt,widFt,headDeg){
+  const f=bearingOffset(ll,lenFt/2*FT2M,headDeg), b=bearingOffset(ll,lenFt/2*FT2M,headDeg+180);
+  return [bearingOffset(f,widFt/2*FT2M,headDeg+90),bearingOffset(f,widFt/2*FT2M,headDeg-90),
+          bearingOffset(b,widFt/2*FT2M,headDeg-90),bearingOffset(b,widFt/2*FT2M,headDeg+90)];
 }
 function renderPortAuger(pa) {
   removePortAugerLyr(pa.id);
-  const {bootLL,disLL,disHt:htFt,mode,bin}=paEndpoints(pa);
-  const dashed=mode!=='standalone';
-  const line=L.polyline([bootLL,disLL],{color:pa.color,weight:3,opacity:0.9}).addTo(map);
-  line.on('click',e=>{ L.DomEvent.stopPropagation(e); S.tool==='delete'?deletePortAuger(pa.id):select('portauger',pa.id); });
-  // Boot (intake) marker — filled ring in fill mode is the free end, hollow when pinned to a bin
-  const bootMk=L.circleMarker(bootLL,{radius:6,fillColor:'#1f2937',fillOpacity:1,color:pa.color,weight:2}).addTo(map);
-  bootMk.on('click',e=>{ L.DomEvent.stopPropagation(e); S.tool==='delete'?deletePortAuger(pa.id):select('portauger',pa.id); });
-  bootMk.on('mousedown',e=>{
-    if(S.tool!=='select'||dashed) return; // connected augers follow their bin, not the cursor
-    L.DomEvent.stopPropagation(e); map.dragging.disable(); select('portauger',pa.id);
-    function onMove(e2){ pa.lat=e2.latlng.lat; pa.lng=e2.latlng.lng; renderPortAuger(pa); select('portauger',pa.id); }
-    function onUp(){ map.dragging.enable(); map.off('mousemove',onMove); map.off('mouseup',onUp); autoSave(); }
+  const ep=paEndpoints(pa);
+  const {bootLL,disLL,disHt:htFt,mode,bin,hopperLL,truckLL,truckHead}=ep;
+  const sel=()=>select('portauger',pa.id);
+  const onClick=e=>{ L.DomEvent.stopPropagation(e); S.tool==='delete'?deletePortAuger(pa.id):sel(); };
+  const layers=[];
+  const line=L.polyline([bootLL,disLL],{color:pa.color,weight:3,opacity:0.9}).addTo(map); line.on('click',onClick); layers.push(line);
+  // Generic map drag helper: fn(latlng) updates the auger from the cursor
+  const dragWith=(mk,fn)=>mk.on('mousedown',e=>{
+    if(S.tool!=='select') return;
+    L.DomEvent.stopPropagation(e); map.dragging.disable(); sel();
+    function onMove(e2){ fn(e2.latlng); renderPortAuger(pa); }
+    function onUp(){
+      map.dragging.enable(); map.off('mousemove',onMove); map.off('mouseup',onUp);
+      paTrySnapToBin(pa); // free-standing auger dropped on a bin → connects to it
+      renderPortAuger(pa); sel(); autoSave();
+    }
     map.on('mousemove',onMove); map.on('mouseup',onUp);
   });
-  const disMk=L.circleMarker(disLL,{radius:5,fillColor:pa.color,fillOpacity:1,color:'#fff',weight:1,interactive:false}).addTo(map);
-  const modeTag=mode==='fill'?'↑ fills '+escH(bin.name):mode==='reclaim'?'↓ from '+escH(bin.name):`${pa.angleDeg}° · ${htFt.toFixed(0)}′ dis`;
+  // Boot (intake). Standalone: drags the whole auger. Load In: drags the truck end around the bin
+  // (sets the heading). Load Out: pinned to the bin unload — not draggable.
+  const bootFree=mode!=='reclaim';
+  const bootMk=L.circleMarker(bootLL,{radius:6,fillColor:'#1f2937',fillOpacity:1,color:pa.color,weight:2,interactive:bootFree}).addTo(map);
+  bootMk.on('click',onClick); layers.push(bootMk);
+  if(mode==='standalone'){ bootMk.bindTooltip('Boot — drag to move the auger; drop at a bin unloader to unload it',{direction:'top',offset:[0,-6]}); dragWith(bootMk,ll=>{ pa.lat=ll.lat; pa.lng=ll.lng; }); }
+  else if(mode==='fill') dragWith(bootMk,ll=>{ pa.headingDeg=Math.round(bearingTo(ll,disLL)); });
+  // Discharge. Load Out: drags the truck-loading end around the bin (sets the heading).
+  // Standalone: swings the auger around its boot — drop it over a bin to start loading that bin.
+  const disFree=mode!=='fill';
+  const disMk=L.circleMarker(disLL,{radius:disFree?6:5,fillColor:pa.color,fillOpacity:1,color:'#fff',weight:disFree?2:1,interactive:disFree}).addTo(map);
+  if(disFree){
+    disMk.on('click',onClick);
+    if(mode==='standalone') disMk.bindTooltip('Discharge — drag to swing; drop over a bin to load it',{direction:'top',offset:[0,-6]});
+    dragWith(disMk,ll=>{ pa.headingDeg=Math.round(bearingTo(bootLL,ll)); });
+  }
+  layers.push(disMk);
+  // Swing-away hopper: short tube + hopper square; drag the hopper to swing it around the boot
+  if(hopperLL){
+    const sw=L.polyline([bootLL,hopperLL],{color:pa.color,weight:2,opacity:0.9,dashArray:'4,3'}).addTo(map); sw.on('click',onClick); layers.push(sw);
+    const hop=L.circleMarker(hopperLL,{radius:5,fillColor:'#111827',fillOpacity:1,color:pa.color,weight:2}).addTo(map);
+    hop.bindTooltip('Swing-away hopper — drag to swing',{direction:'top',offset:[0,-6]});
+    hop.on('click',onClick); layers.push(hop);
+    dragWith(hop,ll=>{ pa.swingDeg=Math.round(relDeg(bearingTo(bootLL,ll)-pa.headingDeg)); });
+  }
+  // Ghost truck where it loads / unloads
+  if(truckLL){
+    const tr=L.polygon(rectCorners(truckLL,pa.truckLenFt,pa.truckWidFt,truckHead),{color:'#d1d5db',weight:1,dashArray:'3,3',fillColor:'#6b7280',fillOpacity:0.35,interactive:false}).addTo(map);
+    layers.push(tr);
+    const nose=bearingOffset(truckLL,pa.truckLenFt/2*FT2M,truckHead);
+    const arrow=L.circleMarker(nose,{radius:3,fillColor:'#f59e0b',fillOpacity:1,color:'#f59e0b',weight:1,interactive:false}).addTo(map); layers.push(arrow);
+  }
+  const modeTag=mode==='fill'?`↑ loads ${escH(bin.name)}${ep.short?' ⚠ short':''}`:mode==='reclaim'?`↓ unloads ${escH(bin.name)}`:`${pa.angleDeg}° · ${htFt.toFixed(0)}′ dis`;
   const lbl=L.marker(disLL,{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${pa.color};color:${pa.color}">⤴ ${pa.name}<br><small>${modeTag}</small></div>`,className:'',iconAnchor:[-4,6]}),interactive:false}).addTo(map);
-  LY.portaugers[pa.id]={line,bootMk,disMk,lbl};
+  layers.push(lbl);
+  LY.portaugers[pa.id]={layers};
   if(pa.hidden) applyLayerHidden(LY.portaugers[pa.id]);
 }
 function removePortAugerLyr(id) {
   const l=LY.portaugers[id]; if(!l) return;
-  l.line.remove(); l.bootMk.remove(); l.disMk.remove(); l.lbl.remove();
+  (l.layers||[]).forEach(x=>x.remove());
   delete LY.portaugers[id];
 }
 function deletePortAuger(id) { removePortAugerLyr(id); S.portaugers=S.portaugers.filter(p=>p.id!==id); if(S.selId===id)select(null,null); autoSave(); }
 function portAugerHTML(pa) {
   const ep=paEndpoints(pa);
-  const htFt=ep.disHt, mode=ep.mode, bin=ep.bin;
-  const runFt=(pa.lengthFt*Math.cos(pa.angleDeg*Math.PI/180)).toFixed(1);
+  const htFt=ep.disHt, mode=ep.mode, bin=ep.bin, isFill=mode==='fill', isOut=mode==='reclaim';
+  const runFt=ep.runFt.toFixed(1);
   const binOpts=S.bins.map(b=>`<option value="${b.id}"${pa.connBinId===b.id?' selected':''}>${escH(b.name)}</option>`).join('');
-  const heightLbl=mode==='fill'?'Fills Bin At':(mode==='reclaim'?'Discharge Height':'Discharge Height');
+  const heightLbl=isFill?'Discharge over Peak':'Discharge Height';
+  const hasSwing=paHasSwing(pa);
+  const truckRel=(pa.truckDeg==null)?(isFill?0:90):+pa.truckDeg;
+  const truckRow=ep.truckAt&&bin?`<div class="crow"><span class="lbl">Truck ${isFill?'dumps':'loads'} at</span><span class="val">${Math.round(bearingTo(L.latLng(bin.lat,bin.lng),ep.truckAt))}° · ${distFt(L.latLng(bin.lat,bin.lng),ep.truckAt).toFixed(0)} ft from bin</span></div>`:'';
   return `<div class="ph">Portable Auger — ${pa.name}</div>
   <div class="fr"><label>Name</label><input type="text" id="pan" value="${escH(pa.name)}"/></div>
   <div class="ph">Function</div>
   <div class="fr"><label>Mode</label>
     <select id="pamode">
-      <option value="standalone"${mode==='standalone'?' selected':''}>Standalone (free-standing)</option>
-      <option value="fill"${mode==='fill'?' selected':''}>Fill bin — discharge into top</option>
-      <option value="reclaim"${mode==='reclaim'?' selected':''}>Reclaim — receive from bin unload</option>
+      <option value="standalone"${(pa.paMode||'standalone')==='standalone'?' selected':''}>Standalone (free-standing)</option>
+      <option value="fill"${pa.paMode==='fill'?' selected':''}>Load In — fill a bin (truck dumps at hopper)</option>
+      <option value="reclaim"${pa.paMode==='reclaim'?' selected':''}>Load Out — unload a bin (truck loads at discharge)</option>
     </select>
   </div>
-  ${mode!=='standalone'?(S.bins.length?`<div class="fr"><label>Connected Bin</label>
+  ${(pa.paMode||'standalone')!=='standalone'?(S.bins.length?`<div class="fr"><label>${pa.paMode==='fill'?'Bin Being Filled':'Bin Being Unloaded'}</label>
     <select id="pabin"><option value="">— select bin —</option>${binOpts}</select></div>
-    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">${mode==='fill'?'Discharge end pins to the top of the selected bin; the boot sits on the ground, angled up toward it.':'Boot (intake) pins to the bin unload point; the auger carries grain out to the discharge end.'}</p>`
-    :`<p style="font-size:0.7em;color:#f59e0b;margin-bottom:3px">Add a grain bin first, then connect this auger to it.</p>`):''}
+    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">${pa.paMode==='fill'
+      ?'Discharge pins over the bin peak and the angle is set by what this tube length needs to reach it. <b>Drag the boot or hopper on the map</b> (or set Heading) to put the truck end where the truck will dump.'
+      :'Boot pins to the bin’s unload point. <b>Drag the discharge end on the map</b> (or set Heading) to put it where the truck will load.'}</p>`
+    :`<p style="font-size:0.7em;color:#f59e0b;margin-bottom:3px">Add a grain bin first, then connect this auger to it.</p>`)
+    :`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Free-standing. <b>Drag the boot</b> to move the auger and <b>drag the discharge end</b> to swing it. Drop the discharge over a bin to start loading that bin, or drop the boot at a bin's unloader to start unloading it — or pick a mode above.</p>`}
+  ${ep.problem==='short'?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">⚠ <b>Auger too short:</b> ${pa.lengthFt}′ at ${PA_MAX_ANG}° reaches ${htFt.toFixed(1)}′ but the spout needs to hang ${ep.headHt.toFixed(1)}′ (${escH(bin.name)} peak + ${PA_SPOUT_CLEAR}′). Needs about <b>${ep.needFt}′</b> of tube.</div>`
+    :ep.problem==='steep'?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">⚠ <b>Auger too steep for the roof:</b> ${pa.lengthFt}′ has to stand at ${ep.angDeg.toFixed(1)}° to reach the peak, but anything over ${ep.aMax.toFixed(1)}° cuts through ${escH(bin.name)}'s ${roofDegOf(bin).toFixed(0)}° roof at the eave. Needs about <b>${ep.needFt}′</b> of tube to lay flat enough.</div>`:''}
   <div class="ph">Auger Specs</div>
   <div class="fr"><label>Length (ft)</label><input type="number" id="palen" value="${pa.lengthFt}" min="10" max="200" step="5"/></div>
-  <div class="fr"><label>Angle (°)</label><input type="number" id="paang" value="${pa.angleDeg}" min="5" max="75" step="1"/></div>
-  <div class="fr"><label>Heading (°)</label><input type="number" id="pahead" value="${pa.headingDeg}" min="0" max="359" step="5"/></div>
-  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0°=N · 90°=E · 180°=S · 270°=W${mode==='fill'?' — points from boot up toward the bin':mode==='reclaim'?' — points from bin out to discharge':''}</p>
+  <div class="fr"><label>Angle (°)${isFill?' <span style="color:#6b7280;font-weight:400">auto</span>':''}</label><input type="number" id="paang" value="${isFill?ep.angDeg.toFixed(1):pa.angleDeg}" min="${PA_MIN_ANG}" max="${PA_MAX_ANG}" step="1" ${isFill?'disabled style="opacity:0.55"':''}/></div>
+  ${isFill?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Set by tube length vs. bin peak: a longer auger lays flatter, a shorter one stands steeper.</p>`:''}
+  <div class="fr"><label>Heading (°)</label><input type="number" id="pahead" value="${normDeg(pa.headingDeg)}" min="0" max="359" step="5"/></div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0°=N · 90°=E · 180°=S · 270°=W${isFill?' — direction the tube points from the truck end up to the bin':isOut?' — direction the tube points from the bin out to the truck':''}</p>
   <div class="fr"><label>Diameter (in)</label><input type="number" id="padiam" value="${pa.diamIn||8}" min="4" max="24" step="1"/></div>
   <div class="fr"><label>Capacity (BPH)</label><input type="number" id="pabph" value="${pa.capBph||0}" min="0" max="50000" step="500"/></div>
   <div class="fr"><label>Motor HP</label>
@@ -1970,14 +2160,26 @@ function portAugerHTML(pa) {
   </div>
   ${isHpAuto(pa)?`<p style="font-size:0.69em;color:#6b7280;margin-bottom:3px">Estimated from diameter × length × angle, rounded up to a standard motor. Uncheck Auto to enter your own.</p>`:''}
   <div class="fr"><label>Power Source</label><select id="pasrc">${powerSrcOpts(pa.powerSrc,true)}</select></div>
-  ${pa.powerSrc==='pto'?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">🚜 PTO-driven — hooks to a tractor and is left out of the ⚡ electrical load estimate.</p>`:''}
+  ${!isOut?`<div class="ph">Swing-Away Hopper</div>
+  <div class="fr"><label>Swing-Away Hopper</label><input type="checkbox" id="paswing" ${pa.swingAway?'checked':''}></div>
+  ${hasSwing?`<div class="fr"><label>Hopper Tube Length (ft)</label><input type="number" id="paswlen" value="${pa.swingLenFt}" min="6" max="30" step="1"/></div>
+  <div class="fr"><label>Swing Angle (°)</label><input type="number" id="paswdeg" value="${relDeg(pa.swingDeg)}" min="-180" max="180" step="5"/></div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Angle of the hopper tube off the main tube at the boot: 0 = folded forward under the tube (transport), ±90 = straight out to the side, 180 = straight back. <b>Drag the hopper on the map</b> to swing it.</p>`:''}`:''}
+  ${bin?`<div class="ph">Truck Position</div>
+  <div class="fr"><label>Show Truck Outline</label><input type="checkbox" id="patruck" ${pa.showTruck?'checked':''}></div>
+  ${pa.showTruck?`<div class="fr"><label>Truck Heading Offset (°)</label><input type="number" id="patrdeg" value="${relDeg(truckRel)}" min="-180" max="180" step="15"/></div>
+  <div class="fr"><label>Truck Length / Width (ft)</label><input type="number" id="patrlen" value="${pa.truckLenFt}" min="20" max="120" step="5" style="width:58px"/><input type="number" id="patrwid" value="${pa.truckWidFt}" min="6" max="14" step="0.5" style="width:48px;margin-left:3px"/></div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">${isFill?'The truck straddles the swing-away hopper, driving along the hopper tube (0°). Use ±90 to park across it.':'The truck parks under the discharge spout, across the tube (90°). Use 0 to park in line with it.'}</p>`:''}`:''}
   ${phaseRowHTML(pa.phase||0,pa.removedPhase||0)}
+  <div class="ph">Summary</div>
   <div class="cbox">
     <div class="crow"><span class="lbl">Tube Length</span><span class="val">${pa.lengthFt} ft</span></div>
-    <div class="crow"><span class="lbl">Angle</span><span class="val">${pa.angleDeg}°</span></div>
+    <div class="crow"><span class="lbl">Angle</span><span class="val">${(+ep.angDeg).toFixed(1)}°${isFill?' (auto)':''}</span></div>
     <div class="crow"><span class="lbl">Horizontal Run</span><span class="val">${runFt} ft</span></div>
-    <div class="crow"><span class="lbl">${heightLbl}</span><span class="val">${htFt.toFixed(1)} ft</span></div>
-    ${bin?`<div class="crow"><span class="lbl">${mode==='fill'?'Fills':'Reclaims'}</span><span class="val" style="color:${pa.color}">${escH(bin.name)}</span></div>`:''}
+    <div class="crow"><span class="lbl">${heightLbl}</span><span class="val"${ep.short?' style="color:#ef4444;font-weight:700"':''}>${htFt.toFixed(1)} ft</span></div>
+    ${bin?`<div class="crow"><span class="lbl">${isFill?'Loads Into':'Unloads From'}</span><span class="val" style="color:${pa.color}">${escH(bin.name)}</span></div>`:''}
+    ${hasSwing?`<div class="crow"><span class="lbl">Swing Hopper</span><span class="val">${pa.swingLenFt}′ tube · ${relDeg(pa.swingDeg)}°</span></div>`:''}
+    ${truckRow}
     ${pa.capBph?`<div class="crow"><span class="lbl">Capacity</span><span class="val">${pa.capBph.toLocaleString()} BPH</span></div>`:''}
     ${pa.phase?`<div class="crow"><span class="lbl">Build Phase</span><span class="val" style="color:${phaseColor(pa.phase)}">${phaseName(pa.phase)}</span></div>`:''}
   </div>
@@ -1985,20 +2187,33 @@ function portAugerHTML(pa) {
 }
 function bindPortAuger(pa) {
   function upd(){
+    paNorm(pa);
     pa.name=document.getElementById('pan')?.value||pa.name;
     pa.lengthFt=+document.getElementById('palen')?.value||pa.lengthFt;
-    pa.angleDeg=Math.min(75,Math.max(5,+document.getElementById('paang')?.value||pa.angleDeg));
-    pa.headingDeg=+document.getElementById('pahead')?.value||0;
+    const angEl=document.getElementById('paang');
+    if(angEl&&!angEl.disabled) pa.angleDeg=Math.min(PA_MAX_ANG,Math.max(PA_MIN_ANG,+angEl.value||pa.angleDeg));
+    pa.headingDeg=normDeg(+document.getElementById('pahead')?.value||0);
     pa.diamIn=+document.getElementById('padiam')?.value||8;
     pa.capBph=+document.getElementById('pabph')?.value||0;
     pa.hpAuto=document.getElementById('pahpauto')?.checked??isHpAuto(pa);
     pa.motorHp=pa.hpAuto?estimatePaHp(pa):(+document.getElementById('pahp')?.value||0);
     pa.powerSrc=document.getElementById('pasrc')?.value||pa.powerSrc||'utility';
-    pa.paMode=document.getElementById('pamode')?.value||pa.paMode||'standalone';
+    const prevMode=pa.paMode||'standalone';
+    pa.paMode=document.getElementById('pamode')?.value||prevMode;
     pa.connBinId=pa.paMode==='standalone'?null:(document.getElementById('pabin')?.value||null);
+    // First bin pick for a connected mode: point the tube at a sensible default and reset the truck offset
+    const sw=document.getElementById('paswing'); if(sw) pa.swingAway=sw.checked;
+    const swl=document.getElementById('paswlen'); if(swl) pa.swingLenFt=Math.max(6,+swl.value||12);
+    const swd=document.getElementById('paswdeg'); if(swd) pa.swingDeg=relDeg(+swd.value||0);
+    const tr=document.getElementById('patruck'); if(tr) pa.showTruck=tr.checked;
+    const trd=document.getElementById('patrdeg');
+    if(pa.paMode!==prevMode) pa.truckDeg=null; // mode switch: fall back to that mode's default truck parking
+    else if(trd) pa.truckDeg=relDeg(+trd.value||0);
+    const trl=document.getElementById('patrlen'); if(trl) pa.truckLenFt=Math.max(20,+trl.value||70);
+    const trw=document.getElementById('patrwid'); if(trw) pa.truckWidFt=Math.max(6,+trw.value||8.5);
     renderPortAuger(pa); renderProperties(); autoSave();
   }
-  ['pan','palen','paang','pahead','padiam','pabph','pahp','pahpauto','pasrc','pamode','pabin'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  ['pan','palen','paang','pahead','padiam','pabph','pahp','pahpauto','pasrc','pamode','pabin','paswing','paswlen','paswdeg','patruck','patrdeg','patrlen','patrwid'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
   bindPhaseRow(pa,upd);
 }
 
@@ -2415,8 +2630,14 @@ function binHTML(bin) {
   <div class="fr"><label>Diameter (ft)</label><input type="number" id="pd" value="${bin.diam}" min="12" max="156" step="6"/></div>
   <div class="fr"><label>Ring Height (in)</label><input type="number" id="prh" value="${bin.ringIn}" min="24" max="72" step="6"/></div>
   <div class="fr"><label>Ring Count</label><input type="number" id="prc" value="${bin.ringCount}" min="1" max="32"/></div>
-  <div class="fr"><label>Total Height (ground → peak, ft)</label><input type="number" id="ptot" value="${peakHt(bin).toFixed(1)}" min="8" max="250" step="0.5"/></div>
-  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Enter the manufacturer's overall peak height. Roof height is calculated: ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${bin.roofFt.toFixed(1)}′ roof</b>.</p>
+  <div class="fr"><label>Roof Angle (°)</label>
+    <input type="number" id="proofdeg" value="${roofDegOf(bin).toFixed(1).replace(/\.0$/,'')}" min="10" max="50" step="0.5" ${isRoofAuto(bin)?'':'disabled style="opacity:0.55"'}/>
+    <label style="display:flex;align-items:center;gap:3px;font-size:0.72em;color:#9ca3af;margin-left:5px;cursor:pointer"><input type="checkbox" id="proofauto" ${isRoofAuto(bin)?'checked':''}/>Auto</label>
+  </div>
+  <div class="fr"><label>Total Height (ground → peak, ft)</label><input type="number" id="ptot" value="${peakHt(bin).toFixed(1)}" min="8" max="250" step="0.5" ${isRoofAuto(bin)?'disabled style="opacity:0.55"':''}/></div>
+  ${isRoofAuto(bin)
+    ?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Roof height is calculated from the diameter: ${(bin.diam/2).toFixed(1)}′ radius × tan(${roofDegOf(bin).toFixed(1).replace(/\.0$/,'')}°) = <b>${roofHt(bin).toFixed(1)}′ roof</b>, giving a ${peakHt(bin).toFixed(1)}′ peak over the ${eaveHt(bin).toFixed(1)}′ eave. Uncheck Auto to enter the manufacturer's overall peak height instead.</p>`
+    :`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Manual: roof height is ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${roofHt(bin).toFixed(1)}′ roof</b> (≈${roofDegOf(bin).toFixed(1)}° pitch). Check Auto to size the roof from the diameter at a set angle.</p>`}
   <div class="fr"><label>Sidewall Type</label><select id="pstiff">
     <option value="0"${!bin.stiffened?' selected':''}>Unstiffened (corrugated only)</option>
     <option value="1"${bin.stiffened?' selected':''}>Stiffened (vertical stiffener channels)</option>
@@ -2484,6 +2705,7 @@ function binHTML(bin) {
     ${isCone?`<div class="crow"><span class="lbl">Hopper Clearance</span><span class="val">${legH.toFixed(1)} ft (${Math.round(legH*12)}″)</span></div><div class="crow"><span class="lbl">Hopper Angle</span><span class="val">${bin.coneAngleDeg||45}°</span></div><div class="crow"><span class="lbl">Hopper Height</span><span class="val">${cH.toFixed(2)} ft</span></div>`:''}
     <div class="crow"><span class="lbl">Sidewall Height</span><span class="val">${((bin.ringCount*bin.ringIn)/12).toFixed(2)} ft</span></div>
     <div class="crow"><span class="lbl">Eave Height</span><span class="val">${eh.toFixed(2)} ft</span></div>
+    <div class="crow"><span class="lbl">Roof Height / Angle</span><span class="val">${roofHt(bin).toFixed(2)} ft · ${roofDegOf(bin).toFixed(1)}°</span></div>
     <div class="crow"><span class="lbl">Roof Peak</span><span class="val">${ph.toFixed(2)} ft</span></div>
     <div class="crow"><span class="lbl">Diameter</span><span class="val">${bin.diam} ft</span></div>
     <div class="crow"><span class="lbl">Footprint</span><span class="val">${Math.round(fp).toLocaleString()} sq ft</span></div>
@@ -2522,14 +2744,23 @@ function bindBin(bin) {
     // Read extra fan bearings + HP
     document.querySelectorAll('.xfan').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].bearing=+el.value||0; });
     document.querySelectorAll('.xfanhp').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].hp=+el.value||0; });
+    // Roof: Auto sizes the roof from diameter × tan(angle), so a diameter change re-derives it.
+    const wasAuto=isRoofAuto(bin);
+    bin.roofAuto=document.getElementById('proofauto')?.checked??wasAuto;
+    if(bin.roofAuto){
+      // Only read the angle box if it was editable; re-checking Auto returns to the stored angle (30° default)
+      const deg=wasAuto?+document.getElementById('proofdeg')?.value:0;
+      bin.roofDeg=(deg>0)?deg:(+bin.roofDeg||DEFAULT_ROOF_DEG);
+      bin.roofFt=roofHt(bin); // keep roofFt in sync for anything reading it directly
+    }
     renderBin(bin); renderProperties(); autoSave();
   }
-  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puext','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
-  // Total Height edits derive the roof height (total − eave). Ring/foundation edits
+  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puext','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang','proofdeg','proofauto'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  // Manual mode only: Total Height edits derive the roof height (total − eave). Ring/foundation edits
   // deliberately do NOT re-derive — adding a ring raises the peak, keeping the roof.
   document.getElementById('ptot')?.addEventListener('change',e=>{
     const tot=+e.target.value||0;
-    if(tot>0) bin.roofFt=Math.max(1,Math.round((tot-eaveHt(bin))*10)/10);
+    if(tot>0){ bin.roofAuto=false; bin.roofFt=Math.max(1,Math.round((tot-eaveHt(bin))*10)/10); }
     renderBin(bin); renderProperties(); autoSave();
   });
   ['psf','psu','pssd','pssd2','pss','bpsrc'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
@@ -2861,29 +3092,37 @@ function convHTML(cv) {
   const typeName=cv.type==='auger'?'Inclined Auger':cv.type==='highflight'?'Conveyor (chain, inclined)':cv.type==='doublerun'?'Double-Run Conveyor':'Drag / Horizontal Conveyor';
   const isDblCv=cv.type==='doublerun';
   const isHfCv=cv.type==='highflight';
-  const recRange=cv.type==='auger'?'30°–45°':isHfCv?'up to ~60° (steep-incline chain)':isDblCv?`≤ ${DBLRUN_MAX_ANG}° max`:'~0° (flat)';
+  const recRange=cv.type==='auger'?'30°–45°':isHfCv?'up to ~60° (steep-incline chain)':isDblCv?`${DBLRUN_RANGE_LBL} operating range`:'~0° (flat)';
   const addNodeActive=S.convAddNodeMode===cv.id;
 
   // Node table rows
   let nodeRows='';
-  let maxSegAng=0;
+  let maxSegAng=0, minSegAng=0, dblAngBad=false;
+  const bootLinked=(cv.feedsFrom||[]).length>0, headLinked=(cv.feedsTo||[]).length>0;
+  const spouts=convSpouts(cv);
   nodes.forEach((nd,i)=>{
     const isEndpoint=i===0||i===nodes.length-1;
-    let segInfo='';
+    const linked=(i===0&&bootLinked)||(i===nodes.length-1&&headLinked);
+    const sp=i===0?spouts.boot:(i===nodes.length-1?spouts.head:null);
+    let segInfo=sp?`<span style="color:#9ca3af;font-size:0.8em;white-space:nowrap">↓ ${sp.dropFt.toFixed(1)}′ spout${i===0?' in':''}</span> `:'';
     if(i<nodes.length-1){
       const n1=nodes[i+1];
       const d=distFt(L.latLng(nd.lat,nd.lng),L.latLng(n1.lat,n1.lng));
       const ang=convAngle(nd.htFt,n1.htFt,d),len=convLength(nd.htFt,n1.htFt,d);
-      if(ang>maxSegAng) maxSegAng=ang;
+      if(i===0||ang>maxSegAng) maxSegAng=ang;
+      if(i===0||ang<minSegAng) minSegAng=ang;
+      const segBad=isDblCv&&!dblAngOk(ang);
+      if(segBad) dblAngBad=true;
       const angClr=ang<0?'#ef4444'
-        :isDblCv?(ang>DBLRUN_MAX_ANG?'#ef4444':'#10b981')
+        :isDblCv?(segBad?'#ef4444':'#10b981')
         :ang>=30&&ang<=55?'#10b981':'#f59e0b';
-      segInfo=`<span style="color:${angClr};font-size:0.85em">→ ${ang.toFixed(1)}° · ${len.toFixed(0)}′${isDblCv&&ang>DBLRUN_MAX_ANG?' ⚠':''}</span>`;
+      segInfo=`<span style="color:${angClr};font-size:0.85em">→ ${ang.toFixed(1)}° · ${len.toFixed(0)}′${segBad?' ⚠':''}</span>`;
     }
     nodeRows+=`<tr style="border-bottom:1px solid #1f2937">
       <td style="padding:3px 4px;color:#6b7280;font-size:0.82em;white-space:nowrap">${i===0?'Boot':i===nodes.length-1?'Head':'#'+i}</td>
-      <td style="padding:3px 2px"><input type="number" class="cv-node-ht" data-idx="${i}" value="${nd.htFt}" min="0" max="400" step="0.5"
-        style="width:58px;padding:2px 4px;background:#111827;border:1px solid #374151;color:#f3f4f6;border-radius:3px;font-size:0.84em"/></td>
+      <td style="padding:3px 2px;white-space:nowrap"><input type="number" class="cv-node-ht" data-idx="${i}" value="${nd.htFt}" min="0" max="400" step="0.5"
+        title="${linked?(nd.htManual?'Manual height — the grain-flow connection sets only the position':'Follows the grain-flow connection height; type a value to override'):''}"
+        style="width:58px;padding:2px 4px;background:#111827;border:1px solid ${linked&&nd.htManual?'#f59e0b':'#374151'};color:#f3f4f6;border-radius:3px;font-size:0.84em"/>${linked&&nd.htManual?`<button class="cv-node-auto" data-idx="${i}" title="Return to the connection's height" style="margin-left:3px;padding:1px 4px;background:#1f2937;border:1px solid #f59e0b;color:#f59e0b;border-radius:3px;cursor:pointer;font-size:9px">🔒 auto</button>`:''}</td>
       <td style="padding:3px 2px"><select class="cv-node-bend" data-idx="${i}"
         style="max-width:100px;padding:2px 3px;background:#111827;border:1px solid #374151;color:#f3f4f6;border-radius:3px;font-size:0.77em">
         ${bendOptsFor(nd.bendId)}</select></td>
@@ -2903,19 +3142,22 @@ function convHTML(cv) {
 
   // Double-run: fixed size options; capacity is set by the diameter
   const dblSizeOpts=Object.keys(DBLRUN_SIZES).map(d=>`<option value="${d}"${+(cv.diamIn||10)===+d?' selected':''}>${d}" — ${DBLRUN_SIZES[d].toLocaleString()} BPH</option>`).join('');
-  const overLen=isDblCv&&totalLen>DBLRUN_MAX_LEN, overAng=isDblCv&&maxSegAng>DBLRUN_MAX_ANG;
+  const overLen=isDblCv&&totalLen>DBLRUN_MAX_LEN, overAng=dblAngBad;
+  const tooSteep=isDblCv&&maxSegAng>DBLRUN_MAX_ANG, declining=isDblCv&&minSegAng<DBLRUN_MIN_ANG-0.05;
   const dblWarn=(overLen||overAng)?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">
     ⚠ <b>Out of tolerance:</b>
     ${overLen?`total run ${totalLen.toFixed(0)}′ exceeds the ${DBLRUN_MAX_LEN}′ max — split into a second double-run.`:''}
-    ${overAng?` ${maxSegAng.toFixed(1)}° incline exceeds the ${DBLRUN_MAX_ANG}° max angle.`:''}
+    ${tooSteep?` ${maxSegAng.toFixed(1)}° incline exceeds the ${DBLRUN_MAX_ANG}° max — double-runs operate at ${DBLRUN_RANGE_LBL}. Lower the head, raise the boot, or lengthen the run.`:''}
+    ${declining?` ${minSegAng.toFixed(1)}° segment runs downhill — double-runs operate at ${DBLRUN_RANGE_LBL}; the head must be level with or above the boot.`:''}
   </div>`:'';
 
+  const spoutWarn=spouts.problems.length?`<div style="background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:5px;padding:6px 8px;margin-bottom:6px;font-size:0.75em;color:#fca5a5">⚠ ${spouts.problems.join('<br>⚠ ')}</div>`:'';
   return `<div class="ph">${typeName} — ${cv.name}</div>
-  ${dblWarn}
+  ${dblWarn}${spoutWarn}
   <div class="fr"><label>Name</label><input type="text" id="cvn" value="${escH(cv.name)}"/></div>
   ${isDblCv
     ?`<div class="fr"><label>Size (diameter)</label><select id="cvdiam">${dblSizeOpts}</select></div>
-      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Capacity is set by the size: 8"=4,000 · 10"=7,500 · 12"=11,000 · 14"=15,000 BPH. Max ${DBLRUN_MAX_LEN}′ per run · max ${DBLRUN_MAX_ANG}° incline.</p>`
+      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Capacity is set by the size: 8"=4,000 · 10"=7,500 · 12"=11,000 · 14"=15,000 BPH. Max ${DBLRUN_MAX_LEN}′ per run · operating angle ${DBLRUN_RANGE_LBL}.</p>`
     :isHfCv
     ?`<div class="fr"><label>Box Size (W″ × H″)</label><select id="cvbox">
         ${HIFLIGHT_SIZES.map(s=>`<option value="${s.w}x${s.h}"${(cv.boxWidIn||12)===s.w&&(cv.boxHtIn||12)===s.h?' selected':''}>${s.w}″ × ${s.h}″ — ${s.bph.toLocaleString()} BPH</option>`).join('')}
@@ -2951,7 +3193,7 @@ function convHTML(cv) {
   <button class="pbtn${addNodeActive?' ok':''}" onclick="beginAddConvNode('${cv.id}')">
     ${addNodeActive?'✓ Click map to insert node (Esc to stop)':'+ Add Node / Segment'}
   </button>
-  <p style="font-size:0.69em;color:#6b7280;margin:4px 0 8px">Nodes between Boot and Head create angle changes — like a weld or change in incline. Link to a Bend to snap the height automatically.</p>
+  <p style="font-size:0.69em;color:#6b7280;margin:4px 0 8px">Nodes between Boot and Head create angle changes — like a weld or change in incline. Link to a Bend to snap the height automatically.${(bootLinked||headLinked)?' A connected Boot/Head normally follows its grain-flow object\'s height — type a height to override it (shown with 🔒; click <b>auto</b> to follow again). A head set above its fill point drops in through a spout, shown on the map and in 3D.':''}</p>
   ${convFlowHTML(cv)}
   <div class="ph">Endpoint Connection Points</div>
   <div class="fr"><label>Boot connects at</label>
@@ -2977,7 +3219,7 @@ function convHTML(cv) {
     <div class="crow"><span class="lbl">Total Horizontal</span><span class="val">${totalHoriz.toFixed(1)} ft</span></div>
     <div class="crow"><span class="lbl">Total Run Length</span><span class="val"${overLen?' style="color:#ef4444;font-weight:700"':''}>${totalLen.toFixed(1)} ft${isDblCv?` / ${DBLRUN_MAX_LEN} max`:''}</span></div>
     <div class="crow"><span class="lbl">Net Rise</span><span class="val">${rise>=0?'+':''}${rise.toFixed(1)} ft</span></div>
-    <div class="crow"><span class="lbl">${isDblCv?'Angle Limit':'Recommended Angle'}</span><span class="val"${overAng?' style="color:#ef4444;font-weight:700"':''}>${isDblCv?`${maxSegAng.toFixed(1)}° / ${DBLRUN_MAX_ANG}° max`:recRange}</span></div>
+    <div class="crow"><span class="lbl">${isDblCv?'Operating Angle':'Recommended Angle'}</span><span class="val"${overAng?' style="color:#ef4444;font-weight:700"':''}>${isDblCv?`${nodes.length>2?minSegAng.toFixed(1)+'° to ':''}${maxSegAng.toFixed(1)}° (range ${DBLRUN_RANGE_LBL})`:recRange}</span></div>
     ${isHfCv?`<div class="crow"><span class="lbl">Box Size</span><span class="val">${cv.boxWidIn||12}″ × ${cv.boxHtIn||12}″</span></div>`
       :cv.diamIn?`<div class="crow"><span class="lbl">Pipe Diameter</span><span class="val">${cv.diamIn}"</span></div>`:''}
     ${cv.capBph?`<div class="crow"><span class="lbl">Capacity</span><span class="val">${cv.capBph.toLocaleString()} BPH</span></div>`:''}
@@ -3026,8 +3268,15 @@ function bindConv(cv) {
   document.querySelectorAll('.cv-node-ht').forEach(el=>{
     el.addEventListener('change',()=>{
       const i=+el.dataset.idx;
-      if(cv.nodes[i]) cv.nodes[i].htFt=+el.value||0;
+      if(cv.nodes[i]){ cv.nodes[i].htFt=+el.value||0; cv.nodes[i].htManual=true; } // typed → sticks through auto-snap
       renderConveyor(cv); renderProperties(); autoSave();
+    });
+  });
+  document.querySelectorAll('.cv-node-auto').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const i=+el.dataset.idx;
+      if(cv.nodes[i]) cv.nodes[i].htManual=false;
+      snapConvCore(cv); renderConveyor(cv); renderProperties(); autoSave();
     });
   });
   document.querySelectorAll('.cv-node-bend').forEach(el=>{
@@ -3038,7 +3287,7 @@ function bindConv(cv) {
       cv.nodes[i].bendId=bendId;
       if(bendId){
         const bend=S.bends.find(b=>b.id===bendId);
-        if(bend) cv.nodes[i].htFt=bend.htFt; // snap height to bend
+        if(bend){ cv.nodes[i].htFt=bend.htFt; cv.nodes[i].htManual=false; } // bend sets the height now
       }
       renderConveyor(cv); renderProperties(); autoSave();
     });
@@ -3532,6 +3781,15 @@ window.openProjectsModal = openProjectsModal;
 function hydrateData(data) {
   clearAllLayers();
   S.bins=data.bins||[]; S.legs=data.legs||[]; S.conveyors=data.conveyors||[];
+  // Roof migration: bins saved before the roof-angle option carried only roofFt. Every such bin
+  // moves to an Auto 30° roof sized from its diameter; uncheck Auto in the panel to override one.
+  S.bins.forEach(b=>{
+    if(b.roofAuto===undefined){
+      b.roofAuto=true;
+      b.roofDeg=DEFAULT_ROOF_DEG;
+      b.roofFt=roofHt(b);
+    }
+  });
   S.pits=data.pits||[]; S.dryers=data.dryers||[]; S.trucks=data.trucks||[];
   S.loadouts=data.loadouts||[]; S.structures=data.structures||[]; S.bends=data.bends||[]; S.walkways=data.walkways||[]; S.portaugers=data.portaugers||[]; S.propanetanks=data.propanetanks||[]; S.generators=data.generators||[];
   S.power=data.power||{utilAmps:800,utilVolts:240,utilPhase:1,activeMode:'all'};
@@ -3621,11 +3879,15 @@ function init3D(){
   scene3.add(new THREE.AmbientLight(0xffffff,0.6));scene3.add(new THREE.HemisphereLight(0x87ceeb,0x3d6e2a,0.4));
   const sun=new THREE.DirectionalLight(0xfff4e0,1.0);sun.position.set(300,500,200);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.near=1;sun.shadow.camera.far=3000;sun.shadow.camera.left=sun.shadow.camera.bottom=-800;sun.shadow.camera.right=sun.shadow.camera.top=800;scene3.add(sun);
   const gnd=new THREE.Mesh(new THREE.PlaneGeometry(8000,8000),new THREE.MeshLambertMaterial({color:0x4a7c3f}));gnd.rotation.x=-Math.PI/2;gnd.receiveShadow=true;scene3.add(gnd);scene3._gnd=gnd;
+  // Object drag must be wired with POINTER events and BEFORE OrbitControls is created: OrbitControls
+  // calls preventDefault() on pointerdown, which suppresses the browser's compatibility mousedown /
+  // mouseup events entirely, and it must see our handler first so a grab can stop it orbiting.
+  cv.addEventListener('pointerdown', on3DMouseDown);
+  cv.addEventListener('pointermove', on3DMouseMove);
+  cv.addEventListener('pointerup', on3DMouseUp);
+  window.addEventListener('pointerup', on3DMouseUp); // release outside the canvas still ends a drag
   ctrl3=new THREE.OrbitControls(cam3,cv);ctrl3.enableDamping=true;ctrl3.dampingFactor=0.07;ctrl3.screenSpacePanning=true;ctrl3.minDistance=15;ctrl3.maxDistance=2500;ctrl3.maxPolarAngle=Math.PI/2.05;
   cv.addEventListener('click', on3DCanvasClick);
-  cv.addEventListener('mousedown', on3DMouseDown);
-  cv.addEventListener('mousemove', on3DMouseMove);
-  cv.addEventListener('mouseup', on3DMouseUp);
   window.addEventListener('resize',on3DResize);
 }
 function animate3D(){animId3=requestAnimationFrame(animate3D);ctrl3.update();ren3.render(scene3,cam3);}
@@ -3634,7 +3896,14 @@ function on3DResize(){if(!ren3)return;const el=document.getElementById('view3d')
 let _rLat,_rLng;
 function toXZ(lat,lng){const F=364567,FL=F*Math.cos(_rLat*Math.PI/180);return{x:(lng-_rLng)*FL,z:-(lat-_rLat)*F};}
 function fromXZ(x,z){const F=364567,FL=F*Math.cos(_rLat*Math.PI/180);return{lat:_rLat-z/F,lng:_rLng+x/FL};}
-function add3(o){scene3.add(o);objs3.push(o);}
+// _tag3 names the site object currently being built; add3 stamps it onto every mesh (roofs, seams,
+// labels, stiffeners…) that wasn't tagged explicitly, so clicking any part of a bin picks the bin.
+let _tag3=null;
+function add3(o){
+  if(_tag3) o.traverse(c=>{ if(!c.userData.siteId){ c.userData.siteId=_tag3.siteId; c.userData.siteType=_tag3.siteType; } });
+  scene3.add(o);objs3.push(o);
+}
+function siteOf3(obj){ for(let o=obj;o;o=o.parent){ if(o.userData&&o.userData.siteId) return o.userData; } return null; }
 
 // ── REALISTIC BIN SHELL DETAILS ──────────────────────────────
 // Corrugation seam rings at every ring joint, plus vertical stiffener channels
@@ -3671,7 +3940,16 @@ function addBinRoof3(bin,x,z,r,ev,rf,col){
 }
 
 // ── 3D DRAG STATE ─────────────────────────────────────────────
-let _drag3={active:false,siteType:null,siteId:null,lastPt:null};
+let _drag3={active:false,siteType:null,siteId:null,lastPt:null,offX:0,offZ:0,raf:null};
+const DRAG3_MAPS=()=>({bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
+  conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
+  generator:S.generators||[],propanetank:S.propanetanks||[],portauger:S.portaugers});
+function drag3Obj(){ const arr=DRAG3_MAPS()[_drag3.siteType]; return arr?arr.find(o=>o.id===_drag3.siteId):null; }
+// Rebuild the scene at most once per frame while dragging
+function drag3Rebuild(){
+  if(_drag3.raf) return;
+  _drag3.raf=requestAnimationFrame(()=>{ _drag3.raf=null; _drag3Mode=true; populate3D(); _drag3Mode=false; });
+}
 let _drag3Mode=false;  // suppress camera re-fit during drag
 let _drag3Dirty=false;
 let _edit3Mode=false;  // suppress camera re-fit during property edits
@@ -3684,26 +3962,39 @@ function on3DMouseDown(e){
   const ray=new THREE.Raycaster();ray.setFromCamera(mouse,cam3);
   const hits=ray.intersectObjects(objs3,true);
   for(const hit of hits){
-    const ud=hit.object.userData;
+    const ud=siteOf3(hit.object);
     if(ud&&ud.siteId){
       _drag3.active=true;_drag3.siteType=ud.siteType;_drag3.siteId=ud.siteId;_drag3.lastPt=null;_drag3Dirty=false;
+      // Remember where on the ground the grab happened relative to the object's anchor, so the
+      // object follows the cursor without jumping its center under the pointer.
+      const gp=get3DGroundPoint(e), obj=drag3Obj();
+      _drag3.offX=0;_drag3.offZ=0;
+      if(gp&&obj&&ud.siteType!=='conveyor'){ const a=toXZ(obj.lat,obj.lng); _drag3.offX=a.x-gp.x; _drag3.offZ=a.z-gp.z; }
+      if(gp) _drag3.lastPt=gp.clone();
       ctrl3.enabled=false;cv.style.cursor='grabbing';
-      e.stopPropagation();
+      e.stopImmediatePropagation(); // keep OrbitControls from starting an orbit on this press
+      e.preventDefault();
       return;
     }
   }
 }
 function on3DMouseMove(e){
-  if(!_drag3.active) return;
-  const pt=get3DPoint(e);if(!pt) return;
-  const{lat,lng}=fromXZ(pt.x,pt.z);
-  const maps={bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
-    conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
-    generator:S.generators,propanetank:S.propanetanks,portauger:S.portaugers};
-  const arr=maps[_drag3.siteType];if(!arr) return;
-  const obj=arr.find(o=>o.id===_drag3.siteId);if(!obj) return;
+  if(!_drag3.active){
+    // Hover feedback: show a grab cursor over anything that can be moved
+    if(S.meas3Active||_tool3d||!objs3.length) return;
+    const cv=document.getElementById('canvas3d'),rect=cv.getBoundingClientRect();
+    const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
+    const ray=new THREE.Raycaster();ray.setFromCamera(mouse,cam3);
+    const hit=ray.intersectObjects(objs3,true).find(h=>siteOf3(h.object));
+    cv.style.cursor=hit?'grab':'';
+    return;
+  }
+  // Always track the cursor on the ground plane — never on the object being dragged
+  const pt=get3DGroundPoint(e);if(!pt) return;
+  const obj=drag3Obj();if(!obj) return;
   if(_drag3.siteType==='conveyor'){
     if(!_drag3.lastPt){_drag3.lastPt=pt.clone();return;}
+    const{lat,lng}=fromXZ(pt.x,pt.z);
     const{lat:pLat,lng:pLng}=fromXZ(_drag3.lastPt.x,_drag3.lastPt.z);
     const dLat=lat-pLat,dLng=lng-pLng;
     // Endpoints attached to grain-flow connections stay pinned; free nodes move
@@ -3714,18 +4005,29 @@ function on3DMouseMove(e){
       nd.lat+=dLat;nd.lng+=dLng;
     });
   } else {
-    obj.lat=lat;obj.lng=lng;
+    const{lat,lng}=fromXZ(pt.x+_drag3.offX,pt.z+_drag3.offZ);
+    if(_drag3.siteType==='portauger'&&(obj.paMode||'standalone')!=='standalone'&&obj.connBinId){
+      // Connected auger: the bin end is pinned, so dragging swings the free (truck) end around it
+      const ep=paEndpoints(obj), cur=L.latLng(lat,lng);
+      const hd=ep.mode==='fill'?bearingTo(cur,ep.disLL):bearingTo(ep.bootLL,cur);
+      if(Math.round(hd)===normDeg(obj.headingDeg)) return;
+      obj.headingDeg=Math.round(hd);
+    } else {
+      if(Math.abs(lat-obj.lat)<1e-9&&Math.abs(lng-obj.lng)<1e-9) return;
+      obj.lat=lat;obj.lng=lng;
+    }
   }
   _drag3.lastPt=pt.clone();_drag3Dirty=true;
   // Connected conveyors follow live while dragging (skip when the conveyor itself is being dragged)
   if(_drag3.siteType!=='conveyor') autoSnapAllConveyors();
-  _drag3Mode=true;populate3D();_drag3Mode=false;
+  drag3Rebuild();
 }
 function on3DMouseUp(e){
   if(!_drag3.active) return;
   const wasDrag=_drag3Dirty;
   const capturedType=_drag3.siteType, capturedId=_drag3.siteId;
   _drag3.active=false; ctrl3.enabled=true;
+  if(_drag3.raf){ cancelAnimationFrame(_drag3.raf); _drag3.raf=null; }
   document.getElementById('canvas3d').style.cursor='';
   if(!wasDrag && capturedId){
     // Pure click — no drag movement — select object for editing
@@ -3735,17 +4037,21 @@ function on3DMouseUp(e){
   }
   if(wasDrag){
     _drag3Dirty=false;
+    _drag3.suppressClick=true; // the browser fires 'click' after this release — don't re-select under the cursor
     const rfns={bin:renderBin,leg:renderLeg,conveyor:renderConveyor,dryer:renderDryer,
       pit:renderPit,bend:renderBend,structure:renderStructure,loadout:renderLoadout,truck:renderTruck,
       generator:renderGenerator,propanetank:renderPropaneTank,portauger:renderPortAuger};
     const rfn=rfns[capturedType];
-    const maps={bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
-      conveyor:S.conveyors,structure:S.structures,loadout:S.loadouts,truck:S.trucks,
-      generator:S.generators,propanetank:S.propanetanks,portauger:S.portaugers};
-    const arr=maps[capturedType];
+    const arr=DRAG3_MAPS()[capturedType];
     const obj=arr&&arr.find(o=>o.id===capturedId);
+    if(capturedType==='portauger'&&obj) paTrySnapToBin(obj); // dropped over a bin → connects
     if(rfn&&obj) rfn(obj);
-    populate3D(); autoSave();
+    // Re-draw connected conveyors on the map too (they were re-snapped during the drag)
+    if(capturedType!=='conveyor') S.conveyors.forEach(renderConveyor);
+    // Keep the moved object selected; rebuild in edit mode so the camera stays put
+    _edit3Mode=true; populate3D(); _edit3Mode=false;
+    select(capturedType, capturedId); show3DSelectionRing(capturedType, capturedId);
+    autoSave();
   }
 }
 
@@ -3762,8 +4068,11 @@ function populate3D(){
   }
   const all=[...S.bins,...S.legs,...S.conveyors.map(c=>{ const nds=convNodes(c); return {lat:(nds[0].lat+nds[nds.length-1].lat)/2,lng:(nds[0].lng+nds[nds.length-1].lng)/2}; }),...S.pits,...S.dryers,...S.trucks,...S.loadouts,...S.bends];
   if(!all.length)return;
-  _rLat=all.reduce((s,o)=>s+o.lat,0)/all.length;
-  _rLng=all.reduce((s,o)=>s+o.lng,0)/all.length;
+  _tag3=null;
+  if(!_drag3Mode||_rLat==null){
+    _rLat=all.reduce((s,o)=>s+o.lat,0)/all.length;
+    _rLng=all.reduce((s,o)=>s+o.lng,0)/all.length;
+  }
 
   // ── SATELLITE GROUND TEXTURE ──────────────────────────────
   if(scene3._gnd&&!_drag3Mode){
@@ -3803,7 +4112,8 @@ function populate3D(){
   // BINS
   S.bins.forEach(bin=>{
     if(S.typeHidden3d['bins']||bin.hidden) return;
-    const{x,z}=toXZ(bin.lat,bin.lng),r=bin.diam/2,ev=eaveHt(bin),rf=bin.roofFt,foundH=bin.foundFt||0,col=new THREE.Color(bin.color);
+    _tag3={siteId:bin.id,siteType:'bin'};
+    const{x,z}=toXZ(bin.lat,bin.lng),r=bin.diam/2,ev=eaveHt(bin),rf=roofHt(bin),foundH=bin.foundFt||0,col=new THREE.Color(bin.color);
     const isCone3=(bin.bottomType||'flat')==='cone';
     // Shared derived values
     const sideHt=(bin.ringCount*bin.ringIn)/12; // pure sidewall height (rings only)
@@ -3973,6 +4283,7 @@ function populate3D(){
   // LEGS
   S.legs.forEach(leg=>{
     if(S.typeHidden3d['legs']||leg.hidden) return;
+    _tag3={siteId:leg.id,siteType:'leg'};
     const{x,z}=toXZ(leg.lat,leg.lng),h=legEffHt(leg),foundH=leg.foundFt||0;
     const sm=new THREE.MeshLambertMaterial({color:0xb0bec5}),dm=new THREE.MeshLambertMaterial({color:0x78909c});
     if(foundH>0){
@@ -4054,6 +4365,7 @@ function populate3D(){
   // CONVEYORS (auger=round tube, drag/high-flight=rectangular box)
   S.conveyors.forEach(cv=>{
     if(S.typeHidden3d['conveyors']||cv.hidden) return;
+    _tag3={siteId:cv.id,siteType:'conveyor'};
     const nodes=convNodes(cv);
     // Phase/custom color wins; fall back to the type's default color
     const clr3=new THREE.Color(cv.color||convTypeColor(cv.type)).getHex();
@@ -4107,6 +4419,18 @@ function populate3D(){
         : new THREE.Mesh(new THREE.BoxGeometry(cvW*1.1,cvW*0.7,cvW*1.1),mat);
       joint.position.copy(v);add3(joint);
     });
+    // Drop spouts: a vertical downspout bridges a manual-height end to its connection point
+    const sp3=convSpouts(cv);
+    const spoutMat=new THREE.MeshLambertMaterial({color:new THREE.Color(clr3).multiplyScalar(0.7).getHex()});
+    [sp3.boot,sp3.head].forEach(sp=>{
+      if(!sp) return;
+      const p=toXZ(sp.lat,sp.lng), r=Math.max(0.35,cvW*0.4), h=sp.topHt-sp.botHt;
+      const tube=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,10),spoutMat);
+      tube.position.set(p.x,sp.botHt+h/2,p.z); tube.castShadow=true; add3(tube);
+      // Flared transition at the top where the spout hangs off the head / source
+      const flare=new THREE.Mesh(new THREE.CylinderGeometry(r*1.6,r,Math.min(2,h*0.4),10),spoutMat);
+      flare.position.set(p.x,sp.topHt-Math.min(2,h*0.4)/2,p.z); add3(flare);
+    });
     const midIdx=Math.floor(nodes.length/2);
     const mp=toXZ(nodes[midIdx].lat,nodes[midIdx].lng);
     const typeLbl=cv.type==='auger'?'⤴':cv.type==='highflight'?'⤴⤴':cv.type==='doublerun'?'⇄':'⟶';
@@ -4116,6 +4440,7 @@ function populate3D(){
   // BENDS / TRANSFER POINTS
   S.bends.forEach(bd=>{
     if(S.typeHidden3d['bends']||bd.hidden) return;
+    _tag3={siteId:bd.id,siteType:'bend'};
     const{x,z}=toXZ(bd.lat,bd.lng);
     const clr3={'head':0xa78bfa,'boot':0xf59e0b,'transfer':0x06b6d4,'inlet':0x10b981,'loadout':0x34d399}[bd.bendType]||0xa78bfa;
     const mat=new THREE.MeshLambertMaterial({color:clr3});
@@ -4172,6 +4497,7 @@ function populate3D(){
   // DUMP PITS — direct-burial (deep concrete hopper) or drive-over (Sudenga SDDO-style)
   S.pits.forEach(pit=>{
     if(S.typeHidden3d['pits']||pit.hidden) return;
+    _tag3={siteId:pit.id,siteType:'pit'};
     const{x,z}=toXZ(pit.lat,pit.lng);
     const hRad=-(pit.headDeg*Math.PI/180);
     const concMat=new THREE.MeshLambertMaterial({color:0x9ca3af});
@@ -4286,6 +4612,7 @@ function populate3D(){
   // GRAIN DRYERS
   S.dryers.forEach(dr=>{
     if(S.typeHidden3d['dryers']||dr.hidden) return;
+    _tag3={siteId:dr.id,siteType:'dryer'};
     const{x,z}=toXZ(dr.lat,dr.lng),col=new THREE.Color(dr.color),hRad=-(dr.headDeg*Math.PI/180);
     let body=null;
     if(dr.shape==='rect'){
@@ -4423,6 +4750,7 @@ function populate3D(){
   // TRUCKS
   S.trucks.forEach(truck=>{
     if(S.typeHidden3d['trucks']||truck.hidden) return;
+    _tag3={siteId:truck.id,siteType:'truck'};
     const{x,z}=toXZ(truck.lat,truck.lng),tl=truck.lenFt,tw=truck.widFt;
     const grp=new THREE.Group();
     const truckClr=new THREE.Color(truck.color||'#6b7280');
@@ -4478,6 +4806,7 @@ function populate3D(){
   // SUPPORT STRUCTURES
   S.structures.forEach(st=>{
     if(S.typeHidden3d['structures']||st.hidden) return;
+    _tag3={siteId:st.id,siteType:'structure'};
     const{x,z}=toXZ(st.lat,st.lng),hRad=-(st.headDeg*Math.PI/180),col=new THREE.Color(st.color);
     const hw=st.widFt/2, hl=st.lenFt/2, ph=Math.max(0.5,st.postHt);
     const numBays=Math.max(1,Math.round(st.lenFt/Math.max(1,st.bayFt)));
@@ -4581,6 +4910,7 @@ function populate3D(){
   // OVERHEAD LOAD-OUTS
   S.loadouts.forEach(lo=>{
     if(S.typeHidden3d['loadouts']||lo.hidden) return;
+    _tag3={siteId:lo.id,siteType:'loadout'};
     const{x,z}=toXZ(lo.lat,lo.lng),col=new THREE.Color(lo.color);
     const sh=lo.supportHt, hh=lo.hopperHtFt;
     const r=Math.max(lo.hopperWidFt,lo.hopperLenFt)/2; // use largest dimension as radius
@@ -4627,6 +4957,7 @@ function populate3D(){
   // PROPANE TANKS — horizontal cylinder on saddle supports
   (S.propanetanks||[]).forEach(pt=>{
     if(S.typeHidden3d['propanetanks']||pt.hidden) return;
+    _tag3={siteId:pt.id,siteType:'propanetank'};
     const{x,z}=toXZ(pt.lat,pt.lng);
     const hRad=-(pt.headingDeg||0)*Math.PI/180;
     const len=pt.lengthFt, r=(pt.diamFt||4)/2;
@@ -4672,6 +5003,7 @@ function populate3D(){
   // GENERATORS — enclosure box on a skid with radiator end and exhaust stack
   (S.generators||[]).forEach(g=>{
     if(S.typeHidden3d['generators']||g.hidden) return;
+    _tag3={siteId:g.id,siteType:'generator'};
     const{x,z}=toXZ(g.lat,g.lng);
     const hRad=-(g.headingDeg||0)*Math.PI/180;
     const gl=g.lenFt||12, gw=g.widFt||5, gh=g.htFt||6;
@@ -4696,6 +5028,7 @@ function populate3D(){
   // PORTABLE AUGERS
   S.portaugers.forEach(pa=>{
     if(S.typeHidden3d['portaugers']||pa.hidden) return;
+    _tag3={siteId:pa.id,siteType:'portauger'};
     const ep=paEndpoints(pa);
     const b3=toXZ(ep.bootLL.lat,ep.bootLL.lng), d3=toXZ(ep.disLL.lat,ep.disLL.lng);
     const bootY=Math.max(0.5,ep.bootHt), disY=Math.max(0.5,ep.disHt);
@@ -4717,21 +5050,39 @@ function populate3D(){
     // Boot intake housing
     const bootBox=new THREE.Mesh(new THREE.BoxGeometry(tubR*3,tubR*2.2,tubR*3),darkMat);
     bootBox.position.set(x,bootY+0.2,z); bootBox.castShadow=true; add3(bootBox);
-    // Swing hopper: low drive-over hopper rolled out beside the boot, feeding it
-    // through a short swing tube (this is what backs under the truck/grain cart)
-    const hopC={x:x+perp.x*5,z:z+perp.z*5};
-    const hopRim=new THREE.Mesh(new THREE.BoxGeometry(4.2,0.5,4.2),darkMat);
-    hopRim.position.set(hopC.x,1.55,hopC.z); add3(hopRim);
-    const hopBody=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.3,3.2),mat);
-    hopBody.position.set(hopC.x,0.8,hopC.z); hopBody.castShadow=true; add3(hopBody);
-    [-1,1].forEach(s=>{ // hopper transport rollers
-      const roller=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.25,10),new THREE.MeshLambertMaterial({color:0x374151}));
-      roller.rotation.x=Math.PI/2; roller.position.set(hopC.x+perp.x*s*1.8,0.35,hopC.z+perp.z*s*1.8); add3(roller);
-    });
-    const swing=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(
-      new THREE.Vector3(hopC.x,0.9,hopC.z), new THREE.Vector3(x,bootY+0.3,z)
-    ),1,Math.max(0.35,tubR*0.75),10,false),mat);
-    swing.castShadow=true; add3(swing);
+    // Swing-away hopper: low drive-over hopper at the end of a short swing tube out of the boot,
+    // positioned by the auger's swing angle / tube length (this is what the truck dumps into)
+    if(ep.hopperLL){
+      const h3=toXZ(ep.hopperLL.lat,ep.hopperLL.lng);
+      const hopC={x:h3.x,z:h3.z};
+      const swDir=new THREE.Vector3(hopC.x-x,0,hopC.z-z); if(swDir.lengthSq()<0.01) swDir.copy(perp); swDir.normalize();
+      const swPerp=new THREE.Vector3(-swDir.z,0,swDir.x);
+      const hopRim=new THREE.Mesh(new THREE.BoxGeometry(4.2,0.5,4.2),darkMat);
+      hopRim.position.set(hopC.x,1.55,hopC.z); add3(hopRim);
+      const hopBody=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.3,3.2),mat);
+      hopBody.position.set(hopC.x,0.8,hopC.z); hopBody.castShadow=true; add3(hopBody);
+      [-1,1].forEach(s=>{ // hopper transport rollers
+        const roller=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.25,10),new THREE.MeshLambertMaterial({color:0x374151}));
+        roller.rotation.x=Math.PI/2; roller.position.set(hopC.x+swPerp.x*s*1.8,0.35,hopC.z+swPerp.z*s*1.8); add3(roller);
+      });
+      const swing=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(
+        new THREE.Vector3(hopC.x,0.9,hopC.z), new THREE.Vector3(x,bootY+0.3,z)
+      ),1,Math.max(0.35,tubR*0.75),10,false),mat);
+      swing.castShadow=true; add3(swing);
+    }
+    // Ghost truck where it dumps (Load In) or loads (Load Out)
+    if(ep.truckLL){
+      const t3=toXZ(ep.truckLL.lat,ep.truckLL.lng), tl=pa.truckLenFt, tw=pa.truckWidFt;
+      const ghost=new THREE.MeshLambertMaterial({color:0x9ca3af,transparent:true,opacity:0.45});
+      const ghostDark=new THREE.MeshLambertMaterial({color:0x4b5563,transparent:true,opacity:0.45});
+      const grp=new THREE.Group();
+      const cabL=tl*0.22, cabH=6.5;
+      const cab=new THREE.Mesh(new THREE.BoxGeometry(tw*0.95,cabH,cabL),ghostDark); cab.position.set(0,cabH/2,-tl/2+cabL/2); grp.add(cab);
+      const box=new THREE.Mesh(new THREE.BoxGeometry(tw,4.2,tl*0.72),ghost); box.position.set(0,1.0+2.1,-tl/2+cabL+0.5+tl*0.36); grp.add(box);
+      const frame=new THREE.Mesh(new THREE.BoxGeometry(tw*0.7,0.6,tl),ghostDark); frame.position.set(0,0.7,0); grp.add(frame);
+      // heading: 0° = north = -z in scene; group's -z is the cab end
+      grp.position.set(t3.x,0,t3.z); grp.rotation.y=-ep.truckHead*Math.PI/180; add3(grp);
+    }
     // Discharge downspout at the head
     const spout=new THREE.Mesh(new THREE.CylinderGeometry(tubR*0.95,tubR*0.7,2.2,10),darkMat);
     spout.position.set(ex,disY-1.1,ez); spout.castShadow=true; add3(spout);
@@ -4758,12 +5109,13 @@ function populate3D(){
     const hitch=new THREE.Mesh(new THREE.SphereGeometry(0.28,8,8),wheelMat); hitch.position.copy(hitchEnd); add3(hitch);
     const jack=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.8,6),wheelMat); jack.position.set(hitchEnd.x,0.4,hitchEnd.z); add3(jack);
     if(S.showLabels){
-      const tag=ep.mode==='fill'?`↑ fills ${ep.bin.name}`:ep.mode==='reclaim'?`↓ from ${ep.bin.name}`:`${htFt.toFixed(0)}′ dis`;
+      const tag=ep.mode==='fill'?`↑ loads ${ep.bin.name}${ep.short?' ⚠ short':''}`:ep.mode==='reclaim'?`↓ unloads ${ep.bin.name}`:`${htFt.toFixed(0)}′ dis`;
       const spr=makeLabel3(`⤴ ${pa.name}\n${tag}`,pa.color);spr.position.set(ex,disY+8,ez);add3(spr);
     }
   });
 
   // WALKWAYS
+  _tag3=null; // walkways are fixed between bins — not draggable
   S.walkways.forEach(ww=>{
     if(ww.hidden) return;
     const b1=S.bins.find(b=>b.id===ww.binId1), b2=S.bins.find(b=>b.id===ww.binId2);
@@ -5097,7 +5449,8 @@ function get3DPoint(event) {
   // Fall back to ground plane y=0
   const gndPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
   const pt = new THREE.Vector3();
-  ray.ray.intersectPlane(gndPlane, pt);
+  // intersectPlane returns null when the ray never meets the ground (pointing at the sky)
+  if (!ray.ray.intersectPlane(gndPlane, pt)) return null;
   return pt.y > -1 ? pt : null;
 }
 function add3DMark(pt, color=0xf59e0b) {
@@ -5153,7 +5506,8 @@ function get3DGroundPoint(event) {
   const ray = new THREE.Raycaster(); ray.setFromCamera(mouse, cam3);
   const gndPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
   const pt = new THREE.Vector3();
-  ray.ray.intersectPlane(gndPlane, pt);
+  // intersectPlane returns null when the ray never meets the ground (pointing at the sky)
+  if (!ray.ray.intersectPlane(gndPlane, pt)) return null;
   return pt.y > -1 ? pt : null;
 }
 
@@ -5205,6 +5559,7 @@ function place3DObject(type, lat, lng) {
   populate3D();
 }
 function on3DCanvasClick(e) {
+  if (_drag3.suppressClick) { _drag3.suppressClick=false; return; } // tail of a drag, not a click
   // ── MEASURE MODE ──
   if (S.meas3Active) {
     e.stopPropagation();
