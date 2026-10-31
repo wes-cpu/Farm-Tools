@@ -1328,9 +1328,11 @@ function snapConvCore(cv) {
   if(!cv.nodes) cv.nodes = convNodes(cv);
   const nodes = cv.nodes;
   let changed = false;
+  // A node the user typed a height into (htManual) keeps that height; only its position follows.
   const apply=(nd,pt)=>{
-    if(Math.abs(nd.lat-pt.lat)>1e-9||Math.abs(nd.lng-pt.lng)>1e-9||Math.abs((nd.htFt||0)-pt.htFt)>1e-6){
-      nd.lat=pt.lat; nd.lng=pt.lng; nd.htFt=pt.htFt; changed=true;
+    const ht=nd.htManual?(+nd.htFt||0):pt.htFt;
+    if(Math.abs(nd.lat-pt.lat)>1e-9||Math.abs(nd.lng-pt.lng)>1e-9||Math.abs((nd.htFt||0)-ht)>1e-6){
+      nd.lat=pt.lat; nd.lng=pt.lng; nd.htFt=ht; changed=true;
     }
   };
   // BOOT (node[0])
@@ -2902,8 +2904,10 @@ function convHTML(cv) {
   // Node table rows
   let nodeRows='';
   let maxSegAng=0, minSegAng=0, dblAngBad=false;
+  const bootLinked=(cv.feedsFrom||[]).length>0, headLinked=(cv.feedsTo||[]).length>0;
   nodes.forEach((nd,i)=>{
     const isEndpoint=i===0||i===nodes.length-1;
+    const linked=(i===0&&bootLinked)||(i===nodes.length-1&&headLinked);
     let segInfo='';
     if(i<nodes.length-1){
       const n1=nodes[i+1];
@@ -2920,8 +2924,9 @@ function convHTML(cv) {
     }
     nodeRows+=`<tr style="border-bottom:1px solid #1f2937">
       <td style="padding:3px 4px;color:#6b7280;font-size:0.82em;white-space:nowrap">${i===0?'Boot':i===nodes.length-1?'Head':'#'+i}</td>
-      <td style="padding:3px 2px"><input type="number" class="cv-node-ht" data-idx="${i}" value="${nd.htFt}" min="0" max="400" step="0.5"
-        style="width:58px;padding:2px 4px;background:#111827;border:1px solid #374151;color:#f3f4f6;border-radius:3px;font-size:0.84em"/></td>
+      <td style="padding:3px 2px;white-space:nowrap"><input type="number" class="cv-node-ht" data-idx="${i}" value="${nd.htFt}" min="0" max="400" step="0.5"
+        title="${linked?(nd.htManual?'Manual height — the grain-flow connection sets only the position':'Follows the grain-flow connection height; type a value to override'):''}"
+        style="width:58px;padding:2px 4px;background:#111827;border:1px solid ${linked&&nd.htManual?'#f59e0b':'#374151'};color:#f3f4f6;border-radius:3px;font-size:0.84em"/>${linked&&nd.htManual?`<button class="cv-node-auto" data-idx="${i}" title="Return to the connection's height" style="margin-left:3px;padding:1px 4px;background:#1f2937;border:1px solid #f59e0b;color:#f59e0b;border-radius:3px;cursor:pointer;font-size:9px">🔒 auto</button>`:''}</td>
       <td style="padding:3px 2px"><select class="cv-node-bend" data-idx="${i}"
         style="max-width:100px;padding:2px 3px;background:#111827;border:1px solid #374151;color:#f3f4f6;border-radius:3px;font-size:0.77em">
         ${bendOptsFor(nd.bendId)}</select></td>
@@ -2991,7 +2996,7 @@ function convHTML(cv) {
   <button class="pbtn${addNodeActive?' ok':''}" onclick="beginAddConvNode('${cv.id}')">
     ${addNodeActive?'✓ Click map to insert node (Esc to stop)':'+ Add Node / Segment'}
   </button>
-  <p style="font-size:0.69em;color:#6b7280;margin:4px 0 8px">Nodes between Boot and Head create angle changes — like a weld or change in incline. Link to a Bend to snap the height automatically.</p>
+  <p style="font-size:0.69em;color:#6b7280;margin:4px 0 8px">Nodes between Boot and Head create angle changes — like a weld or change in incline. Link to a Bend to snap the height automatically.${(bootLinked||headLinked)?' A connected Boot/Head normally follows its grain-flow object\'s height — type a height to override it (shown with 🔒; click <b>auto</b> to follow again).':''}</p>
   ${convFlowHTML(cv)}
   <div class="ph">Endpoint Connection Points</div>
   <div class="fr"><label>Boot connects at</label>
@@ -3066,8 +3071,15 @@ function bindConv(cv) {
   document.querySelectorAll('.cv-node-ht').forEach(el=>{
     el.addEventListener('change',()=>{
       const i=+el.dataset.idx;
-      if(cv.nodes[i]) cv.nodes[i].htFt=+el.value||0;
+      if(cv.nodes[i]){ cv.nodes[i].htFt=+el.value||0; cv.nodes[i].htManual=true; } // typed → sticks through auto-snap
       renderConveyor(cv); renderProperties(); autoSave();
+    });
+  });
+  document.querySelectorAll('.cv-node-auto').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const i=+el.dataset.idx;
+      if(cv.nodes[i]) cv.nodes[i].htManual=false;
+      snapConvCore(cv); renderConveyor(cv); renderProperties(); autoSave();
     });
   });
   document.querySelectorAll('.cv-node-bend').forEach(el=>{
@@ -3078,7 +3090,7 @@ function bindConv(cv) {
       cv.nodes[i].bendId=bendId;
       if(bendId){
         const bend=S.bends.find(b=>b.id===bendId);
-        if(bend) cv.nodes[i].htFt=bend.htFt; // snap height to bend
+        if(bend){ cv.nodes[i].htFt=bend.htFt; cv.nodes[i].htManual=false; } // bend sets the height now
       }
       renderConveyor(cv); renderProperties(); autoSave();
     });
