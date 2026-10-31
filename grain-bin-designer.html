@@ -3572,13 +3572,13 @@ window.openProjectsModal = openProjectsModal;
 function hydrateData(data) {
   clearAllLayers();
   S.bins=data.bins||[]; S.legs=data.legs||[]; S.conveyors=data.conveyors||[];
-  // Roof migration: bins saved before the roof-angle option carried only roofFt (old default 10′).
-  // Untouched defaults move to Auto 30°; a bin with an entered peak height keeps it as a manual roof.
+  // Roof migration: bins saved before the roof-angle option carried only roofFt. Every such bin
+  // moves to an Auto 30° roof sized from its diameter; uncheck Auto in the panel to override one.
   S.bins.forEach(b=>{
     if(b.roofAuto===undefined){
-      b.roofAuto=(b.roofFt==null||+b.roofFt===10);
-      b.roofDeg=b.roofDeg||DEFAULT_ROOF_DEG;
-      if(b.roofAuto) b.roofFt=roofHt(b);
+      b.roofAuto=true;
+      b.roofDeg=DEFAULT_ROOF_DEG;
+      b.roofFt=roofHt(b);
     }
   });
   S.pits=data.pits||[]; S.dryers=data.dryers||[]; S.trucks=data.trucks||[];
