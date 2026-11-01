@@ -215,7 +215,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
     <div class="dd">
       <button class="btn dd-btn" onclick="toggleDd(this)" title="Reports and images">📊 Reports ▾</button>
       <div class="dd-menu dd-right">
-        <button class="btn" onclick="showReport()" title="Grain bin size report">📊 Site Report</button>
+        <button class="btn" onclick="showReport()" title="Bin sizes, equipment, cost estimate by phase with concrete and rock">📊 Site Report &amp; Costs</button>
+        <button class="btn" onclick="exportPlanSheet()" title="2D plan image with title block, north arrow, scale bar and legend">📐 Plan Sheet (PNG)</button>
         <button class="btn" onclick="showPowerReport()" title="Electrical load estimate — size your service and generator">⚡ Power Estimate</button>
         <button class="btn" id="btn-ss2d" onclick="export2D()" title="Save 2D map as image">📷 Save 2D Image</button>
         <button class="btn" id="btn-ss3d" onclick="export3D()" title="Save 3D view as image" style="display:none">📸 Save 3D Image</button>
@@ -3792,7 +3793,7 @@ window.useAreaForRock = function(measId) {
 function serialise(includeProjects) {
   return JSON.stringify({
     bins:S.bins,legs:S.legs,conveyors:S.conveyors,pits:S.pits,dryers:S.dryers,trucks:S.trucks,
-    loadouts:S.loadouts,structures:S.structures,bends:S.bends,walkways:S.walkways,portaugers:S.portaugers,propanetanks:S.propanetanks,generators:S.generators,power:S.power,opModes:S.opModes,opAssign:S.opAssign,siteCheck:S.siteCheck||null,
+    loadouts:S.loadouts,structures:S.structures,bends:S.bends,walkways:S.walkways,portaugers:S.portaugers,propanetanks:S.propanetanks,generators:S.generators,power:S.power,opModes:S.opModes,opAssign:S.opAssign,siteCheck:S.siteCheck||null,costOpts:S.costOpts||null,
     savedAt:Date.now(),
     // Saved-project library rides along (data file / export only — never inside a
     // project payload itself, which would nest the library recursively)
@@ -3956,7 +3957,7 @@ function hydrateData(data) {
     });
     if(changed) saveProjIndex(idx);
   }
-  S.grainType=data.grainType||'corn'; S.uid=data.uid||1; S.siteCheck=data.siteCheck||null;
+  S.grainType=data.grainType||'corn'; S.uid=data.uid||1; S.siteCheck=data.siteCheck||null; S.costOpts=data.costOpts||null;
   S.projectId=data.projectId||null; S.projectName=data.projectName||'';
   S.typeHidden3d=data.typeHidden3d||{}; S.shownPhases3d=data.shownPhases3d||[];
   S.phases=data.phases||[{num:1,name:'Phase 1',color:'#f59e0b'},{num:2,name:'Phase 2',color:'#06b6d4'},{num:3,name:'Phase 3',color:'#10b981'},{num:4,name:'Phase 4',color:'#8b5cf6'},{num:5,name:'Phase 5',color:'#ef4444'}];
@@ -6247,6 +6248,99 @@ function showToast(msg, dur=2200) {
   setTimeout(() => t.style.opacity = '0', dur);
 }
 
+// ── COST ESTIMATE: concrete, rock, totals by phase ───────────
+function costOpts(){ if(!S.costOpts) S.costOpts={concreteYd:450,rockTon:18,rockDepthIn:6,rockWaste:10,contPct:10,rockAreaSqFt:0}; return S.costOpts; }
+window.setCostOpt=function(k,v){ costOpts()[k]=Math.max(0,+v||0); autoSave(); showReport(); };
+// Cubic yards of concrete an object needs, from its own dimensions. Rules of thumb, not a takeoff.
+function objConcrete(o,type){
+  const yd=cf=>cf/27;
+  if(type==='bin'){
+    if((o.bottomType||'flat')==='cone') return {yd:yd(6*3*3*4),desc:'6 pier footings 3×3×4'};
+    const r=((+o.foundDiamFt>0)?+o.foundDiamFt:(+o.diam+4))/2, t=(+o.foundFt>0)?+o.foundFt:0.5;
+    const slab=Math.PI*r*r*t, ring=2*Math.PI*(o.diam/2)*2*3;
+    return {yd:yd(slab+ring),desc:`${(r*2).toFixed(0)}′ slab ${(t*12).toFixed(0)}″ + 2×3′ ring footing`};
+  }
+  if(type==='leg'){ const d=(+o.foundFt>0)?+o.foundFt:4; return {yd:yd(12*12*d),desc:`12×12×${d}′ leg foundation`}; }
+  if(type==='dryer'){ const ext=+o.foundExtFt||0, t=Math.max(0.5,+o.foundHtFt||0); const L=o.shape==='rect'?+o.lenFt+2*ext:(+o.diamFt+4), W=o.shape==='rect'?+o.widFt+2*ext:(+o.diamFt+4); return {yd:yd(L*W*t),desc:`${L.toFixed(0)}×${W.toFixed(0)}′ pad ${(t*12).toFixed(0)}″`}; }
+  if(type==='structure'){
+    if(+o.foundHtFt>0){ const ext=+o.foundExtFt||0; return {yd:yd((+o.lenFt+2*ext)*(+o.widFt+2*ext)*+o.foundHtFt),desc:`${(+o.lenFt+2*ext).toFixed(0)}×${(+o.widFt+2*ext).toFixed(0)}′ slab ${(+o.foundHtFt*12).toFixed(0)}″`}; }
+    const posts=2*(Math.max(1,Math.round(o.lenFt/Math.max(1,o.bayFt||24)))+1); return {yd:yd(posts*2*2*4),desc:`${posts} post footings 2×2×4`};
+  }
+  if(type==='pit'){
+    if(o.pitType==='driveover'){ const L=2*(+o.grateLenFt||12)+(+o.grateGapFt||14), W=+o.grateWidFt||8, d=(+o.trenchDepthIn||38)/12; return {yd:yd(L*W*d*0.5+L*W*0.5),desc:`drive-over trench ${L.toFixed(0)}×${W}′ + approach slab`}; }
+    const w=+o.widFt||10,l=+o.lenFt||14,d=+o.depthFt||10; return {yd:yd(w*l*d-Math.max(0,(w-2)*(l-2)*(d-1))),desc:`${w}×${l}×${d}′ pit, 1′ walls & floor`};
+  }
+  if(type==='loadout') return {yd:yd(4*3*3*5),desc:'4 footings 3×3×5'};
+  if(type==='generator'||type==='propanetank') return {yd:yd((+o.lenFt||12)*(+o.widFt||5)*0.5),desc:'equipment pad 6″'};
+  return {yd:0,desc:''};
+}
+function concreteRows(){
+  const out=[]; const push=(list,type)=>(list||[]).forEach(o=>{ const c=objConcrete(o,type); if(c.yd>0) out.push({type,o,yd:c.yd,desc:c.desc}); });
+  push(S.bins,'bin'); push(S.legs,'leg'); push(S.dryers,'dryer'); push(S.structures,'structure'); push(S.pits,'pit'); push(S.loadouts,'loadout'); push(S.generators,'generator'); push(S.propanetanks,'propanetank');
+  return out;
+}
+function rockEstimate(){
+  const c=costOpts(); let area=+c.rockAreaSqFt||0, source='manual';
+  if(!area){ area=(S.measurements||[]).reduce((s,m)=>s+(+m.areaSqFt||0),0); source='measured'; }
+  if(!area){ area=S.bins.reduce((s,b)=>s+Math.PI*(b.diam/2)**2,0)*2.5+S.dryers.reduce((s,d)=>s+(d.lenFt||0)*(d.widFt||0)*3,0)+S.structures.reduce((s,x)=>s+(x.lenFt||0)*(x.widFt||0)*1.5,0); source='footprint'; }
+  const yd=area*(c.rockDepthIn/12)/27, tons=yd*1.5*(1+c.rockWaste/100);
+  return {area,source,yd,tons,cost:tons*c.rockTon};
+}
+function costByPhase(){
+  const c=costOpts(); const rows={}; const get=n=>rows[n]||(rows[n]={phase:n,equip:0,infra:0,concYd:0});
+  const types=[['bins','bin'],['legs','leg'],['conveyors','conveyor'],['pits','pit'],['dryers','dryer'],['trucks','truck'],['loadouts','loadout'],['bends','bend'],['structures','structure'],['portaugers','portauger'],['propanetanks','propanetank'],['generators','generator'],['walkways','walkway']];
+  types.forEach(([k,t])=>(S[k]||[]).forEach(o=>{ const r=get(o.phase||0); r.equip+=+o.cost||0; r.infra+=(o.infraItems||[]).reduce((s,i)=>s+(+i.cost||0),0); r.concYd+=objConcrete(o,t).yd; }));
+  const list=Object.values(rows).sort((a,b)=>a.phase-b.phase).map(r=>({...r,conc:r.concYd*c.concreteYd,sub:r.equip+r.infra+r.concYd*c.concreteYd}));
+  const rock=rockEstimate(); const sub=list.reduce((s,r)=>s+r.sub,0)+rock.cost; const cont=sub*c.contPct/100;
+  return {list,rock,sub,cont,total:sub+cont};
+}
+function costReportHTML(){
+  const c=costOpts(), cb=costByPhase(), money=n=>'$'+Math.round(n).toLocaleString();
+  const inp=(k,lbl,step,w=64)=>`<label style="white-space:nowrap">${lbl} <input type="number" value="${c[k]}" min="0" step="${step}" style="width:${w}px" onchange="setCostOpt('${k}',this.value)"/></label>`;
+  let h=`<div class="rpt-section">Cost Estimate by Phase</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.78em;margin-bottom:8px;color:#d1d5db">${inp('concreteYd','Concrete $/yd³ installed',10)} ${inp('rockDepthIn','Rock depth (in)',1,46)} ${inp('rockTon','Rock $/ton',1,50)} ${inp('rockWaste','Rock waste %',1,46)} ${inp('contPct','Contingency %',1,46)} ${inp('rockAreaSqFt','Rock area sq ft (0 = auto)',500,80)}</div>
+  <table class="rpt-table"><thead><tr><th>Phase</th><th>Equipment</th><th>Line items</th><th>Concrete</th><th>Subtotal</th></tr></thead><tbody>`;
+  cb.list.forEach(r=>{ h+=`<tr><td style="color:${phaseColor(r.phase)}">${escH(phaseName(r.phase))}</td><td class="num">${money(r.equip)}</td><td class="num">${money(r.infra)}</td><td class="num">${r.concYd.toFixed(1)} yd³ · ${money(r.conc)}</td><td class="num">${money(r.sub)}</td></tr>`; });
+  h+=`<tr><td>Site rock / gravel</td><td colspan="3" style="color:#9ca3af">${Math.round(cb.rock.area).toLocaleString()} sq ft ${cb.rock.source==='measured'?'(measured polygons)':cb.rock.source==='manual'?'(entered)':'<span style="color:#f59e0b">(rough: 2.5× bin footprints — draw the pad with Measure for a real area)</span>'} · ${cb.rock.yd.toFixed(0)} yd³ · ${cb.rock.tons.toFixed(0)} tons</td><td class="num">${money(cb.rock.cost)}</td></tr>
+  <tr><td>Contingency ${c.contPct}%</td><td colspan="3"></td><td class="num">${money(cb.cont)}</td></tr>
+  <tr><td style="font-weight:700;color:#f59e0b">Project total</td><td colspan="3"></td><td class="num" style="color:#10b981;font-size:1.1em">${money(cb.total)}</td></tr></tbody></table>
+  <p style="font-size:0.72em;color:#6b7280;margin:-8px 0 10px">Equipment and line items are what you typed on each object. Concrete is a rule-of-thumb takeoff from each object's foundation fields (bins: slab + ring footing; legs 12×12×4; dryer and structure pads; pit walls). Check it against your contractor's numbers.</p>
+  <div class="rpt-section">Concrete Quantities</div><table class="rpt-table"><thead><tr><th>Object</th><th>Basis</th><th>yd³</th><th>Cost</th></tr></thead><tbody>`;
+  const rows=concreteRows(); rows.forEach(r=>{ h+=`<tr><td>${escH(r.o.name)}</td><td style="color:#9ca3af">${escH(r.desc)}</td><td class="num">${r.yd.toFixed(1)}</td><td class="num">${money(r.yd*c.concreteYd)}</td></tr>`; });
+  h+=`<tr><td style="font-weight:700">Total</td><td></td><td class="num">${rows.reduce((s,r)=>s+r.yd,0).toFixed(1)}</td><td class="num">${money(rows.reduce((s,r)=>s+r.yd,0)*c.concreteYd)}</td></tr></tbody></table>`;
+  return h;
+}
+
+// ── PLAN SHEET: 2D map with title block, north arrow, scale bar and legend ──
+async function exportPlanSheet(){
+  if(is3D){ flash('Switch to 2D view first.'); return; }
+  const mapEl=document.getElementById('map');
+  const c=map.getCenter(), z=map.getZoom(), mpp=156543.03392*Math.cos(c.lat*Math.PI/180)/Math.pow(2,z), ftpp=mpp/FT2M;
+  const nice=[20,50,100,200,500,1000].find(n=>n/ftpp>=90)||1000, barPx=nice/ftpp;
+  const totBu=S.bins.reduce((a,b)=>a+bushels(b,S.grainType),0);
+  const legend=[['#f59e0b','Grain bin'],['#d1d5db','Leg'],[convTypeColor('auger'),'Auger'],[convTypeColor('highflight'),'Conveyor'],[convTypeColor('doublerun'),'Double-run'],[convTypeColor('drag'),'Drag'],['#78350f','Dump pit'],['#d97706','Dryer'],['#94a3b8','Structure'],['#f59e0b','— — Dimension / measure']];
+  const ov=document.createElement('div'); ov.id='plan-overlay'; ov.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:900;font-family:Segoe UI,system-ui,sans-serif';
+  ov.innerHTML=`
+    <div style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.92);color:#111827;border:1px solid #374151;border-radius:6px;padding:6px 10px;text-align:center;font-weight:700"><div style="font-size:26px;line-height:1">⬆</div><div style="font-size:12px">N</div></div>
+    <div style="position:absolute;bottom:12px;left:12px;background:rgba(255,255,255,0.94);color:#111827;border:1px solid #374151;border-radius:6px;padding:8px 12px;min-width:260px;font-size:12px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:2px">${escH(S.projectName||'Grain Site Plan')}</div>
+      <div>${S.bins.length} bins · ${Math.round(totBu).toLocaleString()} bu · ${S.legs.length} legs · ${S.conveyors.length} conveyors · ${S.dryers.length} dryers</div>
+      <div style="color:#4b5563">${new Date().toLocaleDateString()} · ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} · zoom ${z}</div>
+      <div style="margin-top:6px;display:flex;align-items:center;gap:6px"><div style="width:${barPx.toFixed(0)}px;height:8px;background:linear-gradient(90deg,#111827 50%,#fff 50%);border:1px solid #111827"></div><span>${nice} ft</span></div>
+    </div>
+    <div style="position:absolute;bottom:12px;right:12px;background:rgba(255,255,255,0.94);color:#111827;border:1px solid #374151;border-radius:6px;padding:8px 12px;font-size:11px">
+      <div style="font-weight:700;margin-bottom:3px">Legend</div>${legend.map(([col,t])=>`<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:14px;height:10px;background:${col};border:1px solid #374151"></span>${t}</div>`).join('')}
+    </div>`;
+  mapEl.appendChild(ov);
+  showToast('Capturing plan sheet…');
+  try{
+    const canvas=await html2canvas(mapEl,{useCORS:true,allowTaint:true,logging:false,scale:Math.max(2,window.devicePixelRatio||1),ignoreElements:el=>el.classList&&el.classList.contains('leaflet-control')});
+    const link=document.createElement('a'); link.download='grain-site-plan-'+new Date().toISOString().slice(0,10)+'.png'; link.href=canvas.toDataURL('image/png'); link.click();
+    showToast('Plan sheet saved — add dimensions with Measure before exporting if you need them on the sheet');
+  }catch(e){ alert('Plan sheet export failed: '+e.message); }
+  finally{ ov.remove(); }
+}
+
 // ── SITE REPORT ───────────────────────────────────────────────
 let _reportData = [];
 function showReport() {
@@ -6445,6 +6539,7 @@ function showReport() {
     <tr><td>Walkways / Catwalks</td><td class="num">${S.walkways.length}</td></tr>
     <tr><td>Report Date</td><td class="num">${new Date().toLocaleDateString()}</td></tr>
   </tbody></table>`;
+  html += costReportHTML();
 
   document.getElementById('modal-title').textContent = 'Site Report'+(S.projectName?' — '+S.projectName:'');
   document.getElementById('modal-csv-btn').style.display = S.bins.length ? '' : 'none';
