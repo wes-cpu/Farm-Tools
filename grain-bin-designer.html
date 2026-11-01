@@ -241,6 +241,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
       <button onclick="cam3Preset('west')">← W</button>
       <button id="btn-meas3d" onclick="toggle3DMeasure()" title="Click two points in the scene to measure distance">📏 Measure</button>
       <button onclick="clear3DMeasure()" title="Remove all 3D measurement lines from view">🗑 Clear</button>
+      <button id="btn-galv" onclick="toggleGalv3d()" title="Bins: galvanized steel look, or tinted with their phase / custom colour">🎨 Tint</button>
       <button id="btn-sum3d" onclick="toggleSummary3D()" title="Project summary">📋 Summary</button>
     </div>
     <div id="view3d-hint">Left-drag orbit · Right-drag pan · Scroll zoom · Click object to select/edit · Drag to move</div>
@@ -4396,26 +4397,77 @@ function add3(o){
 }
 function siteOf3(obj){ for(let o=obj;o;o=o.parent){ if(o.userData&&o.userData.siteId) return o.userData; } return null; }
 
-// ── REALISTIC BIN SHELL DETAILS ──────────────────────────────
-// Corrugation seam rings at every ring joint, plus vertical stiffener channels
-// on stiffened bins (one per sidewall sheet, ~9.4 ft of circumference each).
+// ── REALISTIC BIN SHELL ──────────────────────────────────────
+// Galvanized corrugated sheets with vertical sheet seams and bolt lines, one texture tile per
+// sheet (≈9.4 ft of circumference × one ring tall), repeated around and up the bin.
+const _corrugTex={};
+function corrugTex(ringIn){
+  const key=Math.round(ringIn); if(_corrugTex[key]) return _corrugTex[key];
+  const c=document.createElement('canvas'); c.width=256; c.height=256; const g=c.getContext('2d');
+  g.fillStyle='#c6cbd0'; g.fillRect(0,0,256,256);
+  const n=Math.max(4,Math.round(ringIn/4)); const h=256/n;            // 4" corrugation pitch
+  for(let i=0;i<n;i++){ const y=i*h; const gr=g.createLinearGradient(0,y,0,y+h); gr.addColorStop(0,'#e3e7ea'); gr.addColorStop(0.45,'#b3b9bf'); gr.addColorStop(0.55,'#a6adb3'); gr.addColorStop(1,'#d9dde0'); g.fillStyle=gr; g.fillRect(0,y,256,h); }
+  // faint galvanized spangle
+  for(let i=0;i<220;i++){ g.fillStyle=`rgba(255,255,255,${(Math.random()*0.12).toFixed(2)})`; g.fillRect(Math.random()*256,Math.random()*256,3,2); }
+  // vertical sheet seam with bolts, horizontal ring seam with bolts
+  g.fillStyle='#8a9096'; g.fillRect(0,0,4,256); g.fillRect(0,252,256,4);
+  g.fillStyle='#4b5157'; for(let y=8;y<256;y+=14){ g.beginPath(); g.arc(2,y,2.2,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(9,y+7,1.6,0,Math.PI*2); g.fill(); }
+  for(let x=14;x<256;x+=16){ g.beginPath(); g.arc(x,254,2.2,0,Math.PI*2); g.fill(); }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=4; _corrugTex[key]=t; return t;
+}
+function galv3dOn(){ try{ return localStorage.getItem('gbd_galv3d')!=='0'; }catch(e){ return true; } }
+function toggleGalv3d(){ try{ localStorage.setItem('gbd_galv3d',galv3dOn()?'0':'1'); }catch(e){} const b=document.getElementById('btn-galv'); if(b) b.classList.toggle('active',!galv3dOn()); if(is3D&&scene3){ _edit3Mode=true; populate3D(); _edit3Mode=false; } }
+// Sidewall material: corrugated galvanized, or the same corrugation tinted with the bin's colour
+function binWallMat(bin,col){
+  const t=corrugTex(bin.ringIn||42).clone(); t.needsUpdate=true;
+  t.repeat.set(Math.max(4,Math.round(Math.PI*bin.diam/9.4)),Math.max(1,bin.ringCount||8));
+  return new THREE.MeshLambertMaterial({map:t,color:galv3dOn()?0xffffff:col.clone().lerp(new THREE.Color(0xffffff),0.35)});
+}
+// Roof: faceted galvanized cone, radial ribs, vents, peak fill collar with lid, roof ladder, eave trim
+function addBinRoof3(bin,x,z,r,ev,rf,col){
+  const galv=galv3dOn();
+  const roofMat=new THREE.MeshLambertMaterial({color:galv?0xcfd4d8:col.clone().multiplyScalar(0.7),flatShading:true});
+  const ribMat=new THREE.MeshLambertMaterial({color:galv?0x9aa1a7:col.clone().multiplyScalar(0.5)});
+  const dark=new THREE.MeshLambertMaterial({color:0x3f454c});
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(r,rf,24,1),roofMat);
+  roof.position.set(x,ev+rf/2,z); roof.castShadow=true; add3(roof);
+  // Ribs between roof panels
+  const nRib=Math.max(12,Math.round(Math.PI*bin.diam/6.5));
+  for(let i=0;i<nRib;i++){ const a=(i/nRib)*Math.PI*2; const p0=new THREE.Vector3(x+r*Math.sin(a),ev+0.05,z-r*Math.cos(a)), p1=new THREE.Vector3(x,ev+rf+0.1,z);
+    const rib=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(p0,p1),1,0.11,6,false),ribMat); add3(rib); }
+  // Roof vents around the roof + peak fill collar and lid
+  const nv=bin.diam>=36?6:4;
+  for(let i=0;i<nv;i++){ const a=(i/nv)*Math.PI*2+Math.PI/nv; const rr=r*0.58, y=ev+rf*(1-0.58);
+    const v=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.9,1.2),dark); v.position.set(x+rr*Math.sin(a),y+0.45,z-rr*Math.cos(a)); v.rotation.y=-a; add3(v); }
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(1,r*0.09),Math.max(1.2,r*0.11),1.4,12),ribMat); collar.position.set(x,ev+rf+0.5,z); add3(collar);
+  const lid=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(1.1,r*0.1),Math.max(1.1,r*0.1),0.25,12),dark); lid.position.set(x,ev+rf+1.3,z); add3(lid);
+  // Roof ladder from the eave to the peak collar, on the stairs landing side (or north)
+  const la=((bin.showStairs?(bin.stairsLandDeg||0):0)*Math.PI/180); const sx=Math.sin(la), sz=-Math.cos(la);
+  const L0=new THREE.Vector3(x+(r-0.5)*sx,ev+0.5,z+(r-0.5)*sz), L1=new THREE.Vector3(x+r*0.14*sx,ev+rf*0.86+0.5,z+r*0.14*sz);
+  const px=-sz, pz=sx;
+  [-0.7,0.7].forEach(o=>{ const rail=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(L0.clone().add(new THREE.Vector3(px*o,0,pz*o)),L1.clone().add(new THREE.Vector3(px*o,0,pz*o))),1,0.07,6,false),dark); add3(rail); });
+  const steps=Math.max(4,Math.round(L0.distanceTo(L1)/1.2));
+  for(let i=1;i<steps;i++){ const p=L0.clone().lerp(L1,i/steps); const rung=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.08,1.4),dark); rung.position.copy(p); rung.rotation.y=-la; add3(rung); }
+  // Eave trim ring
+  const trim=new THREE.Mesh(new THREE.TorusGeometry(r+0.1,0.22,6,48),ribMat); trim.rotation.x=Math.PI/2; trim.position.set(x,ev,z); add3(trim);
+}
+// Sidewall extras: stiffeners (stiffened bins), sidewall access door at grade, colour band when galvanized
 function addBinShellDetail3(bin,x,z,r,baseY,sideHt,col){
-  const seamMat=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.72)});
-  const ringHt=(bin.ringIn||42)/12, nRings=bin.ringCount||8;
-  for(let k=1;k<nRings;k++){
-    const seam=new THREE.Mesh(new THREE.TorusGeometry(r+0.06,0.09,6,40),seamMat);
-    seam.rotation.x=Math.PI/2; seam.position.set(x,baseY+k*ringHt,z); add3(seam);
-  }
+  const galv=galv3dOn();
   if(bin.stiffened){
-    const stMat=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.82)});
+    const stMat=new THREE.MeshLambertMaterial({color:galv?0xaeb4ba:col.clone().multiplyScalar(0.82)});
     const n=Math.max(8,Math.round(Math.PI*bin.diam/9.4));
-    for(let i=0;i<n;i++){
-      const a=(i/n)*Math.PI*2;
-      const sx=x+(r+0.28)*Math.sin(a), sz=z-(r+0.28)*Math.cos(a);
-      const st=new THREE.Mesh(new THREE.BoxGeometry(0.55,sideHt,0.4),stMat);
-      st.position.set(sx,baseY+sideHt/2,sz); st.rotation.y=-a; st.castShadow=true; add3(st);
-    }
+    for(let i=0;i<n;i++){ const a=(i/n)*Math.PI*2; const sx=x+(r+0.28)*Math.sin(a), sz=z-(r+0.28)*Math.cos(a);
+      const st=new THREE.Mesh(new THREE.BoxGeometry(0.55,sideHt,0.4),stMat); st.position.set(sx,baseY+sideHt/2,sz); st.rotation.y=-a; st.castShadow=true; add3(st); }
   }
+  // Access door 90° round from the unloader
+  const da=((bin.unloadAng||0)+90)*Math.PI/180; const dx=x+(r+0.12)*Math.sin(da), dz=z-(r+0.12)*Math.cos(da);
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(3.4,5.6,0.25),new THREE.MeshLambertMaterial({color:0x4b5157})); frame.position.set(dx,baseY+2.8,dz); frame.rotation.y=-da; add3(frame);
+  const door=new THREE.Mesh(new THREE.BoxGeometry(2.8,5.0,0.2),new THREE.MeshLambertMaterial({color:galv?0xd7dbdf:col.clone().multiplyScalar(0.9)})); door.position.set(dx+0.1*Math.sin(da),baseY+2.8,dz-0.1*Math.cos(da)); door.rotation.y=-da; add3(door);
+  // Colour band at the top ring keeps phase / custom colour readable on a galvanized bin
+  if(galv){ const band=new THREE.Mesh(new THREE.CylinderGeometry(r+0.08,r+0.08,1.0,48,1,true),new THREE.MeshLambertMaterial({color:col,side:THREE.DoubleSide})); band.position.set(x,baseY+sideHt-1.2,z); add3(band); }
+  // Concrete grade ring
+  const ring=new THREE.Mesh(new THREE.CylinderGeometry(r+1.2,r+1.2,0.35,48),new THREE.MeshLambertMaterial({color:0xb5b5ae})); ring.position.set(x,baseY-0.17,z); ring.receiveShadow=true; add3(ring);
 }
 // Aeration fan at grade on the outside of the sidewall. Three real types:
 //   axial       — vane-axial: round tube, motor inside the airstream behind the inlet guard
@@ -4474,19 +4526,6 @@ function addBinFan3(x,z,r,baseY,bearingDeg,colorHex,type,hp){
     legs(2.1+Ln*0.35,-0.9*k,cy); legs(2.1+Ln*0.35,0.9*k,cy); legs(2.1+Ln*0.85,-0.9*k,cy); legs(2.1+Ln*0.85,0.9*k,cy);
   }
 }
-// Paneled roof (faceted like real roof sheets) + peak collar cap
-function addBinRoof3(bin,x,z,r,ev,rf,col){
-  const roofMat=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.65),flatShading:true});
-  const roof=new THREE.Mesh(new THREE.ConeGeometry(r,rf,18,1),roofMat);
-  roof.position.set(x,ev+rf/2,z); roof.castShadow=true; add3(roof);
-  const capMat=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.5)});
-  const cap=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(1,r*0.09),Math.max(1.2,r*0.11),1.4,12),capMat);
-  cap.position.set(x,ev+rf+0.5,z); add3(cap);
-  // Eave trim ring where roof meets sidewall
-  const trim=new THREE.Mesh(new THREE.TorusGeometry(r+0.1,0.22,6,40),capMat);
-  trim.rotation.x=Math.PI/2; trim.position.set(x,ev,z); add3(trim);
-}
-
 // ── PORTABLE DRYER 3D MODEL ───────────────────────────────────
 // Built in a group at the dryer's position, rotated to its heading. Local axes:
 // X = across the dryer (+ right of heading), Y = up, Z = along it (− head end, + tail end).
@@ -4663,7 +4702,9 @@ let _drag3Mode=false;  // suppress camera re-fit during drag
 let _drag3Dirty=false;
 let _edit3Mode=false;  // suppress camera re-fit during property edits
 
+let _press3={x:0,y:0};
 function on3DMouseDown(e){
+  _press3={x:e.clientX,y:e.clientY};
   if(S.meas3Active||_tool3d||e.button!==0) return;
   const cv=document.getElementById('canvas3d');
   const rect=cv.getBoundingClientRect();
@@ -4776,7 +4817,7 @@ function populate3D(){
     const bar=document.getElementById('meas3d-bar');if(bar)bar.style.display='none';
   }
   const all=[...S.bins,...S.legs,...S.conveyors.map(c=>{ const nds=convNodes(c); return {lat:(nds[0].lat+nds[nds.length-1].lat)/2,lng:(nds[0].lng+nds[nds.length-1].lng)/2}; }),...S.pits,...S.dryers,...S.trucks,...S.loadouts,...S.bends];
-  if(!all.length)return;
+  if(!all.length){ if(_rLat==null){ const c=map.getCenter(); _rLat=c.lat; _rLng=c.lng; } return; }
   _tag3=null;
   if(!_drag3Mode||_rLat==null){
     _rLat=all.reduce((s,o)=>s+o.lat,0)/all.length;
@@ -4867,7 +4908,7 @@ function populate3D(){
       const gate=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.7,1.6),new THREE.MeshLambertMaterial({color:0xf97316}));
       gate.position.set(x,foundH+Math.max(0.6,legH-1.0),z);gate.castShadow=true;add3(gate);
       // Cylindrical bin body (sits on top of the inverted cone)
-      const body=new THREE.Mesh(new THREE.CylinderGeometry(r,r,sideHt,48,1,false),new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.88}));
+      const body=new THREE.Mesh(new THREE.CylinderGeometry(r,r,sideHt,48,1,true),binWallMat(bin,col));
       body.position.set(x,binFloorY+sideHt/2,z);body.castShadow=body.receiveShadow=true;body.userData={siteId:bin.id,siteType:'bin'};add3(body);
       // Roof + realistic shell details (corrugation seams, stiffeners, peak cap)
       addBinRoof3(bin,x,z,r,ev,rf,col);
@@ -4930,7 +4971,8 @@ function populate3D(){
     } else {
       // ── FLAT BOTTOM ──────────────────────────────────────────
       const totalSideHt=ev-foundH;
-      const body=new THREE.Mesh(new THREE.CylinderGeometry(r,r,totalSideHt,48,1,false),new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.88}));body.position.set(x,foundH+totalSideHt/2,z);body.castShadow=body.receiveShadow=true;body.userData={siteId:bin.id,siteType:'bin'};add3(body);
+      const body=new THREE.Mesh(new THREE.CylinderGeometry(r,r,totalSideHt,48,1,true),binWallMat(bin,col));body.position.set(x,foundH+totalSideHt/2,z);
+      const floor=new THREE.Mesh(new THREE.CircleGeometry(r,48),new THREE.MeshLambertMaterial({color:0x9a9a94})); floor.rotation.x=-Math.PI/2; floor.position.set(x,foundH+0.05,z); add3(floor);body.castShadow=body.receiveShadow=true;body.userData={siteId:bin.id,siteType:'bin'};add3(body);
       // Roof + realistic shell details (corrugation seams, stiffeners, peak cap)
       addBinRoof3(bin,x,z,r,ev,rf,col);
       addBinShellDetail3(bin,x,z,r,foundH,totalSideHt,col);
@@ -6168,6 +6210,7 @@ function place3DObject(type, lat, lng) {
 }
 function on3DCanvasClick(e) {
   if (_drag3.suppressClick) { _drag3.suppressClick=false; return; } // tail of a drag, not a click
+  if (Math.hypot(e.clientX-_press3.x,e.clientY-_press3.y)>6) return;  // that was an orbit, not a click
   // ── MEASURE MODE ──
   if (S.meas3Active) {
     e.stopPropagation();
