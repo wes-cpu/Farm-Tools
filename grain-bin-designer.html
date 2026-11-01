@@ -42,6 +42,8 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
 .guide { font-size: 0.76em; color: #d1d5db; padding-left: 18px; margin: 4px 0 8px; line-height: 1.45; }
 .guide li { margin-bottom: 5px; }
 .guide kbd { background: #374151; border: 1px solid #4b5563; border-radius: 3px; padding: 0 4px; font-size: 0.9em; color: #f59e0b; }
+.badge { display: inline-block; min-width: 16px; padding: 0 5px; border-radius: 9px; font-size: 0.85em; font-weight: 700; text-align: center; margin-left: 3px; background: #374151; color: #e5e7eb; }
+.badge.warn { background: #f59e0b; color: #111827; } .badge.err { background: #ef4444; color: #fff; }
 
 #loc-input { padding: 3px 7px; background: #111827; border: 1px solid #374151; color: #fff; border-radius: 4px; font-size: 0.74em; width: 230px; }
 #loc-results { display:none; position:fixed; z-index:5000; width:420px; max-height:260px; overflow-y:auto; background:#1f2937; border:1px solid #4b5563; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,0.5); font-size:0.78em; }
@@ -209,6 +211,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
         <button class="btn warn" onclick="confirmClear()" title="Remove every object from the map">Clear All…</button>
       </div>
     </div>
+    <button class="btn" id="btn-check" onclick="showSiteCheck()" title="Flow, clearance and throughput check">✓ Check <span id="check-badge" class="badge" style="display:none"></span></button>
     <div class="dd">
       <button class="btn dd-btn" onclick="toggleDd(this)" title="Reports and images">📊 Reports ▾</button>
       <div class="dd-menu dd-right">
@@ -3704,7 +3707,7 @@ function summaryHTML() {
     <li><b>Place storage.</b> Press <kbd>B</kbd> and click the map for a bin. Set diameter and rings. Use <i>Add Row of Bins</i> in the bin panel for a line of matching bins.</li>
     <li><b>Add receiving.</b> Press <kbd>P</kbd> for a dump pit and <kbd>L</kbd> for a leg. In the leg's <i>Bin Routing</i> pick which bins it fills.</li>
     <li><b>Connect handling.</b> Press <kbd>F</kbd> (conveyor) or <kbd>R</kbd> (double-run), click the source then the destination. Dropping an end on an object connects it.</li>
-    <li><b>Check and save.</b> Open <i>Reports</i> for the bin and power reports, look it over in <i>3D</i>, then <i>File → Save</i>. <kbd>Ctrl+Z</kbd> undoes any step.</li>
+    <li><b>Check and save.</b> Hit <i>✓ Check</i> for missing fill paths, tight clearances and trucks per hour, open <i>Reports</i>, look it over in <i>3D</i>, then <i>File → Save</i>. <kbd>Ctrl+Z</kbd> undoes any step.</li>
   </ol>
   <div class="ph">Site Summary</div>
   <div class="cbox">
@@ -3789,7 +3792,7 @@ window.useAreaForRock = function(measId) {
 function serialise(includeProjects) {
   return JSON.stringify({
     bins:S.bins,legs:S.legs,conveyors:S.conveyors,pits:S.pits,dryers:S.dryers,trucks:S.trucks,
-    loadouts:S.loadouts,structures:S.structures,bends:S.bends,walkways:S.walkways,portaugers:S.portaugers,propanetanks:S.propanetanks,generators:S.generators,power:S.power,opModes:S.opModes,opAssign:S.opAssign,
+    loadouts:S.loadouts,structures:S.structures,bends:S.bends,walkways:S.walkways,portaugers:S.portaugers,propanetanks:S.propanetanks,generators:S.generators,power:S.power,opModes:S.opModes,opAssign:S.opAssign,siteCheck:S.siteCheck||null,
     savedAt:Date.now(),
     // Saved-project library rides along (data file / export only — never inside a
     // project payload itself, which would nest the library recursively)
@@ -3806,7 +3809,7 @@ function autoSave() {
   try{localStorage.setItem('gbd_v3',serialise());}catch(e){}
   scheduleDataFileWrite();
   if(is3D&&scene3){_edit3Mode=true;populate3D();_edit3Mode=false;}
-  pushUndo();
+  pushUndo(); siteCheckBadge();
 }
 
 // ── PROJECT MANAGEMENT ───────────────────────────────────────
@@ -3953,7 +3956,7 @@ function hydrateData(data) {
     });
     if(changed) saveProjIndex(idx);
   }
-  S.grainType=data.grainType||'corn'; S.uid=data.uid||1;
+  S.grainType=data.grainType||'corn'; S.uid=data.uid||1; S.siteCheck=data.siteCheck||null;
   S.projectId=data.projectId||null; S.projectName=data.projectName||'';
   S.typeHidden3d=data.typeHidden3d||{}; S.shownPhases3d=data.shownPhases3d||[];
   S.phases=data.phases||[{num:1,name:'Phase 1',color:'#f59e0b'},{num:2,name:'Phase 2',color:'#06b6d4'},{num:3,name:'Phase 3',color:'#10b981'},{num:4,name:'Phase 4',color:'#8b5cf6'},{num:5,name:'Phase 5',color:'#ef4444'}];
@@ -4098,6 +4101,139 @@ function siteObjectCount(){ return Object.values(OBJ_LISTS).reduce((n,k)=>n+((S[
 function toggleDd(btn){ const dd=btn.closest('.dd'); const open=dd.classList.contains('open'); document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); if(!open) dd.classList.add('open'); }
 document.addEventListener('mousedown',e=>{ if(!e.target.closest('.dd')) document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); });
 document.addEventListener('click',e=>{ const b=e.target.closest('.dd-menu .btn'); if(b) document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); });
+
+// ── SITE CHECK: grain flow, clearances, throughput ───────────
+// One place that answers "does every bin have a way in and a way out, is anything too close,
+// and how many trucks an hour can this site take in and send out".
+const CLEAR_MIN_FT=8;      // bin wall to bin wall: fans, ladders, stairs need this much
+const FAN_CLEAR_FT=10;     // a fan pointed at a neighbour needs this much to breathe
+function siteCheckOpts(){ if(!S.siteCheck) S.siteCheck={truckBu:1000,harvestBuDay:40000,hoursDay:10}; return S.siteCheck; }
+function ftEN(a,b){ const n=(b.lat-a.lat)*364000, e=(b.lng-a.lng)*364000*Math.cos(a.lat*Math.PI/180); return {e,n}; }
+// Gap (ft) between a bin's wall and the nearest point of a rotated rectangle (negative = overlap)
+function circleRectGap(bin,rc){
+  const {e,n}=ftEN(L.latLng(rc.lat,rc.lng),L.latLng(bin.lat,bin.lng)); const h=(rc.headDeg||0)*Math.PI/180;
+  const along=e*Math.sin(h)+n*Math.cos(h), across=e*Math.cos(h)-n*Math.sin(h);
+  const dx=Math.max(0,Math.abs(across)-rc.widFt/2), dy=Math.max(0,Math.abs(along)-rc.lenFt/2);
+  const inside=dx===0&&dy===0; const d=Math.hypot(dx,dy);
+  return inside?-(bin.diam/2+Math.min(rc.widFt/2-Math.abs(across),rc.lenFt/2-Math.abs(along))):d-bin.diam/2;
+}
+function runSiteCheck(){
+  const issues=[]; const add=(level,text,type,id)=>issues.push({level,text,type,id});
+  const nm=o=>escH(o.name||'');
+  const legsFor=b=>S.legs.filter(l=>legFeedsBin(l,b.id)&&(l.feedsBins===null||l.feedsBins===undefined||l.feedsBins.length));
+  const cvTo=(type,id)=>S.conveyors.filter(c=>(c.feedsTo||[]).some(f=>f.type===type&&f.id===id));
+  const cvFrom=(type,id)=>S.conveyors.filter(c=>(c.feedsFrom||[]).some(f=>f.type===type&&f.id===id));
+  // ── Flow: every bin in and out ──
+  S.bins.forEach(b=>{
+    const fills=legsFor(b).length+cvTo('bin',b.id).length+S.portaugers.filter(p=>p.paMode==='fill'&&p.connBinId===b.id).length;
+    const outs=cvFrom('bin',b.id).length+S.portaugers.filter(p=>p.paMode==='reclaim'&&p.connBinId===b.id).length;
+    if(!fills) add('warn',`${nm(b)} has no fill path — no leg routes to it, no conveyor or auger delivers into it.`,'bin',b.id);
+    if(!outs) add('note',`${nm(b)} has no unload path — nothing takes grain from its unloader (a portable auger at load-out time?).`,'bin',b.id);
+  });
+  S.legs.forEach(l=>{
+    const ins=cvTo('leg',l.id).length;
+    const outs=S.bins.filter(b=>legFeedsBin(l,b.id)).length+(l.feedsDryers||[]).length+(l.feedsLoadouts||[]).length;
+    if(!ins) add('warn',`${nm(l)} receives nothing — no conveyor delivers into its boot.`,'leg',l.id);
+    if(!outs) add('warn',`${nm(l)} feeds nothing — pick bins in its Bin Routing, or a dryer / load-out.`,'leg',l.id);
+    if(!(+l.capBph>0)) add('note',`${nm(l)} has no capacity (BPH) set — throughput can't be checked through it.`,'leg',l.id);
+  });
+  S.pits.forEach(p=>{ if(!cvFrom('pit',p.id).length) add('warn',`${nm(p)} has no conveyor carrying grain out of it.`,'pit',p.id); });
+  S.dryers.forEach(d=>{
+    const ins=cvTo('dryer',d.id).length+S.legs.filter(l=>(l.feedsDryers||[]).includes(d.id)).length;
+    if(!ins) add('warn',`${nm(d)} is not fed — no leg or conveyor loads its top.`,'dryer',d.id);
+    if(!cvFrom('dryer',d.id).length) add('warn',`${nm(d)} has nothing taking dry grain away from its discharge.`,'dryer',d.id);
+    if(d.threePhase&&S.power&&+S.power.utilPhase===1&&!(S.generators||[]).some(g=>+g.elecPhase===3)) add('warn',`${nm(d)} needs 3-phase power but the utility service is single-phase and no 3-phase generator is on site.`,'dryer',d.id);
+  });
+  S.loadouts.forEach(lo=>{ const ins=cvTo('loadout',lo.id).length+S.legs.filter(l=>(l.feedsLoadouts||[]).includes(lo.id)).length; if(!ins) add('warn',`${nm(lo)} is not fed by any leg or conveyor.`,'loadout',lo.id); });
+  // ── Capacity mismatches along the chain ──
+  S.conveyors.forEach(c=>{
+    (c.feedsTo||[]).forEach(f=>{ if(f.type==='leg'){ const l=S.legs.find(x=>x.id===f.id); if(l&&+l.capBph>0&&+c.capBph>0&&+c.capBph<+l.capBph*0.9) add('note',`${nm(c)} (${(+c.capBph).toLocaleString()} BPH) feeds ${nm(l)} (${(+l.capBph).toLocaleString()} BPH) — the conveyor limits the leg.`,'conveyor',c.id); } });
+    (c.feedsFrom||[]).forEach(f=>{ if(f.type==='leg'){ const l=S.legs.find(x=>x.id===f.id); if(l&&+l.capBph>0&&+c.capBph>0&&+c.capBph<+l.capBph*0.9) add('warn',`${nm(l)} (${(+l.capBph).toLocaleString()} BPH) discharges into ${nm(c)} rated ${(+c.capBph).toLocaleString()} BPH — the conveyor will back up the leg.`,'conveyor',c.id); } });
+  });
+  // ── Geometry problems already flagged on panels, gathered here ──
+  S.conveyors.forEach(c=>{
+    const nds=convNodes(c); let tot=0, bad=null;
+    for(let i=0;i<nds.length-1;i++){ const d=distFt(L.latLng(nds[i].lat,nds[i].lng),L.latLng(nds[i+1].lat,nds[i+1].lng)); const ang=convAngle(nds[i].htFt,nds[i+1].htFt,d); tot+=convLength(nds[i].htFt,nds[i+1].htFt,d); if(c.type==='doublerun'&&!dblAngOk(ang)) bad=ang; }
+    if(c.type==='doublerun'&&bad!==null) add('error',`${nm(c)} runs at ${bad.toFixed(1)}° — double-runs operate at ${DBLRUN_RANGE_LBL}.`,'conveyor',c.id);
+    if(c.type==='doublerun'&&tot>DBLRUN_MAX_LEN) add('error',`${nm(c)} is ${tot.toFixed(0)}′ long — over the ${DBLRUN_MAX_LEN}′ double-run limit; split it.`,'conveyor',c.id);
+    convSpouts(c).problems.forEach(t=>add('error',`${nm(c)}: ${t}`,'conveyor',c.id));
+  });
+  S.portaugers.forEach(p=>{ const ep=paEndpoints(p); if(ep.problem==='short') add('error',`${nm(p)} is too short to reach ${nm(ep.bin)}'s peak — needs about ${ep.needFt}′.`,'portauger',p.id); if(ep.problem==='steep') add('error',`${nm(p)} would cut through ${nm(ep.bin)}'s roof — needs about ${ep.needFt}′ to lay flat enough.`,'portauger',p.id); });
+  S.legs.forEach(l=>{ S.bins.filter(b=>legFeedsBin(l,b.id)).forEach(b=>{ const d=distFt(L.latLng(l.lat,l.lng),L.latLng(b.lat,b.lng)); const ang=legAngle(legEffHt(l),peakHt(b),d); if(ang===null) add('error',`${nm(l)} is lower than ${nm(b)}'s peak — gravity pipe can't fall into it.`,'leg',l.id); else if(ang<TARGET_ANG-2) add('warn',`${nm(l)} → ${nm(b)} pipe falls at ${ang.toFixed(1)}°, under the ${TARGET_ANG}° target — raise the leg or move the bin closer.`,'leg',l.id); }); });
+  // ── Clearances ──
+  for(let i=0;i<S.bins.length;i++) for(let j=i+1;j<S.bins.length;j++){
+    const a=S.bins[i], b=S.bins[j]; const d=distFt(L.latLng(a.lat,a.lng),L.latLng(b.lat,b.lng)); const gap=d-(a.diam+b.diam)/2;
+    if(gap<-0.5) add('error',`${nm(a)} and ${nm(b)} overlap by ${(-gap).toFixed(1)}′.`,'bin',b.id);
+    else if(gap<CLEAR_MIN_FT) add('warn',`${nm(a)} and ${nm(b)} are ${gap.toFixed(1)}′ apart wall to wall — under the ${CLEAR_MIN_FT}′ needed for fans, ladders and stairs.`,'bin',b.id);
+    else if(gap<FAN_CLEAR_FT){
+      const toward=(x,y)=>{ const brg=bearingTo(L.latLng(x.lat,x.lng),L.latLng(y.lat,y.lng)); const fans=[...(x.showFan?[x.fanAng||0]:[]),...(x.fans||[]).map(f=>+f.bearing||0)]; return fans.some(fa=>Math.abs(((fa-brg)%360+540)%360-180)<=25); };
+      if(toward(a,b)||toward(b,a)) add('warn',`A fan on ${toward(a,b)?nm(a):nm(b)} points into the ${gap.toFixed(1)}′ gap to ${toward(a,b)?nm(b):nm(a)} — fans want ${FAN_CLEAR_FT}′ to breathe.`,'bin',toward(a,b)?a.id:b.id);
+    }
+  }
+  const rects=[...S.dryers.filter(d=>d.shape==='rect').map(d=>({o:d,type:'dryer',lat:d.lat,lng:d.lng,widFt:d.widFt,lenFt:d.lenFt,headDeg:d.headDeg})),
+    ...S.structures.map(s=>({o:s,type:'structure',lat:s.lat,lng:s.lng,widFt:s.widFt,lenFt:s.lenFt,headDeg:s.headDeg})),
+    ...S.pits.map(p=>({o:p,type:'pit',lat:p.lat,lng:p.lng,widFt:p.pitType==='driveover'?(p.grateWidFt||8):p.widFt,lenFt:p.pitType==='driveover'?((p.grateLenFt||12)*2+(p.grateGapFt||14)):p.lenFt,headDeg:p.headDeg})),
+    ...S.loadouts.map(l=>({o:l,type:'loadout',lat:l.lat,lng:l.lng,widFt:l.hopperWidFt||12,lenFt:l.hopperLenFt||16,headDeg:l.headDeg}))];
+  S.bins.forEach(b=>rects.forEach(r=>{ const g=circleRectGap(b,r); if(g<-0.5) add('error',`${nm(b)} overlaps ${nm(r.o)} by ${(-g).toFixed(1)}′.`,r.type,r.o.id); else if(g<4) add('warn',`${nm(r.o)} sits ${g.toFixed(1)}′ from ${nm(b)}'s wall — tight for access.`,r.type,r.o.id); }));
+  // ── Throughput ──
+  const o=siteCheckOpts(); const INF=Infinity;
+  const recv=S.pits.map(p=>{ const chain=[{n:p.name,bph:+p.capBph||INF}]; let rate=+p.capBph||INF;
+    cvFrom('pit',p.id).forEach(c=>{ const cb=+c.capBph||INF; chain.push({n:c.name,bph:cb}); rate=Math.min(rate,cb);
+      (c.feedsTo||[]).forEach(f=>{ if(f.type==='leg'){ const l=S.legs.find(x=>x.id===f.id); if(l){ const lb=+l.capBph||INF; chain.push({n:l.name,bph:lb}); rate=Math.min(rate,lb); } } }); });
+    const noConv=!cvFrom('pit',p.id).length; if(noConv) rate=0; // a pit nothing carries away from receives nothing
+    const lim=chain.filter(x=>x.bph===rate&&rate!==INF)[0]; return {pit:p,rate:rate===INF?0:rate,chain,limiter:lim?lim.n:null,noConveyor:noConv}; });
+  const recvTotal=recv.reduce((s,r)=>s+r.rate,0);
+  const dryTotal=S.dryers.reduce((s,d)=>s+(+d.dryBph||0),0);
+  const loadRows=[...S.loadouts.map(lo=>{ const legs=S.legs.filter(l=>(l.feedsLoadouts||[]).includes(lo.id)); const r=legs.reduce((s,l)=>s+(+l.capBph||0),0); return {n:lo.name,rate:r,via:legs.map(l=>l.name).join(', ')||'—'}; }),
+    ...S.portaugers.filter(p=>p.paMode==='reclaim'&&p.connBinId).map(p=>({n:p.name,rate:+p.capBph||0,via:'portable auger from '+((S.bins.find(b=>b.id===p.connBinId)||{}).name||'bin')}))];
+  const loadTotal=loadRows.reduce((s,r)=>s+r.rate,0);
+  const storeBu=S.bins.reduce((s,b)=>s+bushels(b,S.grainType),0);
+  return {issues,thru:{recv,recvTotal,dryTotal,loadRows,loadTotal,storeBu}};
+}
+function siteCheckBadge(){
+  const el=document.getElementById('check-badge'); if(!el) return;
+  try{ const r=runSiteCheck(); const e=r.issues.filter(i=>i.level==='error').length, w=r.issues.filter(i=>i.level==='warn').length;
+    el.textContent=(e+w)?String(e+w):''; el.className='badge'+(e?' err':w?' warn':''); el.style.display=(e+w)?'inline-block':'none';
+  }catch(err){ el.style.display='none'; }
+}
+window.selectFromCheck=function(type,id){ closeModal(); select(type,id); const maps=OBJ_LISTS; const o=(S[maps[type]]||[]).find(x=>x.id===id); if(o){ const ll=type==='conveyor'?(()=>{const n=convNodes(o)[0];return [n.lat,n.lng];})():[o.lat,o.lng]; map.panTo(ll); } };
+window.setSiteCheckOpt=function(k,v){ siteCheckOpts()[k]=Math.max(1,+v||1); autoSave(); showSiteCheck(); };
+function showSiteCheck(){
+  const r=runSiteCheck(), o=siteCheckOpts(), t=r.thru;
+  const icon={error:'⛔',warn:'⚠️',note:'ℹ️'}, clr={error:'#ef4444',warn:'#f59e0b',note:'#9ca3af'};
+  const groups=['error','warn','note'].map(lv=>{ const list=r.issues.filter(i=>i.level===lv); if(!list.length) return ''; return list.map(i=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 6px;border-bottom:1px solid #1f2937;font-size:0.8em"><span>${icon[lv]}</span><span style="flex:1;color:${clr[lv]}">${i.text}</span><button class="btn" onclick="selectFromCheck('${i.type}','${i.id}')" style="font-size:0.85em;padding:1px 7px">Show</button></div>`).join(''); }).join('');
+  const nErr=r.issues.filter(i=>i.level==='error').length, nWarn=r.issues.filter(i=>i.level==='warn').length, nNote=r.issues.filter(i=>i.level==='note').length;
+  const fmt=n=>n>0?Math.round(n).toLocaleString():'—';
+  const hrs=t.recvTotal>0?o.harvestBuDay/t.recvTotal:null;
+  const recvRows=t.recv.map(x=>`<tr><td>${escH(x.pit.name)}</td><td class="num">${fmt(x.rate)}</td><td>${x.chain.map(c=>escH(c.n)+' '+(c.bph===Infinity?'(no BPH set)':c.bph.toLocaleString())).join(' → ')}</td><td>${x.noConveyor?'<span style="color:#f59e0b">no conveyor out</span>':x.limiter?escH(x.limiter):'—'}</td></tr>`).join('')||`<tr><td colspan="4" style="color:#6b7280">No dump pits on the site.</td></tr>`;
+  const loadRows=t.loadRows.map(x=>`<tr><td>${escH(x.n)}</td><td class="num">${fmt(x.rate)}</td><td>${escH(x.via)}</td></tr>`).join('')||`<tr><td colspan="3" style="color:#6b7280">No load-outs or Load Out augers on the site.</td></tr>`;
+  const html=`
+  <div class="rpt-section">Issues — ${nErr} to fix · ${nWarn} to look at · ${nNote} notes</div>
+  ${r.issues.length?groups:'<p style="font-size:0.82em;color:#10b981;margin:6px 0 12px">✓ Every bin has a way in, nothing overlaps, and no conveyor is out of range.</p>'}
+  <div class="rpt-section" style="margin-top:16px">Throughput assumptions</div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:0.8em;margin-bottom:8px">
+    <label>Truck load (bu) <input type="number" value="${o.truckBu}" min="100" step="50" style="width:70px" onchange="setSiteCheckOpt('truckBu',this.value)"/></label>
+    <label>Harvest pace (bu/day) <input type="number" value="${o.harvestBuDay}" min="1000" step="1000" style="width:90px" onchange="setSiteCheckOpt('harvestBuDay',this.value)"/></label>
+    <label>Load-out hours/day <input type="number" value="${o.hoursDay}" min="1" max="24" step="1" style="width:50px" onchange="setSiteCheckOpt('hoursDay',this.value)"/></label>
+  </div>
+  <div class="rpt-section">Receiving — ${fmt(t.recvTotal)} BPH · ${t.recvTotal>0?(t.recvTotal/o.truckBu).toFixed(1):'—'} trucks/hr · ${hrs?hrs.toFixed(1)+' hrs to take in a '+o.harvestBuDay.toLocaleString()+' bu day':'set pit, conveyor and leg BPH'}</div>
+  <table class="rpt-table"><thead><tr><th>Pit</th><th>Rate (BPH)</th><th>Chain</th><th>Limited by</th></tr></thead><tbody>${recvRows}</tbody></table>
+  <div class="rpt-section">Drying — ${fmt(t.dryTotal)} BPH (25% → 15%)${t.recvTotal>0&&t.dryTotal>0&&t.dryTotal<t.recvTotal*0.5?' · <span style="color:#f59e0b">drying is well under receiving: wet holding will fill fast</span>':''}</div>
+  <table class="rpt-table"><thead><tr><th>Dryer</th><th>BPH</th><th>Holding (bu)</th></tr></thead><tbody>${S.dryers.map(d=>`<tr><td>${escH(d.name)}</td><td class="num">${fmt(+d.dryBph||0)}</td><td class="num">${fmt(+d.holdBu||0)}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#6b7280">No dryers on the site.</td></tr>'}</tbody></table>
+  <div class="rpt-section">Load-out — ${fmt(t.loadTotal)} BPH · ${t.loadTotal>0?(t.loadTotal/o.truckBu).toFixed(1):'—'} trucks/hr · ${t.loadTotal>0?Math.round(t.loadTotal*o.hoursDay/o.truckBu)+' trucks in a '+o.hoursDay+'-hr day':'set leg BPH on legs that feed load-outs'}</div>
+  <table class="rpt-table"><thead><tr><th>Load point</th><th>Rate (BPH)</th><th>Fed by</th></tr></thead><tbody>${loadRows}</tbody></table>
+  <div class="rpt-section">Storage — ${fmt(t.storeBu)} bu</div>
+  <table class="rpt-table"><tbody>
+    <tr><td>Days of harvest to fill every bin</td><td class="num">${o.harvestBuDay>0?(t.storeBu/o.harvestBuDay).toFixed(1):'—'}</td></tr>
+    <tr><td>Days to empty the site at load-out rate</td><td class="num">${t.loadTotal>0?(t.storeBu/(t.loadTotal*o.hoursDay)).toFixed(1):'—'}</td></tr>
+    <tr><td>Semi loads to empty the site</td><td class="num">${fmt(t.storeBu/o.truckBu)}</td></tr>
+  </tbody></table>
+  <p style="font-size:0.72em;color:#6b7280">Rates are the smallest capacity along each chain. Set BPH on pits, conveyors and legs for real numbers. Clearance uses ${CLEAR_MIN_FT}′ wall to wall and ${FAN_CLEAR_FT}′ in front of a fan.</p>`;
+  document.getElementById('modal-title').textContent='✓ Site Check'+(S.projectName?' — '+S.projectName:'');
+  document.getElementById('modal-csv-btn').style.display='none';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
 
 // ── LOCATION SEARCH ──────────────────────────────────────────
 // Accepts pasted coordinates (decimal or degrees/minutes/seconds) or a place / street address.
@@ -6610,7 +6746,7 @@ setTimeout(()=>{
   const r=localStorage.getItem('gbd_v3');
   if(r){try{const d=JSON.parse(r);const has=['bins','legs','conveyors','pits','dryers','trucks','loadouts','structures','bends','walkways','portaugers','propanetanks','generators'].some(k=>(d[k]||[]).length);if(has){hydrateData(d);updateProjDisplay();flash('Auto-loaded previous session');}}catch(e){}}
   else { updateProjDisplay(); }
-  pushUndo(); // baseline for undo
+  pushUndo(); siteCheckBadge(); // baseline for undo + first badge
   // After local restore, prefer the linked data file if this computer still has permission
   if(dataFileSupported()){
     (async()=>{
