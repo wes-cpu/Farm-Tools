@@ -2121,7 +2121,7 @@ function renderPortAuger(pa) {
   layers.push(disMk);
   // Swing-away hopper: short tube + hopper square; drag the hopper to swing it around the boot
   if(hopperLL){
-    const sw=L.polyline([bootLL,hopperLL],{color:pa.color,weight:2,opacity:0.9,dashArray:'4,3'}).addTo(map); sw.on('click',onClick); layers.push(sw);
+    const sw=L.polyline([bootLL,hopperLL],{color:pa.color,weight:2,opacity:0.9,dashArray:'4,3',interactive:false}).addTo(map); layers.push(sw);
     const hop=L.circleMarker(hopperLL,{radius:5,fillColor:'#111827',fillOpacity:1,color:pa.color,weight:2}).addTo(map);
     hop.bindTooltip('Swing-away hopper — drag to swing',{direction:'top',offset:[0,-6]});
     hop.on('click',onClick); layers.push(hop);
@@ -2137,6 +2137,8 @@ function renderPortAuger(pa) {
   const modeTag=mode==='fill'?`↑ loads ${escH(bin.name)}${ep.short?' ⚠ short':''}`:mode==='reclaim'?`↓ unloads ${escH(bin.name)}`:`${pa.angleDeg}° · ${htFt.toFixed(0)}′ dis`;
   const lbl=L.marker(disLL,{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${pa.color};color:${pa.color}">⤴ ${pa.name}<br><small>${modeTag}</small></div>`,className:'',iconAnchor:[-4,6]}),interactive:false}).addTo(map);
   layers.push(lbl);
+  // Draggable ends on top of everything else the auger draws
+  [bootMk,disMk].forEach(mk=>{ if(mk.options.interactive) mk.bringToFront(); });
   LY.portaugers[pa.id]={layers};
   if(pa.hidden) applyLayerHidden(LY.portaugers[pa.id]);
 }
@@ -3826,11 +3828,21 @@ function hydrateData(data) {
   S.bins=data.bins||[]; S.legs=data.legs||[]; S.conveyors=data.conveyors||[];
   // Dryer migration: portables saved before the base section existed. Untouched 6.5′ module defaults
   // move to GSI's real proportions (3′ base + 11.45′ per module); edited module heights are kept.
+  let migrated=false;
   (data.dryers||[]).forEach(d=>{
     if((d.dryerType||(d.shape==='cylinder'?'tower':'portable'))!=='portable') return;
     if(d.baseHtFt==null){
+      migrated=true;
       d.baseHtFt=3;
-      if(Array.isArray(d.moduleDims)&&d.moduleDims.length&&d.moduleDims.every(m=>+m.htFt===6.5)) d.moduleDims.forEach(m=>m.htFt=11.45);
+      if(Array.isArray(d.moduleDims)) d.moduleDims.forEach(m=>{ if(!(+m.htFt>9)) m.htFt=11.45; }); // old-scale module heights
+      // The old default / preset footprint (32 × 9) becomes the GSI 2322's installed 31'10" × 8'8"
+      if(Array.isArray(d.moduleDims)&&d.moduleDims.every(m=>+m.lenFt===32&&+m.widFt===9)){
+        d.moduleDims.forEach(m=>{ m.lenFt=31.8; m.widFt=8.7; });
+        if((d.modules||d.moduleDims.length)===2){
+          d.model=d.model||'GSI 2322'; d.holdBu=d.holdBu||1067; d.dryBph=d.dryBph||930; d.threePhase=true;
+          const f=d.dryerFans||[]; if(f.length===3&&!f.some(x=>x.diaIn)){ f.forEach(x=>{ x.diaIn=(+x.hp>=30)?42:36; }); }
+        }
+      }
     }
     (d.dryerFans||[]).forEach(f=>{ if(!f.diaIn) f.diaIn=36; });
     dryerStack(d);
@@ -3878,6 +3890,7 @@ function hydrateData(data) {
   S.bins.forEach(renderBin); S.legs.forEach(renderLeg); S.conveyors.forEach(renderConveyor);
   S.pits.forEach(renderPit); S.dryers.forEach(renderDryer); S.trucks.forEach(renderTruck); S.loadouts.forEach(renderLoadout); S.structures.forEach(renderStructure);
   S.walkways.forEach(renderWalkway); S.portaugers.forEach(renderPortAuger); S.propanetanks.forEach(renderPropaneTank); S.generators.forEach(renderGenerator);
+  if(migrated){ setTimeout(()=>{ autoSave(); flash('Dryer dimensions updated to GSI installed sizes'); },0); } // snaps connected conveyors + saves
   S.measurements.forEach(m=>{
     const pl=L.polyline(m.pts,{color:'#f59e0b',weight:2,dashArray:'6,4'}).addTo(map);
     pl.on('click',e=>{ L.DomEvent.stopPropagation(e); S.tool==='delete'?deleteMeas(m.id):select('measurement',m.id); });
