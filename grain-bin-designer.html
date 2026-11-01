@@ -26,6 +26,22 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
 .btn.warn:hover { background: #ef4444; color: #fff; }
 .btn.ok { border-color: #10b981; color: #10b981; }
 .btn.ok:hover { background: #10b981; color: #111827; }
+.btn:disabled { opacity: 0.35; cursor: default; }
+.btn:disabled:hover { background: #111827; color: #d1d5db; }
+.dd { position: relative; display: inline-block; }
+.dd-menu { display: none; position: absolute; top: calc(100% + 3px); left: 0; background: #1f2937; border: 1px solid #4b5563; border-radius: 6px; padding: 4px; z-index: 3000; min-width: 200px; flex-direction: column; gap: 2px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); }
+.dd-menu.dd-right { left: auto; right: 0; }
+.dd.open .dd-menu { display: flex; }
+.dd-menu .btn { text-align: left; width: 100%; }
+.dd-h { font-size: 0.62em; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; padding: 4px 6px 1px; border-top: 1px solid #374151; margin-top: 2px; }
+.dd-h:first-child { border-top: none; margin-top: 0; }
+.ph-toggle { cursor: pointer; user-select: none; }
+.ph-toggle::before { content: '▾'; display: inline-block; width: 12px; color: #9ca3af; transition: transform 0.12s; }
+.ph-toggle.closed::before { transform: rotate(-90deg); }
+.ph-toggle:hover { color: #fbbf24; }
+.guide { font-size: 0.76em; color: #d1d5db; padding-left: 18px; margin: 4px 0 8px; line-height: 1.45; }
+.guide li { margin-bottom: 5px; }
+.guide kbd { background: #374151; border: 1px solid #4b5563; border-radius: 3px; padding: 0 4px; font-size: 0.9em; color: #f59e0b; }
 
 #loc-input { padding: 3px 7px; background: #111827; border: 1px solid #374151; color: #fff; border-radius: 4px; font-size: 0.74em; width: 230px; }
 #loc-results { display:none; position:fixed; z-index:5000; width:420px; max-height:260px; overflow-y:auto; background:#1f2937; border:1px solid #4b5563; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,0.5); font-size:0.78em; }
@@ -144,25 +160,33 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
   <div class="logo">🌾 Grain Bin Designer</div>
   <div class="tg" id="toolbtns">
     <button class="btn active" data-tool="select"   title="Select/Move [V]">▶ Select</button>
+    <button class="btn" id="btn-undo" onclick="undoAction()" title="Undo [Ctrl+Z]" disabled>↶</button>
+    <button class="btn" id="btn-redo" onclick="redoAction()" title="Redo [Ctrl+Y]" disabled>↷</button>
+    <div class="sep"></div>
     <button class="btn"        data-tool="bin"      title="Add Grain Bin [B]">⊕ Bin</button>
     <button class="btn"        data-tool="leg"      title="Add Grain Leg [L]">↑ Leg</button>
-    <button class="btn"        data-tool="auger"    title="Add Inclined Auger [A] — click start then end">⤴ Auger</button>
-    <button class="btn"        data-tool="drag"     title="Add Drag/Horizontal Conveyor [D] — click start then end">⟶ Drag</button>
     <button class="btn"        data-tool="pit"      title="Add Dump Pit [P]">⬇ Pit</button>
     <button class="btn"        data-tool="dryer"    title="Add Grain Dryer [Y]">🔥 Dryer</button>
-    <button class="btn"        data-tool="truck"    title="Add Semi Truck [T]">🚛 Truck</button>
-    <button class="btn"        data-tool="loadout"   title="Add Overhead Load-Out [O]">🏗 Loadout</button>
-    <button class="btn"        data-tool="structure"  title="Add Support Structure [S] — rectangle with diagonal bracing or closed building">⬡ Structure</button>
-    <button class="btn"        data-tool="portauger"  title="Add Portable Auger — drag-and-drop auger with adjustable length, angle and heading">⤴ Port. Auger</button>
-    <button class="btn"        data-tool="propanetank" title="Add Propane Tank — horizontal cylinder on saddle supports">⬡ Propane Tank</button>
-    <button class="btn"        data-tool="generator" title="Add Generator [G] — standby power for the electrical load estimate">⚡ Generator</button>
-    <button class="btn"        data-tool="bend"      title="Add Bend / Transfer Point [E] — marks position &amp; height of a bend, head, or boot">⬟ Bend</button>
-    <button class="btn"        data-tool="highflight" title="Add Conveyor [F] — inclined chain conveyor (rectangular box), click start then end">⤴ Conveyor</button>
-    <button class="btn"        data-tool="doublerun" title="Add Double-Run Conveyor [R] — twin-tube paddle conveyor, click start then end">⤵⤴ Dbl-Run</button>
-    <button class="btn"        data-tool="walkway"   title="Add Walkway Between Bins [W] — click first bin, then second bin">🔗 Walkway</button>
-  </div>
-  <div class="sep"></div>
-  <div class="tg">
+    <button class="btn"        data-tool="highflight" title="Add Conveyor [F] — inclined chain conveyor, click start then end">⤴ Conveyor</button>
+    <button class="btn"        data-tool="doublerun" title="Add Double-Run Conveyor [R] — twin-tube paddle conveyor, click start then end">⇄ Dbl-Run</button>
+    <button class="btn"        data-tool="auger"    title="Add Inclined Auger [A] — click start then end">⤴ Auger</button>
+    <div class="dd">
+      <button class="btn dd-btn" onclick="toggleDd(this)" title="More objects">More ▾</button>
+      <div class="dd-menu">
+        <div class="dd-h">Handling</div>
+        <button class="btn" data-tool="drag"       title="Add Drag/Horizontal Conveyor [D] — click start then end">⟶ Drag Conveyor</button>
+        <button class="btn" data-tool="portauger"  title="Add Portable Auger — drop it on a bin to load or unload it">⤴ Portable Auger</button>
+        <button class="btn" data-tool="bend"       title="Add Bend / Transfer Point [E] — position &amp; height of a bend, head or boot">⬟ Bend / Transfer</button>
+        <button class="btn" data-tool="walkway"    title="Add Walkway Between Bins [W] — click first bin, then second bin">🔗 Walkway</button>
+        <div class="dd-h">Site</div>
+        <button class="btn" data-tool="loadout"    title="Add Overhead Load-Out [O]">🏗 Overhead Load-Out</button>
+        <button class="btn" data-tool="structure"  title="Add Support Structure [S] — braced rectangle or closed building">⬡ Structure / Building</button>
+        <button class="btn" data-tool="truck"      title="Add Semi Truck [T]">🚛 Semi Truck</button>
+        <button class="btn" data-tool="propanetank" title="Add Propane Tank — horizontal cylinder on saddles">⬡ Propane Tank</button>
+        <button class="btn" data-tool="generator"  title="Add Generator [G] — standby power for the electrical load estimate">⚡ Generator</button>
+      </div>
+    </div>
+    <div class="sep"></div>
     <button class="btn"        data-tool="measure"  title="Measure Distance / Area [M]">📏 Measure</button>
     <button class="btn warn"   data-tool="delete"   title="Delete Object [Del]">✕ Delete</button>
   </div>
@@ -173,18 +197,27 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
     <div class="sep"></div>
     <span id="proj-name" title="Current project">—</span>
     <button class="btn ok"  onclick="saveProj()"  title="Save current project (or save as new)">💾 Save</button>
-    <button class="btn"     onclick="openProjectsModal()" title="Manage saved layouts">📁 Projects</button>
-    <button class="btn"     onclick="exportJSON()" title="Download JSON">⬇ Export</button>
-    <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importJSON(event)"/>
-    <button class="btn"     onclick="document.getElementById('imp-file').click()" title="Import JSON">⬆ Import</button>
-    <button class="btn" id="btn-datafile" onclick="linkDataFile()" title="Keep your site data in a file next to this HTML (e.g. in OneDrive) so it follows you between computers">🔗 Link Data File</button>
-    <div class="sep"></div>
-    <button class="btn warn" onclick="confirmClear()">Clear All</button>
-    <div class="sep"></div>
-    <button class="btn" onclick="showReport()" title="Grain bin size report">📊 Report</button>
-    <button class="btn" onclick="showPowerReport()" title="Electrical load estimate — size your service and generator">⚡ Power</button>
-    <button class="btn" id="btn-ss2d" onclick="export2D()" title="Save 2D map as image">📷 2D Img</button>
-    <button class="btn" id="btn-ss3d" onclick="export3D()" title="Save 3D view as image" style="display:none">📸 3D Img</button>
+    <div class="dd">
+      <button class="btn dd-btn" onclick="toggleDd(this)" title="Projects, export, import, linked data file">📁 File ▾</button>
+      <div class="dd-menu dd-right">
+        <button class="btn"     onclick="openProjectsModal()" title="Manage saved layouts">📁 Projects…</button>
+        <button class="btn"     onclick="exportJSON()" title="Download this layout as a JSON file">⬇ Export JSON</button>
+        <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importJSON(event)"/>
+        <button class="btn"     onclick="document.getElementById('imp-file').click()" title="Load a layout from a JSON file">⬆ Import JSON…</button>
+        <button class="btn" id="btn-datafile" onclick="linkDataFile()" title="Keep your site data in a file next to this HTML (e.g. in OneDrive) so it follows you between computers">🔗 Link Data File…</button>
+        <div class="dd-h"></div>
+        <button class="btn warn" onclick="confirmClear()" title="Remove every object from the map">Clear All…</button>
+      </div>
+    </div>
+    <div class="dd">
+      <button class="btn dd-btn" onclick="toggleDd(this)" title="Reports and images">📊 Reports ▾</button>
+      <div class="dd-menu dd-right">
+        <button class="btn" onclick="showReport()" title="Grain bin size report">📊 Site Report</button>
+        <button class="btn" onclick="showPowerReport()" title="Electrical load estimate — size your service and generator">⚡ Power Estimate</button>
+        <button class="btn" id="btn-ss2d" onclick="export2D()" title="Save 2D map as image">📷 Save 2D Image</button>
+        <button class="btn" id="btn-ss3d" onclick="export3D()" title="Save 3D view as image" style="display:none">📸 Save 3D Image</button>
+      </div>
+    </div>
     <div class="sep"></div>
     <button class="btn" id="btn-labels" onclick="toggleLabels()" title="Toggle labels on/off (2D map + 3D scene)">🏷 Labels</button>
     <button class="btn" id="btn3d" onclick="toggle3D()" title="Toggle 3D View">🏔 3D</button>
@@ -395,7 +428,7 @@ function initMap() {
 }
 
 // ── TOOLS ────────────────────────────────────────────────────
-document.querySelectorAll('#toolbtns .btn').forEach(b =>
+document.querySelectorAll('#toolbtns .btn[data-tool]').forEach(b =>
   b.addEventListener('click', () => setTool(b.dataset.tool)));
 
 const CONV_TOOLS = ['auger','drag','highflight','doublerun'];
@@ -406,7 +439,8 @@ function setTool(t) {
   if (S.walkwayFirstBinId) { cancelWalkway(); }
   S.tool = t;
   document.getElementById('map').classList.toggle('measuring', t === 'measure');
-  document.querySelectorAll('#toolbtns .btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  document.querySelectorAll('#toolbtns .btn[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  document.querySelectorAll('#toolbtns .dd').forEach(dd => dd.querySelector('.dd-btn').classList.toggle('active', !!dd.querySelector('.btn.active[data-tool]')));
   document.getElementById('map').style.cursor = t === 'select' ? 'default' : 'crosshair';
   const hints = {
     select:     'Click to select. Drag to move. Click empty area to deselect.',
@@ -440,6 +474,10 @@ function toggleLabels() {
 
 document.addEventListener('keydown', e => {
   if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey) redoAction(); else undoAction(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redoAction(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){ e.preventDefault(); duplicateSelected(); return; }
+  if(e.ctrlKey||e.metaKey) return;
   const km = {v:'select',b:'bin',l:'leg',a:'auger',d:'drag',f:'highflight',r:'doublerun',e:'bend',w:'walkway',p:'pit',y:'dryer',t:'truck',o:'loadout',s:'structure',g:'generator',m:'measure'};
   if (km[e.key.toLowerCase()]) { setTool(km[e.key.toLowerCase()]); return; }
   if (e.key === 'Escape') {
@@ -1093,6 +1131,8 @@ function visRowHTML(obj, type) {
   const vis=!obj.hidden;
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0 6px;border-bottom:1px solid #374151;margin-bottom:4px">
     <span style="font-size:0.72em;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Visibility</span>
+    <span style="flex:1"></span>
+    ${type!=='walkway'?`<button onclick="duplicateObj('${type}','${obj.id}')" title="Duplicate this object beside the original (Ctrl+D)" style="padding:3px 10px;margin-right:6px;background:#1f2937;border:1px solid #4b5563;color:#d1d5db;border-radius:4px;cursor:pointer;font-size:0.76em;font-weight:600">⧉ Duplicate</button>`:''}
     <button id="pvisbtn" onclick="toggleObjVisibility('${type}','${obj.id}')" style="padding:3px 12px;background:${vis?'rgba(16,185,129,0.12)':'#374151'};border:1px solid ${vis?'#10b981':'#6b7280'};color:${vis?'#10b981':'#9ca3af'};border-radius:4px;cursor:pointer;font-size:0.76em;font-weight:600">${vis?'👁 Visible':'🚫 Hidden'}</button>
   </div>`;
 }
@@ -2637,6 +2677,10 @@ function costSectionHTML(obj) {
 // ── PROPERTY PANELS ──────────────────────────────────────────
 function renderProperties() {
   const p=document.getElementById('properties');
+  _renderPropertiesInner(p);
+  makeCollapsible(p,(S.selId&&S.selType)?S.selType:'summary');
+}
+function _renderPropertiesInner(p) {
   if(!S.selId||!S.selType){ p.innerHTML=summaryHTML(); return; }
   const withVis=(o,type,html)=>visRowHTML(o,type)+html;
   const withCost=(o,type,html)=>withVis(o,type,html)+costSectionHTML(o);
@@ -2676,6 +2720,9 @@ function binHTML(bin) {
   ${isRoofAuto(bin)
     ?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Roof height is calculated from the diameter: ${(bin.diam/2).toFixed(1)}′ radius × tan(${roofDegOf(bin).toFixed(1).replace(/\.0$/,'')}°) = <b>${roofHt(bin).toFixed(1)}′ roof</b>, giving a ${peakHt(bin).toFixed(1)}′ peak over the ${eaveHt(bin).toFixed(1)}′ eave. Uncheck Auto to enter the manufacturer's overall peak height instead.</p>`
     :`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Manual: roof height is ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${roofHt(bin).toFixed(1)}′ roof</b> (≈${roofDegOf(bin).toFixed(1)}° pitch). Check Auto to size the roof from the diameter at a set angle.</p>`}
+  <div class="fr"><label>Row of Bins: count · gap (ft) · dir (°)</label><span style="display:flex;gap:3px"><input type="number" id="brn" value="4" min="2" max="30" step="1" title="How many bins in the row, counting this one" style="width:40px"/><input type="number" id="brg" value="8" min="0" max="60" step="1" title="Gap between bin walls (ft)" style="width:40px"/><input type="number" id="brb" value="90" min="0" max="359" step="15" title="Direction of the row (0°=N 90°=E)" style="width:44px"/></span></div>
+  <button class="pbtn" onclick="addBinRow('${bin.id}')" title="Copy this bin's full spec in a straight line from it" style="margin-bottom:4px">⋯ Add Row of Matching Bins</button>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Count includes this bin. Gap is wall to wall. Direction 0°=N 90°=E.</p>
   <div class="fr"><label>Sidewall Type</label><select id="pstiff">
     <option value="0"${!bin.stiffened?' selected':''}>Unstiffened (corrugated only)</option>
     <option value="1"${bin.stiffened?' selected':''}>Stiffened (vertical stiffener channels)</option>
@@ -3651,6 +3698,14 @@ function summaryHTML() {
   const totBu=S.bins.reduce((a,b)=>a+bushels(b,S.grainType),0);
   const rockOpts=ROCK_TYPES.map((r,i)=>`<option value="${r.density}">${r.label}</option>`).join('');
   return `<div class="no-sel" style="padding:8px 0">Select an object to edit properties.</div>
+  <div class="ph">Build a Site in 5 Steps</div>
+  <ol class="guide">
+    <li><b>Find the site.</b> Type the address or paste coordinates in the search box, then zoom to the yard.</li>
+    <li><b>Place storage.</b> Press <kbd>B</kbd> and click the map for a bin. Set diameter and rings. Use <i>Add Row of Bins</i> in the bin panel for a line of matching bins.</li>
+    <li><b>Add receiving.</b> Press <kbd>P</kbd> for a dump pit and <kbd>L</kbd> for a leg. In the leg's <i>Bin Routing</i> pick which bins it fills.</li>
+    <li><b>Connect handling.</b> Press <kbd>F</kbd> (conveyor) or <kbd>R</kbd> (double-run), click the source then the destination. Dropping an end on an object connects it.</li>
+    <li><b>Check and save.</b> Open <i>Reports</i> for the bin and power reports, look it over in <i>3D</i>, then <i>File → Save</i>. <kbd>Ctrl+Z</kbd> undoes any step.</li>
+  </ol>
   <div class="ph">Site Summary</div>
   <div class="cbox">
     <div class="crow"><span class="lbl">Bins</span><span class="val">${S.bins.length}</span></div>
@@ -3751,6 +3806,7 @@ function autoSave() {
   try{localStorage.setItem('gbd_v3',serialise());}catch(e){}
   scheduleDataFileWrite();
   if(is3D&&scene3){_edit3Mode=true;populate3D();_edit3Mode=false;}
+  pushUndo();
 }
 
 // ── PROJECT MANAGEMENT ───────────────────────────────────────
@@ -3935,6 +3991,113 @@ function clearAllLayers() {
   clearLegLines(); clearConvLines(); cancelMeasure(); cancelConv(); S.convAddNodeMode=null; cancelWalkway();
 }
 function confirmClear() { if(confirm('Clear ALL objects? Cannot be undone.')){clearAllLayers();S.bins=[];S.legs=[];S.conveyors=[];S.pits=[];S.dryers=[];S.trucks=[];S.loadouts=[];S.structures=[];S.bends=[];S.walkways=[];S.portaugers=[];S.propanetanks=[];S.generators=[];S.measurements=[];S.uid=1;select(null,null);autoSave();} }
+
+// ── UNDO / REDO ──────────────────────────────────────────────
+// Every completed action ends in autoSave(), which snapshots the site. Ctrl+Z steps back, Ctrl+Y forward.
+const UNDO_MAX=60; let _undo=[], _redo=[], _undoRestoring=false, _lastSnap=null;
+function snapState(){ const d=JSON.parse(serialise()); delete d.view; delete d.projLib; return JSON.stringify(d); }
+function pushUndo(){
+  if(_undoRestoring) return;
+  const s=snapState(); if(s===_lastSnap) return;
+  if(_lastSnap!==null){ _undo.push(_lastSnap); if(_undo.length>UNDO_MAX) _undo.shift(); _redo.length=0; }
+  _lastSnap=s; updateUndoBtns();
+}
+function restoreSnap(s){
+  _undoRestoring=true;
+  try{
+    hydrateData(JSON.parse(s)); select(null,null); _lastSnap=s;
+    try{localStorage.setItem('gbd_v3',serialise());}catch(e){}
+    scheduleDataFileWrite();
+    if(is3D&&scene3){_edit3Mode=true;populate3D();_edit3Mode=false;}
+  } finally { _undoRestoring=false; }
+  updateUndoBtns();
+}
+function undoAction(){ if(!_undo.length){ flash('Nothing to undo'); return; } _redo.push(_lastSnap); restoreSnap(_undo.pop()); flash('↶ Undone'); }
+function redoAction(){ if(!_redo.length){ flash('Nothing to redo'); return; } _undo.push(_lastSnap); restoreSnap(_redo.pop()); flash('↷ Redone'); }
+function updateUndoBtns(){ const u=document.getElementById('btn-undo'),r=document.getElementById('btn-redo'); if(u) u.disabled=!_undo.length; if(r) r.disabled=!_redo.length; }
+
+// ── DUPLICATE ────────────────────────────────────────────────
+const OBJ_LISTS={bin:'bins',leg:'legs',conveyor:'conveyors',pit:'pits',dryer:'dryers',truck:'trucks',loadout:'loadouts',structure:'structures',bend:'bends',walkway:'walkways',portauger:'portaugers',propanetank:'propanetanks',generator:'generators'};
+const RENDER_FNS=()=>({bin:renderBin,leg:renderLeg,conveyor:renderConveyor,pit:renderPit,dryer:renderDryer,truck:renderTruck,loadout:renderLoadout,structure:renderStructure,bend:renderBend,walkway:renderWalkway,portauger:renderPortAuger,propanetank:renderPropaneTank,generator:renderGenerator});
+function nextName(name,list){
+  const m=(name||'').match(/^(.*?)(\d+)\s*$/); let base=m?m[1]:(name||'')+' ', n=m?+m[2]+1:2;
+  const taken=new Set(list.map(o=>o.name));
+  while(taken.has(base+n)) n++; return base+n;
+}
+function duplicateObj(type,id){
+  const key=OBJ_LISTS[type]; const list=S[key]; if(!list) return;
+  const src=list.find(o=>o.id===id); if(!src) return;
+  if(type==='walkway'){ showToast('A walkway belongs to its two bins — add a new one with W'); return; }
+  const c=JSON.parse(JSON.stringify(src));
+  c.id=(src.id.match(/^[a-z]+_/)||['obj_'])[0]+uid();
+  c.name=nextName(src.name,list); c.hidden=false;
+  // Offset east by the object's own width plus a gap so it lands beside the original, not on it
+  const widthFt=type==='bin'?+src.diam||48:type==='dryer'?+src.widFt||9:type==='structure'?+src.widFt||20:type==='truck'?+src.widFt||8.5:type==='propanetank'?+src.lengthFt||20:12;
+  const offM=(widthFt+10)*FT2M;
+  const shift=ll=>bearingOffset(L.latLng(ll.lat,ll.lng),offM,90);
+  if(type==='conveyor'){
+    c.nodes=(src.nodes||convNodes(src)).map(nd=>{ const s=shift(nd); return {...nd,lat:s.lat,lng:s.lng,bendId:null}; });
+    c.feedsFrom=[]; c.feedsTo=[]; // connections are specific to the original
+  } else {
+    const s=shift(c); c.lat=s.lat; c.lng=s.lng;
+    if(type==='portauger'){ const ep=paEndpoints(src); const b=shift(ep.bootLL); c.lat=b.lat; c.lng=b.lng; c.paMode='standalone'; c.connBinId=null; }
+    if(type==='leg'){ c.sharePipesWith=null; }
+  }
+  list.push(c);
+  const rf=RENDER_FNS()[type]; if(rf) rf(c);
+  select(type,c.id); autoSave();
+  showToast(`⧉ ${c.name} added beside ${src.name} — drag it where you want it`);
+}
+function duplicateSelected(){ if(S.selType&&S.selId) duplicateObj(S.selType,S.selId); }
+
+// ── ROW OF BINS ──────────────────────────────────────────────
+// Copies the selected bin N−1 more times along a bearing, centre-to-centre = diameter + gap.
+function addBinRow(binId){
+  const bin=S.bins.find(b=>b.id===binId); if(!bin) return;
+  const n=Math.max(2,Math.min(30,+document.getElementById('brn')?.value||4));
+  const gap=Math.max(0,+document.getElementById('brg')?.value||8);
+  const bear=normDeg(+document.getElementById('brb')?.value||90);
+  const stepM=((+bin.diam||48)+gap)*FT2M;
+  let last=null;
+  for(let i=1;i<n;i++){
+    const c=JSON.parse(JSON.stringify(bin)); c.id='bin_'+uid(); c.name=nextName(last?last.name:bin.name,S.bins); c.hidden=false;
+    const ll=bearingOffset(L.latLng(bin.lat,bin.lng),stepM*i,bear); c.lat=ll.lat; c.lng=ll.lng;
+    c.color=BIN_COLORS[S.bins.length%BIN_COLORS.length];
+    S.bins.push(c); renderBin(c); last=c;
+  }
+  select('bin',bin.id); autoSave();
+  showToast(`✓ ${n-1} more ${bin.diam}′ bins added in a row at ${gap}′ spacing`);
+}
+
+// ── COLLAPSIBLE PANEL SECTIONS ───────────────────────────────
+// The essentials stay open; everything else folds, and the choice is remembered per section.
+const SECTIONS_COLLAPSED=new Set(['exterior staircase','side draw chutes','aeration fans','unload','custom color','build phase','foundation / concrete pad','drying fans','load & unload ends','downspout','shared pipes','bin routing','loadout feed','dryer feed','angle analysis','swing-away hopper','truck position','endpoint connection points','support structure','hopper / bin','drive-through dimensions','skid dimensions','cost','cost / budget','cost & infrastructure','shortcuts','rock / gravel calculator','grain flow']);
+let _secState=null;
+function secState(){ if(!_secState){ try{ _secState=JSON.parse(localStorage.getItem('gbd_sections')||'{}'); }catch(e){ _secState={}; } } return _secState; }
+function secKey(h){ return (h.textContent||'').split('—')[0].replace(/[^a-z0-9&/ ]/gi,'').trim().toLowerCase(); }
+function makeCollapsible(panel,ctx){
+  const heads=[...panel.children].filter(el=>el.classList&&el.classList.contains('ph'));
+  heads.forEach((h,hi)=>{
+    if(hi===0&&ctx!=='summary') return; // the object title header stays as it is
+    const key=secKey(h); if(!key) return;
+    const body=document.createElement('div'); body.className='psec';
+    let el=h.nextSibling;
+    while(el&&!(el.classList&&el.classList.contains('ph'))){ const nx=el.nextSibling; body.appendChild(el); el=nx; }
+    h.parentNode.insertBefore(body,h.nextSibling);
+    const st=secState();
+    let open=st[key]!==undefined?!!st[key]:!SECTIONS_COLLAPSED.has(key);
+    if(ctx==='summary'&&key==='build a site in 5 steps'&&st[key]===undefined) open=siteObjectCount()<3;
+    h.classList.add('ph-toggle'); h.classList.toggle('closed',!open); body.style.display=open?'':'none';
+    h.title='Click to '+(open?'collapse':'expand');
+    h.addEventListener('click',()=>{ const nowOpen=body.style.display==='none'; body.style.display=nowOpen?'':'none'; h.classList.toggle('closed',!nowOpen); h.title='Click to '+(nowOpen?'collapse':'expand'); st[key]=nowOpen?1:0; try{localStorage.setItem('gbd_sections',JSON.stringify(st));}catch(e){} });
+  });
+}
+function siteObjectCount(){ return Object.values(OBJ_LISTS).reduce((n,k)=>n+((S[k]||[]).length),0); }
+
+// ── TOOLBAR DROPDOWNS ────────────────────────────────────────
+function toggleDd(btn){ const dd=btn.closest('.dd'); const open=dd.classList.contains('open'); document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); if(!open) dd.classList.add('open'); }
+document.addEventListener('mousedown',e=>{ if(!e.target.closest('.dd')) document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); });
+document.addEventListener('click',e=>{ const b=e.target.closest('.dd-menu .btn'); if(b) document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); });
 
 // ── LOCATION SEARCH ──────────────────────────────────────────
 // Accepts pasted coordinates (decimal or degrees/minutes/seconds) or a place / street address.
@@ -6447,6 +6610,7 @@ setTimeout(()=>{
   const r=localStorage.getItem('gbd_v3');
   if(r){try{const d=JSON.parse(r);const has=['bins','legs','conveyors','pits','dryers','trucks','loadouts','structures','bends','walkways','portaugers','propanetanks','generators'].some(k=>(d[k]||[]).length);if(has){hydrateData(d);updateProjDisplay();flash('Auto-loaded previous session');}}catch(e){}}
   else { updateProjDisplay(); }
+  pushUndo(); // baseline for undo
   // After local restore, prefer the linked data file if this computer still has permission
   if(dataFileSupported()){
     (async()=>{
