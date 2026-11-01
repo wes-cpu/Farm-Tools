@@ -27,7 +27,11 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
 .btn.ok { border-color: #10b981; color: #10b981; }
 .btn.ok:hover { background: #10b981; color: #111827; }
 
-#loc-input { padding: 3px 7px; background: #111827; border: 1px solid #374151; color: #fff; border-radius: 4px; font-size: 0.74em; width: 180px; }
+#loc-input { padding: 3px 7px; background: #111827; border: 1px solid #374151; color: #fff; border-radius: 4px; font-size: 0.74em; width: 230px; }
+#loc-results { display:none; position:fixed; z-index:5000; width:420px; max-height:260px; overflow-y:auto; background:#1f2937; border:1px solid #4b5563; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,0.5); font-size:0.78em; }
+.loc-row { display:flex; justify-content:space-between; gap:8px; padding:6px 9px; border-bottom:1px solid #374151; cursor:pointer; color:#e5e7eb; }
+.loc-row:last-child { border-bottom:none; } .loc-row:hover { background:#374151; }
+.loc-lbl { flex:1; line-height:1.3; } .loc-src { color:#9ca3af; font-size:0.85em; white-space:nowrap; align-self:center; }
 #loc-input:focus { outline: none; border-color: #f59e0b; }
 
 #content { display: flex; flex: 1; overflow: hidden; position: relative; }
@@ -164,7 +168,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #111827; colo
   </div>
   <div class="sep"></div>
   <div class="toolbar-right">
-    <input id="loc-input" type="text" placeholder="Search farm address…"/>
+    <input id="loc-input" type="text" placeholder="Address, town, or 41.5123, -95.4567" title="Street address, place name, or coordinates (decimal or degrees/minutes/seconds)" autocomplete="off"/>
     <button class="btn" onclick="searchLoc()">Go</button>
     <div class="sep"></div>
     <span id="proj-name" title="Current project">—</span>
@@ -3860,11 +3864,118 @@ function clearAllLayers() {
 function confirmClear() { if(confirm('Clear ALL objects? Cannot be undone.')){clearAllLayers();S.bins=[];S.legs=[];S.conveyors=[];S.pits=[];S.dryers=[];S.trucks=[];S.loadouts=[];S.structures=[];S.bends=[];S.walkways=[];S.portaugers=[];S.propanetanks=[];S.generators=[];S.measurements=[];S.uid=1;select(null,null);autoSave();} }
 
 // ── LOCATION SEARCH ──────────────────────────────────────────
-async function searchLoc() {
-  const q=document.getElementById('loc-input').value.trim(); if(!q)return;
-  try{const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`,{headers:{'Accept-Language':'en','User-Agent':'GrainBinDesigner/2.0'}});const d=await r.json();if(d&&d.length)map.setView([+d[0].lat,+d[0].lon],18);else alert('Location not found.');}catch(e){alert('Search unavailable.');}
+// Accepts pasted coordinates (decimal or degrees/minutes/seconds) or a place / street address.
+// Addresses are looked up on several free geocoders at once — US Census (rural US street
+// addresses), OpenStreetMap Nominatim and Photon — biased to the area the map is showing, and
+// the candidates are listed under the box so the right one can be picked. A pin marks the spot.
+let _locPin=null, _locResults=[], _locSeq=0;
+function parseCoords(q){
+  const s=q.trim().replace(/[°º]/g,'°');
+  // Decimal: "41.5, -95.5" · "41.5 -95.5" · "N41.5 W95.5" · "41.5N 95.5W"
+  let m=s.match(/^\s*([NS])?\s*(-?\d{1,2}(?:\.\d+)?)\s*°?\s*([NS])?\s*[,;\s]\s*([EW])?\s*(-?\d{1,3}(?:\.\d+)?)\s*°?\s*([EW])?\s*$/i);
+  if(m){
+    let lat=+m[2], lng=+m[5];
+    const ns=(m[1]||m[3]||'').toUpperCase(), ew=(m[4]||m[6]||'').toUpperCase();
+    if(ns==='S') lat=-Math.abs(lat); if(ew==='W') lng=-Math.abs(lng);
+    if(Math.abs(lat)<=90&&Math.abs(lng)<=180) return {lat,lng};
+  }
+  // DMS: 41°30'00"N 95°30'00"W  (also 41 30 00 N, 95 30 00 W)
+  const dms=/(-?\d{1,3})\s*[°\s]\s*(\d{1,2}(?:\.\d+)?)\s*['′\s]\s*(?:(\d{1,2}(?:\.\d+)?)\s*["″]?)?\s*([NSEW])/gi;
+  const parts=[]; let d;
+  while((d=dms.exec(s))&&parts.length<2){
+    const val=(Math.abs(+d[1])+(+d[2])/60+(+(d[3]||0))/3600)*(/[SW]/i.test(d[4])?-1:1);
+    parts.push({val,axis:/[NS]/i.test(d[4])?'lat':'lng'});
+  }
+  if(parts.length===2&&parts[0].axis!==parts[1].axis){
+    const lat=parts.find(p=>p.axis==='lat').val, lng=parts.find(p=>p.axis==='lng').val;
+    if(Math.abs(lat)<=90&&Math.abs(lng)<=180) return {lat,lng};
+  }
+  return null;
 }
-document.getElementById('loc-input').addEventListener('keydown',e=>{if(e.key==='Enter')searchLoc();});
+function fetchJSON(url,ms=8000){
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),ms);
+  return fetch(url,{signal:ctl.signal,headers:{'Accept':'application/json'}}).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).finally(()=>clearTimeout(t));
+}
+// Each source returns [{lat,lng,label,src,score}]
+async function geocodeCensus(q){
+  if(!/^\s*\d+\s+\S/.test(q)) return []; // only street addresses ("123 County Rd …")
+  const d=await fetchJSON(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(q)}&benchmark=Public_AR_Current&format=json`);
+  return ((d&&d.result&&d.result.addressMatches)||[]).slice(0,5).map(m=>({lat:+m.coordinates.y,lng:+m.coordinates.x,label:m.matchedAddress,src:'US Census',score:3}));
+}
+async function geocodeNominatim(q){
+  const c=map.getCenter(), b=map.getBounds();
+  const vb=`${b.getWest().toFixed(4)},${b.getNorth().toFixed(4)},${b.getEast().toFixed(4)},${b.getSouth().toFixed(4)}`;
+  const d=await fetchJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=6&addressdetails=0&viewbox=${vb}&bounded=0&accept-language=en`);
+  return (Array.isArray(d)?d:[]).map(r=>({lat:+r.lat,lng:+r.lon,label:r.display_name,src:'OpenStreetMap',score:(r.category==='place'||r.addresstype==='house'||r.type==='house')?2:1}));
+}
+async function geocodePhoton(q){
+  const c=map.getCenter();
+  const d=await fetchJSON(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=en&lat=${c.lat.toFixed(4)}&lon=${c.lng.toFixed(4)}`);
+  return ((d&&d.features)||[]).map(f=>{
+    const p=f.properties||{}, g=f.geometry&&f.geometry.coordinates;
+    const label=[[p.housenumber,p.street].filter(Boolean).join(' ')||p.name, p.city||p.town||p.village||p.county, p.state, p.postcode, p.country].filter(Boolean).join(', ');
+    return g?{lat:+g[1],lng:+g[0],label,src:'Photon',score:p.housenumber?2:1}:null;
+  }).filter(Boolean);
+}
+function setLocStatus(msg,color){ const h=document.getElementById('hint-bar'); if(h){ h.textContent=msg; if(color) h.style.color=color; else h.style.color=''; } }
+function showLocResults(list){
+  let box=document.getElementById('loc-results');
+  if(!box){ box=document.createElement('div'); box.id='loc-results'; document.body.appendChild(box); }
+  const inp=document.getElementById('loc-input'), r=inp.getBoundingClientRect();
+  box.style.left=Math.max(4,Math.min(r.left,window.innerWidth-424))+'px'; box.style.top=(r.bottom+3)+'px';
+  _locResults=list;
+  if(!list.length){ box.style.display='none'; return; }
+  box.innerHTML=list.map((x,i)=>`<div class="loc-row" data-i="${i}"><span class="loc-lbl">${escH(x.label)}</span><span class="loc-src">${x.src}</span></div>`).join('');
+  box.querySelectorAll('.loc-row').forEach(el=>el.addEventListener('mousedown',e=>{ e.preventDefault(); goToLoc(_locResults[+el.dataset.i]); }));
+  box.style.display='block';
+}
+function hideLocResults(){ const box=document.getElementById('loc-results'); if(box) box.style.display='none'; _locResults=[]; }
+function goToLoc(x){
+  hideLocResults();
+  if(!x) return;
+  const ll=L.latLng(x.lat,x.lng);
+  map.setView(ll,18);
+  if(_locPin) _locPin.remove();
+  _locPin=L.marker(ll,{zIndexOffset:1000,icon:L.divIcon({className:'',iconSize:[26,34],iconAnchor:[13,34],popupAnchor:[0,-30],
+    html:'<svg xmlns="http://www.w3.org/2000/svg" width="26" height="34" viewBox="0 0 26 34"><path d="M13 1C6.4 1 1 6.3 1 12.9 1 21.5 13 33 13 33s12-11.5 12-20.1C25 6.3 19.6 1 13 1z" fill="#f59e0b" stroke="#fff" stroke-width="2"/><circle cx="13" cy="13" r="4.5" fill="#111827"/></svg>'})}).addTo(map);
+  _locPin.bindPopup(`<div style="font-size:12px;max-width:260px">${escH(x.label||'')}<br><span style="color:#6b7280">${x.lat.toFixed(6)}, ${x.lng.toFixed(6)}</span><br><a href="#" onclick="clearLocPin();return false;" style="color:#f59e0b">Remove pin</a></div>`).openPopup();
+  setLocStatus(`📍 ${x.label||''} — ${x.lat.toFixed(5)}, ${x.lng.toFixed(5)}. Pick a tool and click the map to start placing.`);
+  document.getElementById('loc-input').blur();
+}
+function clearLocPin(){ if(_locPin){ _locPin.remove(); _locPin=null; } }
+async function searchLoc(){
+  const inp=document.getElementById('loc-input'); const q=inp.value.trim(); if(!q) return;
+  // Already showing candidates? Enter / Go takes the first one.
+  if(_locResults.length){ goToLoc(_locResults[0]); return; }
+  const c=parseCoords(q);
+  if(c){ goToLoc({lat:c.lat,lng:c.lng,label:'Coordinates',src:'typed'}); return; }
+  const seq=++_locSeq;
+  setLocStatus(`Searching for “${q}”…`);
+  const settled=await Promise.allSettled([geocodeCensus(q),geocodeNominatim(q),geocodePhoton(q)]);
+  if(seq!==_locSeq) return; // a newer search superseded this one
+  const all=[]; let failures=0;
+  settled.forEach(s=>{ if(s.status==='fulfilled') all.push(...s.value); else failures++; });
+  // Merge: best score first, then closest to the current view; drop near-duplicates (< 60 m apart)
+  const here=map.getCenter();
+  all.sort((a,b)=>(b.score-a.score)||(map.distance(here,[a.lat,a.lng])-map.distance(here,[b.lat,b.lng])));
+  const out=[]; all.forEach(x=>{ if(!out.some(y=>map.distance([x.lat,x.lng],[y.lat,y.lng])<60)) out.push(x); });
+  if(!out.length){
+    setLocStatus(failures===settled.length
+      ?'Search unavailable right now (no geocoding service reachable). You can paste coordinates like 41.5123, -95.4567 instead.'
+      :`Nothing found for “${q}”. Add the town and state (e.g. “1234 County Rd 20, Harlan, IA”), or paste coordinates like 41.5123, -95.4567.`,'#f59e0b');
+    return;
+  }
+  if(out.length===1){ goToLoc(out[0]); return; }
+  setLocStatus(`${out.length} matches — pick one from the list (Enter takes the first).`);
+  showLocResults(out.slice(0,8));
+}
+(function(){
+  const inp=document.getElementById('loc-input');
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); searchLoc(); } else if(e.key==='Escape'){ hideLocResults(); } });
+  inp.addEventListener('input',()=>hideLocResults());
+  document.addEventListener('mousedown',e=>{ const box=document.getElementById('loc-results'); if(box&&box.style.display==='block'&&!box.contains(e.target)&&e.target!==inp) hideLocResults(); });
+  window.addEventListener('resize',()=>{ if(_locResults.length) showLocResults(_locResults); });
+})();
 
 // ── 3D VIEW ──────────────────────────────────────────────────
 let scene3,cam3,ren3,ctrl3,is3D=false,animId3=null,objs3=[];
