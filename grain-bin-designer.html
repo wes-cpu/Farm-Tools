@@ -1901,7 +1901,7 @@ function deleteDryer(id) { removeDryerLyr(id); S.dryers=S.dryers.filter(d=>d.id!
 
 // ── TRUCKS ───────────────────────────────────────────────────
 function addTruck(lat,lng) {
-  const t={id:'truck_'+uid(),lat,lng,name:'Truck '+(S.trucks.length+1),headDeg:0,lenFt:70,widFt:8.5,phase:0,color:'#6b7280',cost:0,infraItems:[]};
+  const t={id:'truck_'+uid(),lat,lng,name:'Truck '+(S.trucks.length+1),headDeg:0,lenFt:62,widFt:8.5,phase:0,color:'#991b1b',cost:0,infraItems:[]};
   S.trucks.push(t); renderTruck(t); select('truck',t.id); autoSave();
 }
 function renderTruck(truck) {
@@ -2011,7 +2011,7 @@ function addPortAuger(lat,lng) {
   const pa={id:'pa_'+uid(),lat,lng,name:'Auger '+(S.portaugers.length+1),
     lengthFt:60,angleDeg:35,headingDeg:0,diamIn:8,capBph:0,color:'#f97316',phase:0,
     paMode:'standalone',connBinId:null,hpAuto:true,cost:0,infraItems:[],
-    swingAway:true,swingLenFt:12,swingDeg:90,showTruck:true,truckDeg:null,truckLenFt:70,truckWidFt:8.5};
+    swingAway:true,swingLenFt:12,swingDeg:90,showTruck:true,truckDeg:null,truckLenFt:62,truckWidFt:8.5};
   pa.motorHp=estimatePaHp(pa); // auto-filled from diameter/length/angle
   S.portaugers.push(pa); renderPortAuger(pa); select('portauger',pa.id); autoSave();
 }
@@ -2021,7 +2021,7 @@ function paNorm(pa){
   if(!(pa.swingLenFt>0)) pa.swingLenFt=12;
   if(pa.swingDeg==null||isNaN(+pa.swingDeg)) pa.swingDeg=90;
   if(pa.showTruck===undefined) pa.showTruck=true;
-  if(!(pa.truckLenFt>0)) pa.truckLenFt=70;
+  if(!(pa.truckLenFt>0)||+pa.truckLenFt===70) pa.truckLenFt=62;
   if(!(pa.truckWidFt>0)) pa.truckWidFt=8.5;
   return pa;
 }
@@ -3656,6 +3656,7 @@ function bindDryer(dr) {
 // TRUCK
 function truckHTML(truck) {
   return `<div class="ph">Semi Truck — ${truck.name}</div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Drawn as a Peterbilt 379 with a 40′ Wilson hopper-bottom (62′ overall). Length scales the whole rig; colour paints the tractor.</p>
   <div class="fr"><label>Name</label><input type="text" id="ptn" value="${escH(truck.name)}"/></div>
   <div class="fr"><label>Heading (°)</label><input type="number" id="pthd" value="${truck.headDeg}" min="0" max="359" step="5"/></div>
   <div class="fr"><label>Length (ft)</label><input type="number" id="ptl" value="${truck.lenFt}" min="20" max="100" step="5"/></div>
@@ -4687,6 +4688,65 @@ function addPortableDryer3(dr,x,z,col,hRad){
   return {topY};
 }
 
+// ── SEMI: Peterbilt 379 tractor + 40' Wilson hopper-bottom trailer ──────────
+// Built in a group: −Z is the front bumper, +Z the trailer rear, 62 ft overall at scale 1.
+// opacity < 1 gives the translucent "ghost" used at auger load points.
+const SEMI_LEN_FT=62;
+function buildSemi3(color,opacity=1,scale=1){
+  const G=new THREE.Group(); const tr=opacity<1;
+  const M=(hex,extra)=>new THREE.MeshLambertMaterial(Object.assign({color:hex,transparent:tr,opacity},extra||{}));
+  const paint=M(color), chrome=M(0xe5e7eb), black=M(0x0f1216), dark=M(0x2b3036), alum=M(0xd3d7db), glass=M(0x1e293b), tarp=M(0x303338), red=M(0xdc2626), amber=M(0xf59e0b), steel=M(0x6b7076);
+  const box=(w,h,d,mat,x,y,z,ry)=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); if(ry) m.rotation.y=ry; m.castShadow=!tr; G.add(m); return m; };
+  const cylX=(r,len,mat,x,y,z,seg=16)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg),mat); m.rotation.z=Math.PI/2; m.position.set(x,y,z); m.castShadow=!tr; G.add(m); return m; };
+  const cylZ=(r,len,mat,x,y,z,seg=16)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg),mat); m.rotation.x=Math.PI/2; m.position.set(x,y,z); m.castShadow=!tr; G.add(m); return m; };
+  const cylY=(r,len,mat,x,y,z,seg=16)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg),mat); m.position.set(x,y,z); m.castShadow=!tr; G.add(m); return m; };
+  const wheel=(x,z,dual)=>{ const R=1.75; [dual?0:0, dual?1:null].filter(v=>v!==null).forEach(k=>{ const wx=x+Math.sign(x)*(dual?(k?1.05:0):0); cylX(R,0.95,black,wx,R,z,18); cylX(0.95,1.0,chrome,wx,R,z,12); cylX(0.3,1.08,dark,wx,R,z,8); }); };
+  // ── Tractor ──
+  box(3.0,0.8,22,dark,0,3.0,-20);                       // frame rails
+  box(8.2,1.1,0.5,chrome,0,1.9,-31);                    // front bumper
+  box(5.2,3.3,7.6,paint,0,5.25,-26.9);                  // long hood
+  box(5.4,0.35,7.6,paint,0,6.95,-26.9);                 // hood top line
+  box(4.6,3.0,0.35,chrome,0,5.25,-30.75);               // grille
+  box(4.0,2.4,0.1,dark,0,5.25,-30.95);                  // grille mesh
+  box(0.5,0.5,0.5,chrome,0,7.1,-30.6);                  // hood ornament
+  [-1,1].forEach(s=>{ box(1.7,1.4,4.4,paint,s*3.45,4.5,-28.0); box(1.1,0.9,0.3,chrome,s*3.45,4.8,-30.3); box(0.8,0.6,0.1,M(0xfef3c7),s*3.45,4.8,-30.5); }); // fenders + headlight pods
+  [-1,1].forEach(s=>cylY(0.55,2.6,chrome,s*3.6,6.3,-23.6,12));  // exposed air cleaners
+  box(8.0,4.4,5.2,paint,0,5.9,-20.5);                   // cab
+  box(7.4,2.1,0.2,glass,0,7.0,-23.15);                  // windshield
+  [-1,1].forEach(s=>box(0.15,1.8,2.2,glass,s*4.05,7.0,-21.4)); // door glass
+  box(8.6,0.15,1.3,chrome,0,8.25,-23.7);                // sun visor
+  [-1,1].forEach(s=>{ box(0.25,1.6,0.9,chrome,s*4.6,7.0,-23.0); box(0.1,1.4,0.1,chrome,s*4.35,7.0,-23.0); }); // west-coast mirrors
+  box(8.0,4.6,5.3,paint,0,6.0,-15.25);                  // 63" flat-top sleeper
+  [-1,1].forEach(s=>box(0.15,1.2,1.4,glass,s*4.05,7.2,-15.2)); // sleeper windows
+  [-1,1].forEach(s=>{ cylY(0.32,7.6,chrome,s*4.25,7.4,-17.9,10); cylY(0.36,0.6,chrome,s*4.25,11.0,-17.9,10); }); // dual stacks
+  [-1,1].forEach(s=>cylZ(1.1,4.6,chrome,s*3.9,2.35,-15.5,14));  // fuel tanks
+  [-1,1].forEach(s=>box(0.6,0.5,4.6,chrome,s*3.9,3.6,-15.5));   // tank steps / straps
+  box(3.2,0.4,3.2,dark,0,3.6,-11.6);                    // fifth wheel
+  [-1,1].forEach(s=>box(1.3,0.3,6.5,paint,s*3.95,4.1,-11.4));  // quarter fenders
+  wheel(-3.6,-27.5,false); wheel(3.6,-27.5,false);      // steer axle
+  [-13.6,-9.4].forEach(az=>{ cylX(0.2,8,dark,0,1.75,az,8); wheel(-2.85,az,true); wheel(2.85,az,true); }); // tandem drives
+  // ── Wilson 40' hopper-bottom ──
+  box(8.0,5.5,40,alum,0,8.75,7);                        // body (66" sides)
+  box(8.3,0.3,40.3,steel,0,11.65,7);                    // top rail
+  box(8.3,0.3,40.3,steel,0,5.85,7);                     // bottom rail
+  for(let i=0;i<=16;i++){ const z=-13+i*2.5; [-1,1].forEach(s=>box(0.18,5.6,0.35,steel,s*4.08,8.75,z)); } // side posts
+  box(7.5,0.35,39.2,tarp,0,12.0,7);                     // roll tarp
+  for(let i=0;i<9;i++) box(7.9,0.18,0.18,steel,0,12.2,-12+i*4.75); // tarp bows
+  [-1,1].forEach(s=>box(0.3,5.5,0.3,steel,s*3.6,8.75,-13.2));   // front corner posts
+  box(8.0,5.0,0.4,alum,0,8.5,-13.0); box(8.0,5.0,0.4,alum,0,8.5,27.0); // end caps
+  box(1.6,1.6,0.5,dark,0,6.2,-12.0);                    // kingpin plate / front wall step
+  [-1,1].forEach(s=>{ box(0.35,5,0.35,steel,s*2.7,3.5,-8.5); box(1.2,0.3,1.2,steel,s*2.7,1.0,-8.5); }); // landing gear
+  [-1.5,16.5].forEach(zc=>{                              // two hoppers with traps
+    const hop=new THREE.Mesh(new THREE.CylinderGeometry(0.45,4.1,3.3,4),alum); hop.rotation.x=Math.PI; hop.rotation.y=Math.PI/4; hop.position.set(0,4.35,zc); hop.castShadow=!tr; G.add(hop);
+    box(1.6,0.5,1.6,dark,0,2.55,zc); const crank=new THREE.Mesh(new THREE.TorusGeometry(0.55,0.06,6,16),chrome); crank.rotation.y=Math.PI/2; crank.position.set(4.0,3.0,zc); G.add(crank);
+  });
+  box(2.4,0.8,30,steel,0,6.1,8);                        // trailer frame between hoppers
+  [21.5,26.0].forEach(az=>{ cylX(0.2,8,dark,0,1.75,az,8); wheel(-2.85,az,true); wheel(2.85,az,true); }); // trailer tandems
+  box(8.0,0.5,0.4,steel,0,2.6,27.2); [-1,1].forEach(s=>{ box(0.7,0.4,0.2,red,s*3.2,2.9,27.3); box(2.2,2.2,0.15,black,s*2.85,0.9,27.0); }); // rear bumper, taillights, mud flaps
+  for(let i=0;i<5;i++) [-1,1].forEach(s=>box(0.12,0.25,0.5,amber,s*4.12,11.3,-10+i*9));   // marker lights
+  G.scale.set(scale,scale,scale); return G;
+}
+
 // ── 3D DRAG STATE ─────────────────────────────────────────────
 let _drag3={active:false,siteType:null,siteId:null,lastPt:null,offX:0,offZ:0,raf:null};
 const DRAG3_MAPS=()=>({bin:S.bins,leg:S.legs,pit:S.pits,dryer:S.dryers,bend:S.bends,
@@ -5401,56 +5461,12 @@ function populate3D(){
   S.trucks.forEach(truck=>{
     if(S.typeHidden3d['trucks']||truck.hidden) return;
     _tag3={siteId:truck.id,siteType:'truck'};
-    const{x,z}=toXZ(truck.lat,truck.lng),tl=truck.lenFt,tw=truck.widFt;
-    const grp=new THREE.Group();
-    const truckClr=new THREE.Color(truck.color||'#6b7280');
-    const cabMat=new THREE.MeshLambertMaterial({color:truckClr});
-    const frameMat=new THREE.MeshLambertMaterial({color:0x374151});
-    const hopMat=new THREE.MeshLambertMaterial({color:truckClr.clone().multiplyScalar(0.75)});
-    const wheelMat=new THREE.MeshLambertMaterial({color:0x111827});
-    const hubMat=new THREE.MeshLambertMaterial({color:0x9ca3af});
-    // Chassis frame (low, full length)
-    const frame=new THREE.Mesh(new THREE.BoxGeometry(tw*0.7,0.6,tl),frameMat);frame.position.set(0,0.7,0);frame.castShadow=true;frame.receiveShadow=true;frame.userData={siteId:truck.id,siteType:'truck'};grp.add(frame);
-    // CAB (front ~22% of length, taller)
-    const cabL=tl*0.22,cabH=6.5;
-    const cab=new THREE.Mesh(new THREE.BoxGeometry(tw*0.95,cabH,cabL),cabMat);cab.position.set(0,cabH/2,-tl/2+cabL/2);cab.castShadow=true;grp.add(cab);
-    // Cab windshield groove (dark strip)
-    const wind=new THREE.Mesh(new THREE.BoxGeometry(tw*0.85,1.8,0.15),new THREE.MeshLambertMaterial({color:0x0f172a}));wind.position.set(0,cabH-1.5,-tl/2+cabL-0.1);grp.add(wind);
-    // Exhaust stacks
-    [-tw*0.35,tw*0.35].forEach(ex=>{
-      const stk=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,4,8),frameMat);stk.position.set(ex,cabH+1.8,-tl/2+cabL*0.4);grp.add(stk);
-    });
-    // Trailer upper box sides (hopper upper section)
-    const trailL=tl*0.72,trailStart=-tl/2+cabL+0.5,trailCen=trailStart+trailL/2;
-    const sideH=3.2;
-    const sideBox=new THREE.Mesh(new THREE.BoxGeometry(tw,sideH,trailL),cabMat);sideBox.position.set(0,sideH/2+1.0,trailCen);sideBox.castShadow=true;grp.add(sideBox);
-    // TWO hopper bottoms (inverted 4-sided pyramid via ConeGeometry with 4 segments)
-    const hopL=trailL*0.48,hopH=2.2,hopW=tw;
-    [-trailL*0.25,trailL*0.25].forEach(hOff=>{
-      const hop=new THREE.Mesh(new THREE.CylinderGeometry(0.35,hopW/2,hopH,4),hopMat);
-      hop.rotation.x=Math.PI;hop.rotation.y=Math.PI/4;
-      hop.position.set(0,1.0+hopH/2,trailCen+hOff);hop.castShadow=true;grp.add(hop);
-      // Discharge chute below each hopper
-      const chute=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.9,8),frameMat);chute.position.set(0,0.45,trailCen+hOff);grp.add(chute);
-    });
-    // Wheels — steer axle (front), drive axles (rear of cab), trailer tandems
-    const axlePositions=[-tl/2+cabL*0.85, tl/2-trailL*0.18, tl/2-trailL*0.06];
-    axlePositions.forEach((az,ai)=>{
-      const axleR=ai===0?1.0:1.1; // steer wheels slightly smaller
-      [-tw*0.58,tw*0.58].forEach(wx=>{
-        const wh=new THREE.Mesh(new THREE.CylinderGeometry(axleR,axleR,0.65,14),wheelMat);
-        wh.rotation.z=Math.PI/2;wh.position.set(wx,axleR,az);grp.add(wh);
-        const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,0.7,8),hubMat);hub.rotation.z=Math.PI/2;hub.position.set(wx,axleR,az);grp.add(hub);
-      });
-      // Dual rear wheels (outer)
-      if(ai>0){
-        [-tw*0.72,tw*0.72].forEach(wx=>{
-          const wh2=new THREE.Mesh(new THREE.CylinderGeometry(axleR,axleR,0.55,14),wheelMat);
-          wh2.rotation.z=Math.PI/2;wh2.position.set(wx,axleR,az);grp.add(wh2);
-        });
-      }
-    });
+    const{x,z}=toXZ(truck.lat,truck.lng);
+    // Peterbilt 379 + 40' Wilson hopper-bottom, scaled if the truck's length was changed from 62'
+    const grp=buildSemi3(new THREE.Color(truck.color||'#991b1b').getHex(),1,Math.max(0.5,(+truck.lenFt||SEMI_LEN_FT)/SEMI_LEN_FT));
+    grp.traverse(o=>{ if(o.isMesh) o.userData={siteId:truck.id,siteType:'truck'}; });
     grp.position.set(x,0,z);grp.rotation.y=-(truck.headDeg*Math.PI/180);add3(grp);
+    if(S.showLabels){const spr=makeLabel3(`🚛 ${truck.name}`,truck.color||'#991b1b');spr.position.set(x,15,z);add3(spr);}
   });
 
   // SUPPORT STRUCTURES
@@ -5720,17 +5736,10 @@ function populate3D(){
       ),1,Math.max(0.35,tubR*0.75),10,false),mat);
       swing.castShadow=true; add3(swing);
     }
-    // Ghost truck where it dumps (Load In) or loads (Load Out)
+    // Ghost truck where it dumps (Load In) or loads (Load Out): same Pete 379 + Wilson rig, translucent
     if(ep.truckLL){
-      const t3=toXZ(ep.truckLL.lat,ep.truckLL.lng), tl=pa.truckLenFt, tw=pa.truckWidFt;
-      const ghost=new THREE.MeshLambertMaterial({color:0x9ca3af,transparent:true,opacity:0.45});
-      const ghostDark=new THREE.MeshLambertMaterial({color:0x4b5563,transparent:true,opacity:0.45});
-      const grp=new THREE.Group();
-      const cabL=tl*0.22, cabH=6.5;
-      const cab=new THREE.Mesh(new THREE.BoxGeometry(tw*0.95,cabH,cabL),ghostDark); cab.position.set(0,cabH/2,-tl/2+cabL/2); grp.add(cab);
-      const box=new THREE.Mesh(new THREE.BoxGeometry(tw,4.2,tl*0.72),ghost); box.position.set(0,1.0+2.1,-tl/2+cabL+0.5+tl*0.36); grp.add(box);
-      const frame=new THREE.Mesh(new THREE.BoxGeometry(tw*0.7,0.6,tl),ghostDark); frame.position.set(0,0.7,0); grp.add(frame);
-      // heading: 0° = north = -z in scene; group's -z is the cab end
+      const t3=toXZ(ep.truckLL.lat,ep.truckLL.lng);
+      const grp=buildSemi3(0x9ca3af,0.45,Math.max(0.5,(+pa.truckLenFt||SEMI_LEN_FT)/SEMI_LEN_FT));
       grp.position.set(t3.x,0,t3.z); grp.rotation.y=-ep.truckHead*Math.PI/180; add3(grp);
     }
     // Discharge downspout at the head
