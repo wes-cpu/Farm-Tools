@@ -1134,12 +1134,16 @@ window.removeDryerFan = function(dryerId, idx) {
 // 3-phase power only.
 window.applyGsi2322 = function(dryerId) {
   const d=S.dryers.find(x=>x.id===dryerId); if(!d) return;
-  d.dryerType='portable'; d.shape='rect'; d.modules=2;
-  d.dryerFans=[{hp:30,module:2,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0}];
-  d.moduleDims=[{lenFt:32,widFt:9,htFt:6.5},{lenFt:32,widFt:9,htFt:6.5}]; d.legHtFt=d.legHtFt||0;
-  d.lenFt=32; d.widFt=9; d.htFt=13+(+d.legHtFt||0); d.motorHp=16;
+  // GSI spec sheet: installed 31'10" L × 8'8" W × 25'11" H (excl. foundation supports), 14"×22' column,
+  // 1 × 30 HP 42" top fan + 2 × 15 HP 36" bottom fans, 7.5 HP top auger + 7.5 HP unload auger,
+  // 1,067 bu holding, 930 BPH (25→15%, dry & cool), 3-phase only.
+  d.dryerType='portable'; d.shape='rect'; d.modules=2; d.model='GSI 2322';
+  d.dryerFans=[{hp:30,module:2,side:'back',offFt:0,diaIn:42},{hp:15,module:1,side:'back',offFt:0,diaIn:36},{hp:15,module:1,side:'back',offFt:0,diaIn:36}];
+  d.moduleDims=[{lenFt:31.8,widFt:8.7,htFt:11.45},{lenFt:31.8,widFt:8.7,htFt:11.45}]; d.legHtFt=d.legHtFt||0; d.baseHtFt=3;
+  d.holdBu=1067; d.dryBph=930; d.threePhase=true; d.motorHp=15;
+  dryerStack(d);
   renderDryer(d); renderProperties(); autoSave();
-  showToast('✓ GSI 2322 preset applied — 3 fans (60 HP), 3-phase power required');
+  showToast('✓ GSI 2322: 31′10″ × 8′8″ × 25′11″ installed · 3 fans (60 HP) · 930 BPH · 3-phase power required');
 };
 
 // ── CONVEYOR ENDPOINT SNAP HELPERS ───────────────────────────
@@ -1185,10 +1189,12 @@ function getUnloadPoint(id, type) {
     if (d.shape === 'rect') {
       const uEnd = d.unloadEnd||'head';
       const bear = (((uEnd==='tail' ? d.headDeg+180 : d.headDeg)%360)+360)%360;
-      const ll = bearingOffset(L.latLng(d.lat,d.lng), (d.lenFt/2)*FT2M, bear);
-      return { lat:ll.lat, lng:ll.lng, htFt:0 };
+      // Portable: the unload auger's inclined discharge spout hands off a few feet up, just past the end
+      const portable=(d.dryerType||'portable')==='portable';
+      const ll = bearingOffset(L.latLng(d.lat,d.lng), (d.lenFt/2+(portable?4:0))*FT2M, bear);
+      return { lat:ll.lat, lng:ll.lng, htFt:dryerDischargeHt(d) };
     }
-    return { lat:d.lat, lng:d.lng, htFt:0 };
+    return { lat:d.lat, lng:d.lng, htFt:dryerDischargeHt(d) };
   }
   if (type === 'conveyor') {
     const c = S.conveyors.find(x=>x.id===id); if(!c) return null;
@@ -1258,14 +1264,24 @@ function dryerStack(dr) {
     dr._fanOffMigrated=true;
   }
   const legHt=Math.max(0,+dr.legHtFt||0);
+  // Base section = running gear / frame / metering & unload section under the bottom module.
+  // GSI installed heights (1100 series 14'6", 2300 series 25'11") fit base ≈ 3' + 11.45' per module.
+  if(dr.baseHtFt==null) dr.baseHtFt=3;
+  const baseHt=Math.max(0,+dr.baseHtFt||0);
   const stackH=dr.moduleDims.reduce((s,m)=>s+(+m.htFt||6),0);
-  const totalH=legHt+stackH;
+  const totalH=legHt+baseHt+stackH;
   if((dr.dryerType||'portable')==='portable'&&dr.shape==='rect'){
     dr.htFt=Math.round(totalH*10)/10;
     dr.lenFt=Math.max(...dr.moduleDims.map(m=>+m.lenFt||32));
     dr.widFt=Math.max(...dr.moduleDims.map(m=>+m.widFt||9));
   }
-  return {mods,dims:dr.moduleDims,legHt,stackH,totalH};
+  return {mods,dims:dr.moduleDims,legHt,baseHt,stackH,totalH};
+}
+// Height of the dryer's top (load point) and discharge spout above grade, pad included
+function dryerTopHt(d){ return (+d.foundHtFt||0)+(+d.htFt||0); }
+function dryerDischargeHt(d){
+  const portable=(d.dryerType||(d.shape==='cylinder'?'tower':'portable'))==='portable';
+  return (+d.foundHtFt||0)+(portable?Math.max(0,+d.legHtFt||0)+DRYER_DISCHARGE_HT:0);
 }
 // Lateral offset for an end-mounted dryer fan (user-set only; fans stay centered
 // across the width unless an offset is typed — GSI stacks same-module fans vertically).
@@ -1288,9 +1304,9 @@ function dryerLoadPoint(d) {
     const lEnd = d.loadEnd||'tail';
     const bear = (((lEnd==='tail' ? d.headDeg+180 : d.headDeg)%360)+360)%360;
     const ll = bearingOffset(L.latLng(d.lat,d.lng), (d.lenFt/2)*FT2M, bear);
-    return { lat:ll.lat, lng:ll.lng, htFt:d.htFt };
+    return { lat:ll.lat, lng:ll.lng, htFt:dryerTopHt(d) };
   }
-  return { lat:d.lat, lng:d.lng, htFt:d.htFt };
+  return { lat:d.lat, lng:d.lng, htFt:dryerTopHt(d) };
 }
 // Returns {lat,lng,htFt} of the receiving point of a destination object
 // (used to snap the HEAD/end of a conveyor)
@@ -1354,7 +1370,7 @@ function convEndTargets(cv) {
   if (cv.feedsTo && cv.feedsTo.length > 0) {
     const dst = cv.feedsTo[0];
     // Dryers are always loaded from the top, so default the head to the load point
-    const dstMode = cv.dstSnapMode || (dst.type === 'dryer' ? 'peak' : (cv.binTopConnect ? 'peak' : 'unload'));
+    const dstMode = dst.type === 'dryer' ? 'peak' : (cv.dstSnapMode || (cv.binTopConnect ? 'peak' : 'unload'));
     // Delivering INTO a leg always means the boot inlet near grade — never the head
     const pt = dst.type === 'leg' ? getCenterPoint(dst.id,'leg') : getSnapPoint(dst.id, dst.type, dstMode);
     if (pt) {
@@ -1756,9 +1772,10 @@ function deletePit(id) { removePitLyr(id); S.pits=S.pits.filter(p=>p.id!==id); i
 // ── GRAIN DRYER ───────────────────────────────────────────────
 function addDryer(lat,lng) {
   const d={id:'dryer_'+uid(),lat,lng,name:'Dryer '+(S.dryers.length+1),dryerType:'portable',modules:2,
-    dryerFans:[{hp:30,module:2,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0},{hp:15,module:1,side:'back',offFt:0}],
-    moduleDims:[{lenFt:32,widFt:9,htFt:6.5},{lenFt:32,widFt:9,htFt:6.5}],legHtFt:0,
-    shape:'rect',htFt:13,widFt:9,lenFt:32,diamFt:12,headDeg:0,color:'#d97706',loadEnd:'tail',unloadEnd:'head',phase:0,foundHtFt:0,foundExtFt:0,motorHp:16,cost:0,infraItems:[]};
+    dryerFans:[{hp:30,module:2,side:'back',offFt:0,diaIn:42},{hp:15,module:1,side:'back',offFt:0,diaIn:36},{hp:15,module:1,side:'back',offFt:0,diaIn:36}],
+    moduleDims:[{lenFt:31.8,widFt:8.7,htFt:11.45},{lenFt:31.8,widFt:8.7,htFt:11.45}],legHtFt:0,baseHtFt:3,
+    model:'GSI 2322',holdBu:1067,dryBph:930,threePhase:true,
+    shape:'rect',htFt:25.9,widFt:8.7,lenFt:31.8,diamFt:12,headDeg:0,color:'#d97706',loadEnd:'tail',unloadEnd:'head',phase:0,foundHtFt:0,foundExtFt:0,motorHp:15,cost:0,infraItems:[]};
   S.dryers.push(d); renderDryer(d); select('dryer',d.id); autoSave();
 }
 function renderDryer(dr) {
@@ -1809,7 +1826,7 @@ function renderDryer(dr) {
   } else {
     shape=L.circle(ll,{radius:(dr.diamFt/2)*FT2M,color:dr.color,fillColor:dr.color,fillOpacity:0.3,weight:2}).addTo(map);
   }
-  const lbl=L.marker(ll,{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${dr.color};color:${dr.color}">🔥 ${dr.name}<br><small>${dr.htFt}′ ht · ↑ top load</small></div>`,className:'',iconAnchor:[40,6]}),interactive:false}).addTo(map);
+  const lbl=L.marker(ll,{icon:L.divIcon({html:`<div class="conv-lbl" style="border-color:${dr.color};color:${dr.color}">🔥 ${dr.name}<br><small>${dryerTopHt(dr).toFixed(0)}′ top · ↑ top load</small></div>`,className:'',iconAnchor:[40,6]}),interactive:false}).addTo(map);
   shape.on('click',e=>{
     L.DomEvent.stopPropagation(e);
     if(S.tool==='delete'){ deleteDryer(dr.id); return; }
@@ -2836,11 +2853,11 @@ function legHTML(leg) {
   const dryerRows=(leg.feedsDryers||[]).map(dId=>{
     const dr=S.dryers.find(d=>d.id===dId); if(!dr) return '';
     const d=distFt(legLL,L.latLng(dr.lat,dr.lng));
-    const ang=legAngle(eff,dr.htFt,d), req=reqLegHt(dr.htFt,d);
+    const ang=legAngle(eff,dryerTopHt(dr),d), req=reqLegHt(dryerTopHt(dr),d);
     let cls='bad',adisp='— too short';
     if(ang!==null){adisp=ang.toFixed(1)+'°';cls=ang>=TARGET_ANG-2&&ang<=TARGET_ANG+5?'good':ang<TARGET_ANG-2?'bad':'warn2';}
     return `<tr>
-      <td>🔥 ${escH(dr.name)}</td><td>${d.toFixed(0)}′</td><td>${dr.htFt.toFixed(1)}′</td>
+      <td>🔥 ${escH(dr.name)}</td><td>${d.toFixed(0)}′</td><td>${dryerTopHt(dr).toFixed(1)}′</td>
       <td class="${cls}">${adisp}</td><td>${req.toFixed(1)}′</td></tr>`;
   }).join('');
 
@@ -2864,7 +2881,7 @@ function legHTML(leg) {
           ${(leg.feedsDryers||[]).includes(dr.id)?'checked':''}
           style="transform:scale(1.2);accent-color:#d97706;flex-shrink:0;cursor:pointer">
         <span style="font-size:0.81em;color:#d1d5db;flex:1">🔥 ${escH(dr.name)}</span>
-        <span style="font-size:0.75em;color:#6b7280;white-space:nowrap">${dr.htFt}′ ht · ${dr.shape==='rect'?dr.widFt+'×'+dr.lenFt+'′':'∅'+dr.diamFt+'′'}</span>
+        <span style="font-size:0.75em;color:#6b7280;white-space:nowrap">${dryerTopHt(dr).toFixed(0)}′ top · ${dr.shape==='rect'?dr.widFt+'×'+dr.lenFt+'′':'∅'+dr.diamFt+'′'}</span>
       </div>`).join('')
     : '<p style="color:#6b7280;font-size:0.8em;margin:4px 0">No dryers placed yet.</p>';
 
@@ -3442,8 +3459,13 @@ function dryerHTML(dr) {
       <div class="fr"><label>Width (ft)</label><input type="number" class="drmwid" data-idx="${i}" value="${m.widFt}" min="4" max="20" step="0.5" style="width:70px"/></div>
       <div class="fr"><label>Module Height (ft)</label><input type="number" class="drmht" data-idx="${i}" value="${m.htFt}" min="3" max="20" step="0.5" style="width:70px"/></div>
     </div>`).join('')}
-    <div class="fr"><label>Leg / Elevation Height (ft)</label><input type="number" id="drlegs" value="${dr.legHtFt||0}" min="0" max="30" step="0.5"/></div>
-    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Legs raise the whole module stack off the ground (0 = sits on the pad). Total height: <b>${st.totalH.toFixed(1)} ft</b>${st.legHt?` (${st.legHt}′ legs + ${st.stackH.toFixed(1)}′ of modules)`:''}. Conveyors and legs feeding the top follow automatically.</p>`
+    <div class="fr"><label>Base Section Height (ft)</label><input type="number" id="drbase" value="${st.baseHt}" min="0" max="10" step="0.5"/></div>
+    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Running gear, frame and the metering / unload section under the bottom module (≈3′ on GSI portables).</p>
+    <div class="fr"><label>Foundation Supports / Legs (ft)</label><input type="number" id="drlegs" value="${dr.legHtFt||0}" min="0" max="30" step="0.5"/></div>
+    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Steel stands that raise the whole dryer off the pad (0 = on its wheels). Installed height: <b>${st.totalH.toFixed(1)} ft</b> = ${st.legHt?st.legHt+'′ supports + ':''}${st.baseHt}′ base + ${st.stackH.toFixed(1)}′ of modules${dr.foundHtFt?`; top is ${dryerTopHt(dr).toFixed(1)}′ above grade with the ${dr.foundHtFt}′ pad`:''}. Conveyors and legs feeding the top follow automatically.</p>
+    <div class="fr"><label>Holding Capacity (bu)</label><input type="number" id="drhold" value="${dr.holdBu||0}" min="0" max="20000" step="10"/></div>
+    <div class="fr"><label>Drying Capacity (BPH)</label><input type="number" id="drbph" value="${dr.dryBph||0}" min="0" max="20000" step="10"/></div>
+    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">From the spec sheet (BPH at 25% → 15%, dry &amp; cool). Used for the summary only.</p>`
     :isRect?`<div class="fr"><label>Length (ft)</label><input type="number" id="drl" value="${dr.lenFt}" min="5" max="300"/></div>
   <div class="fr"><label>Width (ft)</label><input type="number" id="drw" value="${dr.widFt}" min="5" max="50"/></div>`:`<div class="fr"><label>Diameter (ft)</label><input type="number" id="drdiam" value="${dr.diamFt}" min="4" max="60"/></div>`}
   ${dtype!=='portable'?`<div class="fr"><label>Height (ft)</label><input type="number" id="drht" value="${dr.htFt}" min="5" max="120"/></div>`:''}
@@ -3457,7 +3479,7 @@ function dryerHTML(dr) {
       <span style="font-size:0.78em;color:#e5e7eb;font-weight:600">Fan ${i+1}</span>
       <button onclick="removeDryerFan('${dr.id}',${i})" style="padding:1px 6px;background:#374151;border:1px solid #6b7280;color:#d1d5db;border-radius:3px;cursor:pointer;font-size:0.7em">✕</button>
     </div>
-    <div class="fr"><label>Motor HP</label><input type="number" class="drfanhp" data-idx="${i}" value="${f.hp||0}" min="0" max="200" step="0.5" style="width:70px"/></div>
+    <div class="fr"><label>Motor HP / Fan Dia (in)</label><input type="number" class="drfanhp" data-idx="${i}" value="${f.hp||0}" min="0" max="200" step="0.5" style="width:62px"/><input type="number" class="drfandia" data-idx="${i}" value="${f.diaIn||36}" min="18" max="72" step="2" title="Fan diameter (in)" style="width:52px;margin-left:3px"/></div>
     ${dtype==='portable'?`<div class="fr"><label>Module</label><select class="drfanmod" data-idx="${i}" style="width:110px">
       ${Array.from({length:mods},(_,m)=>`<option value="${m+1}"${fMod===m+1?' selected':''}>Module ${m+1}${m===0?' (bottom)':m===mods-1?' (top)':''}</option>`).join('')}
     </select></div>
@@ -3505,8 +3527,14 @@ function dryerHTML(dr) {
     <div class="crow"><span class="lbl">Type</span><span class="val">${dtype==='tower'?'Tower (cylindrical)':'Portable — '+(dr.modules||2)+' module'+((dr.modules||2)>1?'s':'')}</span></div>
     ${(dr.dryerFans||[]).length?`<div class="crow"><span class="lbl">Fans</span><span class="val">${(dr.dryerFans||[]).length} × (${(dr.dryerFans||[]).map(f=>f.hp||0).join(' + ')} HP) = ${fanTotalHp} HP</span></div>`:''}
     ${(fanTotalHp+(+dr.motorHp||0))>0?`<div class="crow"><span class="lbl">Total Electrical</span><span class="val">${(fanTotalHp+(+dr.motorHp||0)).toFixed(1)} HP</span></div>`:''}
-    ${st&&st.legHt?`<div class="crow"><span class="lbl">Leg Elevation</span><span class="val">${st.legHt} ft</span></div>`:''}
-    <div class="crow"><span class="lbl">${st?'Total Height':'Height'}</span><span class="val">${dr.htFt} ft${st&&st.legHt?' (incl. legs)':''}</span></div>
+    ${dr.model?`<div class="crow"><span class="lbl">Model</span><span class="val">${escH(dr.model)}</span></div>`:''}
+    ${st?`<div class="crow"><span class="lbl">Installed Size</span><span class="val">${dr.lenFt}′ L × ${dr.widFt}′ W × ${dr.htFt}′ H</span></div>`:''}
+    ${st&&st.legHt?`<div class="crow"><span class="lbl">Foundation Supports</span><span class="val">${st.legHt} ft</span></div>`:''}
+    <div class="crow"><span class="lbl">${st?'Installed Height':'Height'}</span><span class="val">${dr.htFt} ft${st&&st.legHt?' (incl. supports)':''}</span></div>
+    <div class="crow"><span class="lbl">Top / Load Point above Grade</span><span class="val">${dryerTopHt(dr).toFixed(1)} ft${dr.foundHtFt?' (incl. pad)':''}</span></div>
+    <div class="crow"><span class="lbl">Discharge Spout Height</span><span class="val">${dryerDischargeHt(dr).toFixed(1)} ft</span></div>
+    ${dr.holdBu?`<div class="crow"><span class="lbl">Holding Capacity</span><span class="val">${(+dr.holdBu).toLocaleString()} bu</span></div>`:''}
+    ${dr.dryBph?`<div class="crow"><span class="lbl">Drying Capacity</span><span class="val">${(+dr.dryBph).toLocaleString()} BPH</span></div>`:''}
     <div class="crow"><span class="lbl">Footprint</span><span class="val">${Math.round(footprint)} sq ft</span></div>
     ${isRect?`<div class="crow"><span class="lbl">Load End</span><span class="val good">↑ Top · ${lEnd==='tail'?'Tail':'Head'} (${loadBear}°)</span></div>
     <div class="crow"><span class="lbl">Unload End</span><span class="val">${uEnd==='tail'?'Tail':'Head'} (${unloadBear}°)</span></div>
@@ -3521,6 +3549,10 @@ function bindDryer(dr) {
     dr.shape=dr.dryerType==='tower'?'cylinder':'rect'; // type drives geometry
     dr.modules=+document.getElementById('drmod')?.value||dr.modules||2;
     dr.legHtFt=Math.max(0,+document.getElementById('drlegs')?.value||0);
+    const bse=document.getElementById('drbase'); if(bse) dr.baseHtFt=Math.max(0,+bse.value||0);
+    const hb=document.getElementById('drhold'); if(hb) dr.holdBu=Math.max(0,+hb.value||0);
+    const bp=document.getElementById('drbph'); if(bp) dr.dryBph=Math.max(0,+bp.value||0);
+    document.querySelectorAll('.drfandia').forEach(el=>{ const i=+el.dataset.idx; if(dr.dryerFans&&dr.dryerFans[i]) dr.dryerFans[i].diaIn=Math.max(18,+el.value||36); });
     document.querySelectorAll('.drmlen').forEach(el=>{ const i=+el.dataset.idx; if(dr.moduleDims&&dr.moduleDims[i]) dr.moduleDims[i].lenFt=+el.value||dr.moduleDims[i].lenFt; });
     document.querySelectorAll('.drmwid').forEach(el=>{ const i=+el.dataset.idx; if(dr.moduleDims&&dr.moduleDims[i]) dr.moduleDims[i].widFt=+el.value||dr.moduleDims[i].widFt; });
     document.querySelectorAll('.drmht').forEach(el=>{ const i=+el.dataset.idx; if(dr.moduleDims&&dr.moduleDims[i]) dr.moduleDims[i].htFt=+el.value||dr.moduleDims[i].htFt; });
@@ -3543,8 +3575,8 @@ function bindDryer(dr) {
     dr.foundExtFt=+document.getElementById('drfext')?.value||0;
     renderDryer(dr); renderProperties(); autoSave();
   }
-  ['drn','drtype','drmod','drlegs','drl','drw','drdiam','drht','drhead','drhp','drsrc','drunde','drlde','drfht','drfext'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
-  document.querySelectorAll('.drfanhp,.drfanmod,.drfanside,.drfanpos,.drfanoff,.drmlen,.drmwid,.drmht').forEach(el=>el.addEventListener('change',upd));
+  ['drn','drtype','drmod','drlegs','drbase','drhold','drbph','drl','drw','drdiam','drht','drhead','drhp','drsrc','drunde','drlde','drfht','drfext'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  document.querySelectorAll('.drfanhp,.drfandia,.drfanmod,.drfanside,.drfanpos,.drfanoff,.drmlen,.drmwid,.drmht').forEach(el=>el.addEventListener('change',upd));
   // Custom color: swatch click or free color picker clears the phase (manual color wins)
   document.getElementById('drclrs')?.querySelectorAll('.cswatch').forEach(sw=>sw.addEventListener('click',()=>{dr.color=sw.dataset.clr;dr.phase=0;renderDryer(dr);renderProperties();autoSave();}));
   document.getElementById('drcpick')?.addEventListener('change',e=>{dr.color=e.target.value;dr.phase=0;renderDryer(dr);renderProperties();autoSave();});
@@ -3792,6 +3824,17 @@ window.openProjectsModal = openProjectsModal;
 function hydrateData(data) {
   clearAllLayers();
   S.bins=data.bins||[]; S.legs=data.legs||[]; S.conveyors=data.conveyors||[];
+  // Dryer migration: portables saved before the base section existed. Untouched 6.5′ module defaults
+  // move to GSI's real proportions (3′ base + 11.45′ per module); edited module heights are kept.
+  (data.dryers||[]).forEach(d=>{
+    if((d.dryerType||(d.shape==='cylinder'?'tower':'portable'))!=='portable') return;
+    if(d.baseHtFt==null){
+      d.baseHtFt=3;
+      if(Array.isArray(d.moduleDims)&&d.moduleDims.length&&d.moduleDims.every(m=>+m.htFt===6.5)) d.moduleDims.forEach(m=>m.htFt=11.45);
+    }
+    (d.dryerFans||[]).forEach(f=>{ if(!f.diaIn) f.diaIn=36; });
+    dryerStack(d);
+  });
   // Roof migration: bins saved before the roof-angle option carried only roofFt. Every such bin
   // moves to an Auto 30° roof sized from its diameter; uncheck Auto in the panel to override one.
   S.bins.forEach(b=>{
@@ -4081,6 +4124,156 @@ function addBinRoof3(bin,x,z,r,ev,rf,col){
   // Eave trim ring where roof meets sidewall
   const trim=new THREE.Mesh(new THREE.TorusGeometry(r+0.1,0.22,6,40),capMat);
   trim.rotation.x=Math.PI/2; trim.position.set(x,ev,z); add3(trim);
+}
+
+// ── PORTABLE DRYER 3D MODEL ───────────────────────────────────
+// Built in a group at the dryer's position, rotated to its heading. Local axes:
+// X = across the dryer (+ right of heading), Y = up, Z = along it (− head end, + tail end).
+let _perfTex=null;
+function perfScreenTex(){
+  if(_perfTex) return _perfTex;
+  const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  g.fillStyle='#b4b9bf'; g.fillRect(0,0,64,64);
+  g.fillStyle='#4b5157';
+  for(let y=8;y<64;y+=16) for(let x=8;x<64;x+=16){ g.beginPath(); g.arc(x,y,3,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(x+8,y+8,3,0,Math.PI*2); g.fill(); }
+  _perfTex=new THREE.CanvasTexture(c); _perfTex.wrapS=_perfTex.wrapT=THREE.RepeatWrapping; return _perfTex;
+}
+function perfMat(lenFt,htFt){ const t=perfScreenTex().clone(); t.needsUpdate=true; t.repeat.set(Math.max(1,lenFt),Math.max(1,htFt)); return new THREE.MeshLambertMaterial({map:t,color:0xffffff}); }
+const DRYER_DISCHARGE_HT=4; // ft above the dryer's base the discharge auger spout hands grain off
+function addPortableDryer3(dr,x,z,col,hRad){
+  const st=dryerStack(dr);
+  const L=Math.max(10,+dr.lenFt||32), W=Math.max(5,+dr.widFt||8.67);
+  const pad=dr.foundHtFt||0, legH=st.legHt, base=st.baseHt;
+  const y0=pad+legH;                       // bottom of the base section
+  const fansAtTail=!(dr.dryerFans||[]).some(f=>f.side==='front');
+  const FS=Math.min(7,L*0.22);             // fan / burner section depth at the fan end
+  const zFan=fansAtTail?1:-1;              // which end the fan section is on
+  const CL=L-FS-1.2;                       // column (screen) length
+  const zC=-zFan*(FS-1.2)/2;               // column centre, shifted away from the fan end
+  const zColFan=zC+zFan*CL/2;              // column face on the fan side
+  const zColEnd=zC-zFan*CL/2;              // column face on the hitch side
+  const G=new THREE.Group(); G.position.set(x,0,z); G.rotation.y=hRad;
+  const galv=new THREE.MeshLambertMaterial({color:0xc3c8cd});
+  const galvDark=new THREE.MeshLambertMaterial({color:0x8f959b});
+  const steel=new THREE.MeshLambertMaterial({color:0x3f454c});
+  const black=new THREE.MeshLambertMaterial({color:0x14181d});
+  const accent=new THREE.MeshLambertMaterial({color:col});
+  const accentDark=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.7)});
+  const box=(w,h,d,mat,px,py,pz,shadow=true)=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(px,py,pz); m.castShadow=shadow; m.receiveShadow=shadow; G.add(m); return m; };
+  const cylZ=(r,len,mat,px,py,pz,seg=16)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg),mat); m.rotation.x=Math.PI/2; m.position.set(px,py,pz); m.castShadow=true; G.add(m); return m; };
+  const cylX=(r,len,mat,px,py,pz,seg=16)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg),mat); m.rotation.z=Math.PI/2; m.position.set(px,py,pz); m.castShadow=true; G.add(m); return m; };
+
+  // ── Base section: frame rails, metering / unload hopper, wheels or support stands, hitch ──
+  const railX=W/2-0.45;
+  [-railX,railX].forEach(sx=>box(0.6,0.7,CL+1.0,steel,sx,y0+base-0.35,zC));
+  for(let k=-2;k<=2;k++) box(W-1.2,0.5,0.4,steel,0,y0+base-0.3,zC+k*(CL/4.6));
+  box(W-1.8,Math.max(0.8,base-0.9),CL-0.6,galvDark,0,y0+base-0.9-Math.max(0.8,base-0.9)/2+0.45,zC); // hopper / metering section
+  cylZ(0.42,CL+2.2,galvDark,0,y0+0.55,zC);                                                           // unload auger tube
+  if(legH>0.1){
+    // On foundation supports: steel stands under the rails, cross rails at the top
+    const lz=CL/2-1.5;
+    [[-railX,-lz],[railX,-lz],[-railX,0],[railX,0],[-railX,lz],[railX,lz]].forEach(([sx,sz])=>box(0.7,legH,0.7,steel,sx,pad+legH/2,zC+sz));
+    [-railX,railX].forEach(sx=>box(0.5,0.4,CL-1,steel,sx,pad+legH-0.2,zC));
+    [-lz,0,lz].forEach(sz=>box(W-1,0.4,0.5,steel,0,pad+legH-0.2,zC+sz));
+  } else {
+    // Transport running gear: two axles toward the fan end, tires tucked under the body
+    const tR=1.55, tW=0.95;
+    [zC+zFan*CL*0.12, zC+zFan*CL*0.30].forEach(az=>{
+      cylX(0.18,W-0.8,steel,0,pad+tR,az);
+      [-1,1].forEach(s=>{ const t=cylX(tR,tW,black,s*(W/2-0.55),pad+tR,az,20); const hub=cylX(0.55,tW+0.1,galvDark,s*(W/2-0.55),pad+tR,az,12); });
+    });
+    // Hitch tongue + jack at the hitch end
+    const zh=zColEnd-zFan*0.2, zt=zh-zFan*3.8;
+    const tongue=new THREE.Mesh(new THREE.BoxGeometry(0.35,0.35,4.2),steel); tongue.position.set(0,y0+1.0,(zh+zt)/2); G.add(tongue);
+    [-1,1].forEach(s=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,3.2),steel); b.position.set(s*1.0,y0+1.0,(zh+zt)/2+zFan*0.4); b.rotation.y=s*zFan*0.25; G.add(b); });
+    const ball=new THREE.Mesh(new THREE.SphereGeometry(0.28,8,8),steel); ball.position.set(0,y0+1.0,zt); G.add(ball);
+    box(0.25,y0+1.0-pad,0.25,steel,0.6,pad+(y0+1.0-pad)/2,zt+zFan*0.6);
+  }
+
+  // ── Modules: galvanized plenum box, perforated screens, corner posts, flanges ──
+  let cum=y0+base; const modBases=[];
+  st.dims.forEach((m,mi)=>{
+    const h=+m.htFt||11.45; modBases.push(cum);
+    const yc=cum+h/2;
+    box(W,h,CL,galv,0,yc,zC);                                             // plenum / column body
+    const sh=h-1.6, sl=CL-1.4;
+    const pm=perfMat(sl,sh);
+    [-1,1].forEach(s=>{ const scr=new THREE.Mesh(new THREE.BoxGeometry(0.12,sh,sl),pm); scr.position.set(s*(W/2+0.06),yc,zC); scr.castShadow=false; G.add(scr); });
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>box(0.4,h,0.4,galvDark,sx*(W/2),yc,zC+sz*(CL/2)));
+    box(W+0.5,0.35,CL+0.5,galvDark,0,cum+h-0.17,zC);                      // top flange / module seam
+    box(W+0.5,0.35,CL+0.5,galvDark,0,cum+0.17,zC);                        // bottom flange
+    cum+=h;
+  });
+  const topY=cum, topDims=st.dims[st.dims.length-1]||{widFt:W,lenFt:L};
+  // End cap at the hitch end (accent colour so build phases still read)
+  box(W,topY-(y0+base),0.9,accent,0,(y0+base+topY)/2,zColEnd-zFan*0.45);
+
+  // ── Fan / burner end: plenum transition in accent colour, then each fan's burner box + housing ──
+  const fans=dr.dryerFans||[];
+  const anyFanAtEnd=fans.some(f=>(f.side||'back')==='back'||f.side==='front');
+  if(anyFanAtEnd) box(W-0.4,topY-(y0+base)-0.6,2.2,accentDark,0,(y0+base+topY)/2,zColFan+zFan*1.1);
+  const yUpV=new THREE.Vector3(0,1,0);
+  fans.forEach((f,i)=>{
+    const fMod=Math.min(st.mods,f.module||1), md=st.dims[fMod-1]||st.dims[0];
+    const stk=dryerFanStack(dr,i);
+    const fr=Math.max(0.9,Math.min(((+f.diaIn||36)/24), ((+md.htFt||11)/(stk.n*2.15))));
+    const y=modBases[fMod-1]+(+md.htFt||11)*((stk.pos+0.5)/stk.n);
+    const mount=f.side||'back';
+    let cx,cz,dir; // dir = unit vector pointing away from the body
+    if(mount==='back'||mount==='front'){
+      const zs=mount==='back'?1:-1; const hw=W/2-fr-0.2;
+      cx=Math.max(-hw,Math.min(hw,dryerFanOffFt(dr,i)));
+      cz=(zs===zFan?zColFan+zFan*2.2:zColEnd-zFan*0.9)+zs*0.0; dir=new THREE.Vector3(0,0,zs);
+    } else {
+      const ss=mount==='right'?1:-1; const posFt=(f.posFt!=null)?f.posFt:L/2;
+      cz=zC-zFan*(CL/2-Math.max(0,Math.min(CL,posFt)))*-1*zFan; cx=ss*(W/2); dir=new THREE.Vector3(ss,0,0);
+      cz=zColEnd+zFan*Math.max(1,Math.min(CL-1,posFt));
+    }
+    // Burner / transition box against the body, then the round fan housing, inlet bell, guard, motor
+    const bb=new THREE.Mesh(new THREE.BoxGeometry(fr*2+0.6,fr*2+0.6,1.6),steel);
+    bb.position.set(cx+dir.x*0.8,y,cz+dir.z*0.8); if(dir.x) bb.rotation.y=Math.PI/2; bb.castShadow=true; G.add(bb);
+    const q=new THREE.Quaternion().setFromUnitVectors(yUpV,dir);
+    const hous=new THREE.Mesh(new THREE.CylinderGeometry(fr,fr,2.4,20),galvDark); hous.setRotationFromQuaternion(q); hous.position.set(cx+dir.x*2.8,y,cz+dir.z*2.8); hous.castShadow=true; G.add(hous);
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(fr+0.08,fr+0.08,0.35,20),accent); band.setRotationFromQuaternion(q); band.position.set(cx+dir.x*2.0,y,cz+dir.z*2.0); G.add(band);
+    const bell=new THREE.Mesh(new THREE.CylinderGeometry(fr*1.18,fr*0.95,0.9,20),galv); bell.setRotationFromQuaternion(q); bell.position.set(cx+dir.x*4.4,y,cz+dir.z*4.4); G.add(bell);
+    const guard=new THREE.Mesh(new THREE.TorusGeometry(fr*1.05,0.1,8,24),steel); guard.setRotationFromQuaternion(q); guard.rotateX(Math.PI/2); guard.position.set(cx+dir.x*4.9,y,cz+dir.z*4.9); G.add(guard);
+    const hub=new THREE.Mesh(new THREE.SphereGeometry(fr*0.25,10,10),black); hub.position.set(cx+dir.x*4.85,y,cz+dir.z*4.85); G.add(hub);
+    for(let b=0;b<3;b++){ const bl=new THREE.Mesh(new THREE.BoxGeometry(dir.x?0.08:fr*1.6,0.35,dir.x?fr*1.6:0.08),black); bl.position.set(cx+dir.x*4.85,y,cz+dir.z*4.85); bl.rotation[dir.x?'x':'z']=b*Math.PI/3; G.add(bl); }
+    const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,1.3,12),black); motor.setRotationFromQuaternion(q); motor.position.set(cx+dir.x*2.8,y+fr+0.45,cz+dir.z*2.8); G.add(motor);
+  });
+
+  // ── Top: loading auger housing along the ridge, fill hopper at the load end, drive at the other ──
+  const lEnd=dr.loadEnd||'tail', zLoad=lEnd==='tail'?1:-1;
+  const zTopA=zColEnd, zTopB=zColFan; const zMin=Math.min(zTopA,zTopB)+0.6, zMax=Math.max(zTopA,zTopB)-0.6;
+  box(1.6,1.1,zMax-zMin,galvDark,0,topY+0.55,(zMin+zMax)/2);
+  cylZ(0.5,zMax-zMin+1.5,galv,0,topY+0.9,(zMin+zMax)/2,12);
+  const zHop=zLoad>0?zMax-1.6:zMin+1.6;
+  box(3.4,2.4,3.4,accent,0,topY+1.2,zHop);                                 // fill hopper (load point)
+  box(3.8,0.3,3.8,new THREE.MeshLambertMaterial({color:0x10b981}),0,topY+2.55,zHop); // green rim = "↑ IN"
+  const zDrv=zLoad>0?zMin+1.0:zMax-1.0;
+  box(1.0,0.9,1.4,black,0,topY+1.6,zDrv);                                  // top auger drive
+  // Walkway handrail along one side of the top
+  for(let k=0;k<=6;k++){ box(0.1,2.6,0.1,galvDark,W/2-0.2,topY+1.3,zMin+(zMax-zMin)*k/6,false); }
+  box(0.1,0.1,zMax-zMin,galvDark,W/2-0.2,topY+2.6,(zMin+zMax)/2,false);
+
+  // ── Bottom: unload auger exits the unload end into an inclined discharge auger with a spout ──
+  const uEnd=dr.unloadEnd||'head', zU=uEnd==='tail'?1:-1;
+  const zFace=zU===zFan?zColFan+zFan*(FS-0.2):zColEnd-zFan*1.2;
+  const rise=DRYER_DISCHARGE_HT-0.55, run=rise/Math.tan(35*Math.PI/180);
+  const p0=new THREE.Vector3(0,y0+0.55,zFace), p1=new THREE.Vector3(0,y0+0.55+rise,zFace+zU*run);
+  const disc=new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(p0,p1),1,0.42,10,false),galvDark); disc.castShadow=true; G.add(disc);
+  box(1.6,1.6,1.6,new THREE.MeshLambertMaterial({color:0xf97316}),0,p1.y-0.3,p1.z+zU*0.6); // orange spout = "↓ OUT"
+  box(0.5,1.0,0.5,steel,0,p1.y-1.4,p1.z);                                                  // discharge drive
+
+  // ── Ladder on the right side at the fan end, control cabinet on the right near the hitch end ──
+  const zLad=zColFan-zFan*1.2, xLad=W/2+0.45;
+  [-0.6,0.6].forEach(o=>box(0.12,topY-y0,0.12,galvDark,xLad,(y0+topY)/2,zLad+o,false));
+  for(let yy=y0+1;yy<topY;yy+=1.2) box(0.08,0.08,1.2,galvDark,xLad,yy,zLad,false);
+  box(1.0,2.4,1.8,accentDark,W/2+0.5,y0+base+2.0,zColEnd+zFan*3.5);
+
+  G.traverse(o=>{ if(o.isMesh) o.userData={siteId:dr.id,siteType:'dryer'}; });
+  add3(G);
+  return {topY};
 }
 
 // ── 3D DRAG STATE ─────────────────────────────────────────────
@@ -4760,119 +4953,18 @@ function populate3D(){
     const{x,z}=toXZ(dr.lat,dr.lng),col=new THREE.Color(dr.color),hRad=-(dr.headDeg*Math.PI/180);
     let body=null;
     if(dr.shape==='rect'){
-      // ── Portable dryer: stacked modules on optional legs ──
-      const st3=dryerStack(dr);
-      const baseY=(dr.foundHtFt||0)+st3.legHt; // bottom of module 1
-      const lenRad=(((dr.headDeg)%360)+360)%360*Math.PI/180;       // length axis bearing
-      const lenDir={x:Math.sin(lenRad),z:-Math.cos(lenRad)};
-      const sideRad=(((dr.headDeg+90)%360)+360)%360*Math.PI/180;   // side bearing
-      const sideDir={x:Math.sin(sideRad),z:-Math.cos(sideRad)};
-      // Module boxes stacked bottom-up, each with its own dimensions
-      const seamMat=new THREE.MeshLambertMaterial({color:col.clone().multiplyScalar(0.55)});
-      const modBases=[]; let cum=baseY;
-      st3.dims.forEach((m,mi)=>{
-        modBases.push(cum);
-        const box=new THREE.Mesh(new THREE.BoxGeometry(m.widFt,m.htFt,m.lenFt),new THREE.MeshLambertMaterial({color:mi%2?col.clone().multiplyScalar(0.9):col,transparent:true,opacity:0.9}));
-        box.position.set(x,cum+m.htFt/2,z); box.rotation.y=hRad;
-        box.castShadow=box.receiveShadow=true; box.userData={siteId:dr.id,siteType:'dryer'}; add3(box);
-        // Seam flange between modules
-        if(mi<st3.dims.length-1){
-          const seam=new THREE.Mesh(new THREE.BoxGeometry(m.widFt+0.4,0.5,m.lenFt+0.4),seamMat);
-          seam.position.set(x,cum+m.htFt,z); seam.rotation.y=hRad; add3(seam);
-        }
-        cum+=m.htFt;
-      });
-      const topY=cum, botDims=st3.dims[0], topDims=st3.dims[st3.dims.length-1];
-      // Support legs when elevated: 6 posts under the bottom module
-      if(st3.legHt>0.1){
-        const legMat=new THREE.MeshLambertMaterial({color:0x6b7280});
-        const lw=botDims.widFt/2-0.5, llen=botDims.lenFt/2-1;
-        [[-lw,-llen],[lw,-llen],[-lw,0],[lw,0],[-lw,llen],[lw,llen]].forEach(([ox,oz])=>{
-          const px=x+sideDir.x*ox+lenDir.x*oz, pz=z+sideDir.z*ox+lenDir.z*oz;
-          const post=new THREE.Mesh(new THREE.BoxGeometry(0.7,st3.legHt,0.7),legMat);
-          post.position.set(px,(dr.foundHtFt||0)+st3.legHt/2,pz); post.rotation.y=hRad; post.castShadow=true; add3(post);
-        });
-        // Cross-brace skid rails along each side
-        [-lw,lw].forEach(ox=>{
-          const rail=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,botDims.lenFt-1),legMat);
-          rail.position.set(x+sideDir.x*ox,(dr.foundHtFt||0)+st3.legHt-0.25,z+sideDir.z*ox); rail.rotation.y=hRad; add3(rail);
-        });
-      }
-      // ── Discharge chute at unload end (ground level, orange) ──
-      const uEnd=dr.unloadEnd||'head';
-      const unloadBearDeg=(((uEnd==='tail'?dr.headDeg+180:dr.headDeg)%360)+360)%360;
-      const uRad=unloadBearDeg*Math.PI/180;
-      const ux=x+(botDims.lenFt/2)*Math.sin(uRad), uz=z-(botDims.lenFt/2)*Math.cos(uRad);
-      const chuteW=Math.max(3, botDims.widFt*0.4);
-      const chute=new THREE.Mesh(new THREE.BoxGeometry(chuteW,4,2.5),new THREE.MeshLambertMaterial({color:0xf97316}));
-      chute.position.set(ux+(1.25)*Math.sin(uRad), 2, uz-(1.25)*Math.cos(uRad));
-      chute.castShadow=true; add3(chute);
-      const outDir=new THREE.Vector3(Math.sin(uRad),0,-Math.cos(uRad));
-      const yUp=new THREE.Vector3(0,1,0);
-      const capQ=new THREE.Quaternion().setFromUnitVectors(yUp,outDir);
-      const cap=new THREE.Mesh(new THREE.ConeGeometry(chuteW*0.5,2.5,8),new THREE.MeshLambertMaterial({color:0xea580c}));
-      cap.setRotationFromQuaternion(capQ);
-      cap.position.set(ux+(3)*Math.sin(uRad), 2, uz-(3)*Math.cos(uRad));
-      add3(cap);
-      // Wet-grain drop pipe from the elevated dryer down to the chute when on legs
-      if(st3.legHt>0.1){
-        const drop=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,st3.legHt,10),new THREE.MeshLambertMaterial({color:0xea580c}));
-        drop.position.set(ux-(1)*Math.sin(uRad),(dr.foundHtFt||0)+st3.legHt/2,uz+(1)*Math.cos(uRad)); add3(drop);
-      }
-      // Top-load inlet box (green) on top of the TOP module at the LOAD end
-      const lEnd=dr.loadEnd||'tail';
-      const loadBearDeg=(((lEnd==='tail'?dr.headDeg+180:dr.headDeg)%360)+360)%360;
-      const lRad=loadBearDeg*Math.PI/180;
-      const lx=x+(topDims.lenFt/2-2)*Math.sin(lRad), lz=z-(topDims.lenFt/2-2)*Math.cos(lRad);
-      const inlet=new THREE.Mesh(new THREE.BoxGeometry(topDims.widFt*0.3,3,topDims.widFt*0.3),new THREE.MeshLambertMaterial({color:0x10b981}));
-      inlet.position.set(lx,topY+1.5,lz); inlet.castShadow=true; add3(inlet);
-      // ── Fan housings: module height + mount location + auto-spread offsets ──
-      const fans=dr.dryerFans||[];
-      const yUpV=new THREE.Vector3(0,1,0);
-      fans.forEach((f,i)=>{
-        const fMod=Math.min(st3.mods,f.module||((st3.mods>1&&i===0)?st3.mods:1));
-        const md=st3.dims[fMod-1];
-        // Fans sharing a module stack VERTICALLY within it (GSI layout)
-        const stk=dryerFanStack(dr,i);
-        const y=modBases[fMod-1]+md.htFt*((stk.pos+0.5)/stk.n);
-        const fr=Math.min(2.4,md.widFt*0.26,md.htFt/(stk.n*2.3));
-        const mount=f.side||'back';
-        let cx,cz,outV;
-        if(mount==='back'||mount==='front'){
-          const eSign=mount==='front'?1:-1; // head end = +lenDir face
-          const hw=md.widFt/2;
-          const offFt=Math.max(-hw,Math.min(hw,dryerFanOffFt(dr,i)));
-          cx=x+eSign*lenDir.x*(md.lenFt/2+1.4)+sideDir.x*offFt;
-          cz=z+eSign*lenDir.z*(md.lenFt/2+1.4)+sideDir.z*offFt;
-          outV=new THREE.Vector3(eSign*lenDir.x,0,eSign*lenDir.z);
-        } else {
-          const sSign=mount==='right'?1:-1; // sideDir points right of heading
-          const posFt=(f.posFt!=null)?f.posFt:md.lenFt/2;
-          const alongC=md.lenFt/2-Math.max(0,Math.min(md.lenFt,posFt));
-          cx=x+lenDir.x*alongC+sSign*sideDir.x*(md.widFt/2+1.2);
-          cz=z+lenDir.z*alongC+sSign*sideDir.z*(md.widFt/2+1.2);
-          outV=new THREE.Vector3(sSign*sideDir.x,0,sSign*sideDir.z);
-        }
-        const fq=new THREE.Quaternion().setFromUnitVectors(yUpV,outV);
-        // Housing barrel + intake cone + guard ring + hub — reads as a vane-axial fan
-        const hous=new THREE.Mesh(new THREE.CylinderGeometry(fr,fr,2.8,16),new THREE.MeshLambertMaterial({color:0x374151}));
-        hous.setRotationFromQuaternion(fq); hous.position.set(cx,y,cz); hous.castShadow=true; add3(hous);
-        const cone=new THREE.Mesh(new THREE.CylinderGeometry(fr*1.15,fr*0.8,1.2,16),new THREE.MeshLambertMaterial({color:0x4b5563}));
-        cone.setRotationFromQuaternion(fq); cone.position.set(cx+outV.x*1.9,y,cz+outV.z*1.9); add3(cone);
-        const ring=new THREE.Mesh(new THREE.TorusGeometry(fr*1.05,0.15,8,20),new THREE.MeshLambertMaterial({color:0x9ca3af}));
-        ring.setRotationFromQuaternion(fq); ring.rotateX(Math.PI/2);
-        ring.position.set(cx+outV.x*2.5,y,cz+outV.z*2.5); add3(ring);
-        const hub=new THREE.Mesh(new THREE.SphereGeometry(fr*0.28,10,10),new THREE.MeshLambertMaterial({color:0x111827}));
-        hub.position.set(cx+outV.x*2.5,y,cz+outV.z*2.5); add3(hub);
-      });
+      // ── Portable dryer (GSI 1100 / 2300 style): wheeled base section, stacked galvanized
+      //    grain-column modules with perforated screens, burner-fan units on the fan end,
+      //    top loading auger with fill hopper, bottom unload auger with discharge, ladder ──
+      addPortableDryer3(dr,x,z,col,hRad);
     } else {
       const g=new THREE.CylinderGeometry(dr.diamFt/2,dr.diamFt/2,dr.htFt,32);
       body=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.85}));
       // Top-load inlet for cylinder
       const inlet=new THREE.Mesh(new THREE.CylinderGeometry(dr.diamFt*0.15,dr.diamFt*0.15,3,12),new THREE.MeshLambertMaterial({color:0x6b7280}));
-      inlet.position.set(x,dr.htFt+1.5,z); inlet.castShadow=true; add3(inlet);
+      inlet.position.set(x,dryerTopHt(dr)+1.5,z); inlet.castShadow=true; add3(inlet);
     }
-    if(body){ body.position.set(x,dr.htFt/2,z);body.rotation.y=hRad;body.castShadow=body.receiveShadow=true;body.userData={siteId:dr.id,siteType:'dryer'};add3(body); }
+    if(body){ body.position.set(x,(dr.foundHtFt||0)+dr.htFt/2,z);body.rotation.y=hRad;body.castShadow=body.receiveShadow=true;body.userData={siteId:dr.id,siteType:'dryer'};add3(body); }
     // Foundation pad
     if((dr.foundHtFt||0)>0){
       const fh=dr.foundHtFt,ext=dr.foundExtFt||0;
@@ -4888,7 +4980,7 @@ function populate3D(){
         pad.position.set(x,fh/2,z);pad.receiveShadow=true;add3(pad);
       }
     }
-    if(S.showLabels){const spr=makeLabel3(`🔥 ${dr.name}\n${dr.htFt}′ ht`,dr.color);spr.position.set(x,dr.htFt+10,z);add3(spr);}
+    if(S.showLabels){const spr=makeLabel3(`🔥 ${dr.name}\n${dryerTopHt(dr).toFixed(0)}′ top`,dr.color);spr.position.set(x,dryerTopHt(dr)+10,z);add3(spr);}
   });
 
   // TRUCKS
