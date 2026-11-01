@@ -1299,11 +1299,19 @@ function dryerFanStack(dr,i) {
 }
 // Returns {lat,lng,htFt} of a dryer's load point: always the TOP of the dryer,
 // at the configured load end for rectangular dryers (center for cylindrical).
+// Portable dryer end geometry, shared by the load point, the map marker and the 3D model:
+// the fan / burner section occupies the fan end, the grain column (and the top-auger fill
+// hopper that sits on it) is inboard of that. The fill hopper is where grain is delivered.
+function dryerFanEnd(d){ return (d.dryerFans||[]).some(f=>f.side==='front')?'head':'tail'; }
+function dryerFanSectionFt(d){ const L=+d.lenFt||32; return Math.min(7,L*0.22); }
+function dryerFillInsetFt(d){ const lEnd=d.loadEnd||'tail'; return lEnd===dryerFanEnd(d)?dryerFanSectionFt(d)+2.2:3.4; }
 function dryerLoadPoint(d) {
   if (d.shape === 'rect') {
     const lEnd = d.loadEnd||'tail';
     const bear = (((lEnd==='tail' ? d.headDeg+180 : d.headDeg)%360)+360)%360;
-    const ll = bearingOffset(L.latLng(d.lat,d.lng), (d.lenFt/2)*FT2M, bear);
+    const portable=(d.dryerType||'portable')==='portable';
+    const inset=portable?dryerFillInsetFt(d):0; // fill hopper sits inboard of the end, not on the fans
+    const ll = bearingOffset(L.latLng(d.lat,d.lng), Math.max(0,d.lenFt/2-inset)*FT2M, bear);
     return { lat:ll.lat, lng:ll.lng, htFt:dryerTopHt(d) };
   }
   return { lat:d.lat, lng:d.lng, htFt:dryerTopHt(d) };
@@ -1795,7 +1803,7 @@ function renderDryer(dr) {
     unloadMk=L.marker(unloadLL,{icon:L.divIcon({html:`<div style="background:#f97316;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid #fff;white-space:nowrap">↓ OUT</div>`,className:'',iconAnchor:[20,6]}),interactive:false}).addTo(map);
     // Load end marker — green "↑ IN" just beyond the load face (grain enters the TOP here)
     const loadBear=((((dr.loadEnd||'tail')==='tail'?dr.headDeg+180:dr.headDeg)%360)+360)%360;
-    const loadLL=bearingOffset(ll,lM+3*FT2M,loadBear);
+    const lp0=dryerLoadPoint(dr); const loadLL=L.latLng(lp0.lat,lp0.lng);
     loadMk=L.marker(loadLL,{icon:L.divIcon({html:`<div style="background:#10b981;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid #fff;white-space:nowrap">↑ IN</div>`,className:'',iconAnchor:[20,6]}),interactive:false}).addTo(map);
     // Fan markers at each fan's configured mount + position (F1/M2 = fan 1 on module 2)
     if((dr.dryerType||'portable')==='portable'){
@@ -4260,7 +4268,7 @@ function addPortableDryer3(dr,x,z,col,hRad){
   const zTopA=zColEnd, zTopB=zColFan; const zMin=Math.min(zTopA,zTopB)+0.6, zMax=Math.max(zTopA,zTopB)-0.6;
   box(1.6,1.1,zMax-zMin,galvDark,0,topY+0.55,(zMin+zMax)/2);
   cylZ(0.5,zMax-zMin+1.5,galv,0,topY+0.9,(zMin+zMax)/2,12);
-  const zHop=zLoad>0?zMax-1.6:zMin+1.6;
+  const zHop=zLoad*(L/2-dryerFillInsetFt(dr)); // same spot the load point / ↑ IN marker uses
   box(3.4,2.4,3.4,accent,0,topY+1.2,zHop);                                 // fill hopper (load point)
   box(3.8,0.3,3.8,new THREE.MeshLambertMaterial({color:0x10b981}),0,topY+2.55,zHop); // green rim = "↑ IN"
   const zDrv=zLoad>0?zMin+1.0:zMax-1.0;
