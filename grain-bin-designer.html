@@ -420,9 +420,9 @@ function initMap() {
   // maxNativeZoom caps tile requests at the imagery's real resolution; beyond that
   // Leaflet upscales the z18 tiles instead of requesting blanks that don't exist.
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { attribution:'© Esri', maxZoom:22, maxNativeZoom:18, crossOrigin:'anonymous' }).addTo(map);
+    {attribution:'© Esri', maxZoom:22, maxNativeZoom:18, crossOrigin:'anonymous' }).addTo(map);
   L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    { attribution:'', maxZoom:22, maxNativeZoom:18, opacity:0.6, crossOrigin:'anonymous' }).addTo(map);
+    {attribution:'', maxZoom:22, maxNativeZoom:18, opacity:0.6, crossOrigin:'anonymous' }).addTo(map);
   map.on('click',     onMapClick);
   map.on('mousemove', onMapMove);
   map.on('dblclick',  onMapDbl);
@@ -6275,7 +6275,7 @@ function export3D() {
     link.href = cv.toDataURL('image/png');
     link.click();
     showToast('3D image saved');
-  } catch(e) { alert('Export failed: ' + e.message); }
+  } catch(e) { reportFailure('Save 3D Image', e); }
 }
 async function export2D() {
   if (is3D) { flash('Switch to 2D view first.'); return; }
@@ -6283,8 +6283,8 @@ async function export2D() {
   showToast('Capturing map…');
   try {
     const canvas = await html2canvas(mapEl, {
-      useCORS: true, allowTaint: true, logging: false,
-      scale: window.devicePixelRatio || 1,
+      useCORS: true, allowTaint: false, logging: false, imageTimeout: 20000,
+      scale: captureScale(mapEl, 1),
       ignoreElements: el => el.classList && el.classList.contains('leaflet-control')
     });
     const link = document.createElement('a');
@@ -6292,8 +6292,33 @@ async function export2D() {
     link.href = canvas.toDataURL('image/png');
     link.click();
     showToast('2D map image saved');
-  } catch(e) { alert('2D export failed: ' + e.message); }
+  } catch(e) { reportFailure('Save 2D Image', e); }
 }
+// Largest capture scale that keeps the output canvas under ~6 million pixels (Safari and tablets
+// kill the page well before Chrome's limits when html2canvas allocates a huge bitmap)
+function captureScale(el, wanted){
+  const w=el.clientWidth||1, h=el.clientHeight||1;
+  return Math.max(0.5, Math.min(wanted, window.devicePixelRatio||1, Math.sqrt(6e6/(w*h))));
+}
+// A report or export that throws shows what broke instead of doing nothing (or blanking the page)
+function reportFailure(name, e){
+  const msg=(e&&e.message)||String(e); const where=((e&&e.stack)||'').split('\n').slice(1,3).map(l=>l.trim()).join(' ← ');
+  try{ localStorage.setItem('gbd_lasterr', JSON.stringify({name,msg,where,at:new Date().toISOString()})); }catch(_){}
+  const body=document.getElementById('modal-body'), title=document.getElementById('modal-title');
+  if(body&&title){
+    title.textContent='⚠ '+name+' could not be generated';
+    document.getElementById('modal-csv-btn').style.display='none';
+    body.innerHTML=`<p style="font-size:0.85em;color:#fca5a5;margin-bottom:8px">${escH(name)} stopped with this error:</p>
+      <pre style="background:#111827;border:1px solid #ef4444;border-radius:5px;padding:8px 10px;font-size:0.78em;color:#fecaca;white-space:pre-wrap">${escH(msg)}\n${escH(where)}</pre>
+      <p style="font-size:0.78em;color:#9ca3af">Your layout is safe. Copy the text above and send it along with which browser and device you are on, and this can be fixed quickly.</p>`;
+    document.getElementById('modal-overlay').classList.add('open');
+  } else { alert(name+' failed: '+msg); }
+  console.error(name+' failed:', e);
+}
+function guardReport(name, fn){ return function(){ try{ const r=fn.apply(this,arguments); if(r&&typeof r.then==='function') r.catch(e=>reportFailure(name,e)); return r; }catch(e){ reportFailure(name,e); } }; }
+// Anything uncaught anywhere shows up as a message rather than a silent dead click
+window.addEventListener('error', ev=>{ try{ const m=ev.message||'Script error'; const h=document.getElementById('hint-bar'); if(h){ h.textContent='⚠ '+m; h.style.color='#ef4444'; } localStorage.setItem('gbd_lasterr',JSON.stringify({name:'uncaught',msg:m,where:(ev.filename||'')+':'+(ev.lineno||''),at:new Date().toISOString()})); }catch(_){} });
+window.addEventListener('unhandledrejection', ev=>{ try{ const m=(ev.reason&&ev.reason.message)||String(ev.reason); const h=document.getElementById('hint-bar'); if(h){ h.textContent='⚠ '+m; h.style.color='#ef4444'; } }catch(_){} });
 function showToast(msg, dur=2200) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.opacity = '1';
@@ -6386,10 +6411,10 @@ async function exportPlanSheet(){
   mapEl.appendChild(ov);
   showToast('Capturing plan sheet…');
   try{
-    const canvas=await html2canvas(mapEl,{useCORS:true,allowTaint:true,logging:false,scale:Math.max(2,window.devicePixelRatio||1),ignoreElements:el=>el.classList&&el.classList.contains('leaflet-control')});
+    const canvas=await html2canvas(mapEl,{useCORS:true,allowTaint:false,logging:false,imageTimeout:20000,scale:captureScale(mapEl,2),ignoreElements:el=>el.classList&&el.classList.contains('leaflet-control')});
     const link=document.createElement('a'); link.download='grain-site-plan-'+new Date().toISOString().slice(0,10)+'.png'; link.href=canvas.toDataURL('image/png'); link.click();
     showToast('Plan sheet saved — add dimensions with Measure before exporting if you need them on the sheet');
-  }catch(e){ alert('Plan sheet export failed: '+e.message); }
+  }catch(e){ reportFailure('Plan Sheet', e); }
   finally{ ov.remove(); }
 }
 
@@ -6894,6 +6919,9 @@ setTimeout(()=>{
   if(r){try{const d=JSON.parse(r);const has=['bins','legs','conveyors','pits','dryers','trucks','loadouts','structures','bends','walkways','portaugers','propanetanks','generators'].some(k=>(d[k]||[]).length);if(has){hydrateData(d);updateProjDisplay();flash('Auto-loaded previous session');}}catch(e){}}
   else { updateProjDisplay(); }
   pushUndo(); siteCheckBadge(); // baseline for undo + first badge
+  showReport=guardReport('Site Report',showReport); showPowerReport=guardReport('Power Estimate',showPowerReport);
+  showSiteCheck=guardReport('Site Check',showSiteCheck); exportReportCSV=guardReport('CSV export',exportReportCSV);
+  export2D=guardReport('Save 2D Image',export2D); export3D=guardReport('Save 3D Image',export3D); exportPlanSheet=guardReport('Plan Sheet',exportPlanSheet);
   // After local restore, prefer the linked data file if this computer still has permission
   if(dataFileSupported()){
     (async()=>{
