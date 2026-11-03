@@ -6282,11 +6282,7 @@ async function export2D() {
   const mapEl = document.getElementById('map');
   showToast('Capturing map…');
   try {
-    const canvas = await html2canvas(mapEl, {
-      useCORS: true, allowTaint: false, logging: false, imageTimeout: 20000,
-      scale: captureScale(mapEl, 1),
-      ignoreElements: el => el.classList && el.classList.contains('leaflet-control')
-    });
+    const canvas = await captureMap(mapEl, 1);
     const link = document.createElement('a');
     link.download = 'grain-site-2d-' + new Date().toISOString().slice(0,10) + '.png';
     link.href = canvas.toDataURL('image/png');
@@ -6299,6 +6295,38 @@ async function export2D() {
 function captureScale(el, wanted){
   const w=el.clientWidth||1, h=el.clientHeight||1;
   return Math.max(0.5, Math.min(wanted, window.devicePixelRatio||1, Math.sqrt(6e6/(w*h))));
+}
+// Capture the 2D map to a canvas. html2canvas draws Leaflet's tiles and HTML markers correctly but
+// gets inline SVG wrong (it double-applies the layer's CSS transform and ignores the viewBox origin),
+// which put bins and conveyors tens of pixels off the imagery. So: tiles in one pass, the vector layer
+// drawn by the browser's own SVG renderer, then labels and markers in a second transparent pass.
+async function captureMap(mapEl, wanted){
+  const scale=captureScale(mapEl,wanted), mr=mapEl.getBoundingClientRect();
+  const W=Math.round(mr.width*scale), H=Math.round(mr.height*scale);
+  const out=document.createElement('canvas'); out.width=W; out.height=H; const g=out.getContext('2d');
+  const has=(el,c)=>!!(el&&el.classList&&el.classList.contains(c)); // ignoring a pane prunes its whole subtree
+  const common={useCORS:true,allowTaint:false,logging:false,imageTimeout:20000,scale};
+  // 1. imagery (tiles) — skip vectors, markers, popups
+  const base=await html2canvas(mapEl,Object.assign({},common,{ignoreElements:el=>has(el,'leaflet-control')||has(el,'leaflet-overlay-pane')||has(el,'leaflet-marker-pane')||has(el,'leaflet-popup-pane')||has(el,'leaflet-tooltip-pane')||(el&&el.id==='plan-overlay')}));
+  g.drawImage(base,0,0,W,H);
+  // 2. vector layer (bins, conveyors, pits, measurements…) exactly where it sits on screen
+  for(const svg of mapEl.querySelectorAll('.leaflet-overlay-pane svg')){
+    const r=svg.getBoundingClientRect(); if(!r.width||!r.height) continue;
+    const clone=svg.cloneNode(true); clone.removeAttribute('style'); clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+    clone.setAttribute('width',String(r.width)); clone.setAttribute('height',String(r.height));
+    const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml;charset=utf-8'}));
+    try{ const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('vector layer did not render')); i.src=url; });
+      g.drawImage(img,(r.left-mr.left)*scale,(r.top-mr.top)*scale,r.width*scale,r.height*scale);
+    } finally { URL.revokeObjectURL(url); }
+  }
+  // 3. labels, markers and any plan-sheet overlay, transparent, on top (the container's own grey
+  //    background must not paint over the layers below, so it is cleared for this pass)
+  const prevBg=mapEl.style.backgroundColor; mapEl.style.backgroundColor='transparent';
+  try{
+    const top=await html2canvas(mapEl,Object.assign({},common,{backgroundColor:null,ignoreElements:el=>has(el,'leaflet-control')||has(el,'leaflet-tile-pane')||has(el,'leaflet-overlay-pane')}));
+    g.drawImage(top,0,0,W,H);
+  } finally { mapEl.style.backgroundColor=prevBg; }
+  return out;
 }
 // A report or export that throws shows what broke instead of doing nothing (or blanking the page)
 function reportFailure(name, e){
@@ -6411,7 +6439,7 @@ async function exportPlanSheet(){
   mapEl.appendChild(ov);
   showToast('Capturing plan sheet…');
   try{
-    const canvas=await html2canvas(mapEl,{useCORS:true,allowTaint:false,logging:false,imageTimeout:20000,scale:captureScale(mapEl,2),ignoreElements:el=>el.classList&&el.classList.contains('leaflet-control')});
+    const canvas=await captureMap(mapEl,2);
     const link=document.createElement('a'); link.download='grain-site-plan-'+new Date().toISOString().slice(0,10)+'.png'; link.href=canvas.toDataURL('image/png'); link.click();
     showToast('Plan sheet saved — add dimensions with Measure before exporting if you need them on the sheet');
   }catch(e){ reportFailure('Plan Sheet', e); }
