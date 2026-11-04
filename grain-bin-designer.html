@@ -313,6 +313,145 @@ const PHASE_COLORS = {1:'#f59e0b',2:'#06b6d4',3:'#10b981',4:'#8b5cf6',5:'#ef4444
 const PHASE_NAMES  = {0:'No Phase',1:'Phase 1',2:'Phase 2',3:'Phase 3',4:'Phase 4',5:'Phase 5'};
 const PHASE_PALETTE = ['#f59e0b','#06b6d4','#10b981','#8b5cf6','#ef4444','#f97316','#3b82f6','#84cc16','#ec4899','#14b8a6','#a78bfa','#fb923c','#e11d48','#0891b2','#65a30d'];
 const GRAIN_DENS = { corn:1.2445, soybeans:1.2445, wheat:0.9694, milo:1.1, oats:1.5 };
+// ── GSI PRODUCT CATALOG ───────────────────────────────────────
+// Transcribed from GSI pages and literature (GS-401/400 Apr 2023, GS-006 Sept 2023, GS-007 Oct 2025,
+// portable/T-Series/modular dryer pages 2026, GS-019 June 2025, Select conveyor pages, GS-042 Oct 2025,
+// GS-018 May 2026, GS-201 Aug 2025). Heights are GSI's ft-in; capacities are GSI bushels
+// (≤52 lb/ft³, 28° repose, 6% compaction, 30° roof). Nothing here is guessed: fields GSI does not
+// publish (leg HP vs height, conveyor HP, spout sizes) stay with the dealer.
+function ftIn(s){ if(typeof s==='number') return s; const m=/^(-?\d+)-(\d+)$/.exec(String(s)); return m?(+m[1]+(+m[2])/12):(+s||0); }
+function ftInStr(ft){ const f=Math.floor(ft+1e-6), i=Math.round((ft-f)*12); return i===12?`${f+1}′0″`:`${f}′${i}″`; }
+const GSI={
+  // ── 40-Series flat-bottom bins ──
+  bins:{
+    '4002':{name:'4002 · unstiffened · 2.66″ · 12″ plenum',stiff:0,corr:2.66,ringIn:32,eaveAdjIn:2,rings:{15:[4,12],18:[4,12],21:[5,12],24:[5,12],27:[5,12],30:[5,15],33:[5,15],36:[5,15],42:[6,15],48:[6,14]},
+      rise:{15:'4-3',18:'5-1',21:'6-0',24:'6-10',27:'7-9',30:'8-8',33:'9-6',36:'10-5',42:'12-2',48:'13-11'},
+      cap:{15:[4,[1649,2047,2444,2841,3239,3636,4033,4430,4828]],18:[4,[2435,3007,3579,4151,4723,5295,5867,6439,7011]],21:[5,[4174,4952,5730,6508,7286,8064,8842,9620]],24:[5,[5546,6563,7580,8597,9614,10631,11648,12665]],27:[5,[7148,8435,9722,11009,12296,13583,14870,16157]],
+        30:[5,[8981,10570,12159,13748,15337,16926,18515,20104,21694,23283,24872]],33:[5,[11056,12979,14902,16825,18748,20671,22594,24517,26440,28363,30286]],36:[5,[13381,15670,17959,20248,22537,24826,27115,29404,31693,33981,36270]],42:[6,[21950,25065,28180,31295,34410,37525,40640,43755,46870,49985]],48:[6,[29480,33548,37616,41684,45752,49820,53888,57957,62025]]},
+      roofLoad:{peakLb:6000,snowPsf:30}},
+    '4004':{name:'4004 · unstiffened · 4″ · 12″ plenum',stiff:0,corr:4,ringIn:44,eaveAdjIn:1,rings:{15:[3,8],18:[3,9],21:[3,9],24:[3,10],27:[3,10],30:[4,10],33:[4,9],36:[4,10],42:[4,10],48:[4,10]},useCapOf:'4024',roofLoad:{peakLb:6000,snowPsf:30}},
+    '4024':{name:'4024 · 2 stiffeners · 4″ · 12″ plenum',stiff:2,corr:4,ringIn:44,eaveAdjIn:1,rings:{12:[3,10],15:[3,10],18:[3,10],21:[3,10],24:[3,10],27:[3,10],30:[3,10],33:[3,10],36:[3,10],42:[3,10],48:[3,10],54:[3,10],60:[3,10]},
+      rise:{12:'3-6',15:'4-4',18:'5-2',21:'6-1',24:'6-11',27:'7-10',30:'8-9',33:'9-7',36:'10-6',42:'12-3',48:'14-0',54:'14-4',60:'16-1'},
+      cap:{12:[3,[1061,1411,1761,2110,2460,2810,3159,3509]],15:[3,[1698,2244,2791,3338,3883,4429,4976,5522]],18:[3,[2502,3288,4075,4862,5648,6435,7222,8009]],21:[3,[3482,4553,5624,6695,7765,8836,9907,10978]],24:[3,[4649,6048,7446,8845,10244,11642,13041,14439]],27:[3,[6012,7782,9552,11322,13092,14862,16632,18402]],
+        30:[3,[7580,9765,11950,14135,16321,18506,20691,22876]],33:[3,[9362,12006,14651,17295,19939,22583,25227,27871]],36:[3,[11369,14516,17662,20809,23956,27102,30249,33396]],42:[3,[16092,20375,24658,28941,33224,37507,41790,46073]],48:[3,[21825,27419,33014,38608,44202,49796,55539,60984]],54:[3,[28644,35724,42804,49884,56964,64044,71124,78204]],60:[3,[36624,45365,54105,62846,71587,80328,89068,97809]]},
+      roofLoad:{peakLb:6000,snowPsf:30,note:'10k / 30k Z-Tek optional on 36′–48′; 54′–60′ 10k (older sheets conflict); 72′ Z-Tek 30k'}},
+    '4022':{name:'4022 · 2 stiffeners · 2.66″ · no plenum',stiff:2,corr:2.66,ringIn:32,eaveAdjIn:2,diams:[18,21,24,27,30,33,36,42,48,54,60],roofLoad:{peakLb:6000,snowPsf:30,note:'10k on 42′–48′; 20k Z-Tek on 54′–60′ (40 psf)'}},
+    '4032':{name:'4032 · 3 stiffeners · 2.66″ · no plenum',stiff:3,corr:2.66,ringIn:32,eaveAdjIn:2,diams:[21,24,27,30,33,36,42,48,54,60,72,75,78,90,105,135,156],roofLoad:{peakLb:6000,snowPsf:30,note:'10k on 42′–48′; 20k Z-Tek 54′–60′; 30k Z-Tek 72′–105′; 50k Z-Tek 135′ (40 psf)'}}
+  },
+  // 4022 / 4032 are linear per ring: [minRings, maxRings, capacity at min, bushels per ring, roof rise]
+  binLin:{18:[12,18,7222,572,'5-1'],21:[12,22,9907,779,'6-0'],24:[12,27,13041,1017,'6-10'],27:[12,30,16632,1287,'7-9'],30:[12,32,20691,1589,'8-8'],33:[12,32,25227,1923,'9-6'],36:[12,32,30249,2289,'10-5'],42:[12,32,41790,3115,'12-2'],48:[12,32,55390,4068,'13-11'],54:[12,40,71124,5149,'14-3'],60:[12,40,89068,6357,'16-0'],72:[12,40,131890,9154,'18-6'],75:[12,40,144094,9933,'19-4'],78:[12,40,156918,10743,'20-3'],90:[12,40,214588,14303,'23-10'],105:[12,40,301731,19468,'28-2'],135:[19,40,755968,32182,'35-11'],156:[12,40,738303,42973,'42-1']},
+  // ── Hopper tanks ──
+  hoppers:{
+    'GHT':{name:'GHT · 45° hopper · unstiffened 2.66″',angle:45,ringIn:32,stiff:0,clearIn:34,start:{9:2,12:2,15:2,18:2,21:3},
+      rows:{9:[[388,'14-2'],[523,'16-10'],[658,'19-6'],[793,'22-2'],[927,'24-10'],[1061,'27-5'],[1195,'30-0'],[1329,'32-8']],12:[[786,'16-11'],[1039,'19-8'],[1290,'22-4'],[1542,'24-11'],[1794,'27-8'],[2045,'30-4'],[2296,'33-0'],[2547,'35-8']],
+        15:[[1340,'19-4'],[1733,'22-0'],[2127,'24-8'],[2520,'27-4'],[2914,'30-0'],[3307,'32-8'],[3700,'35-4'],[4093,'38-0']],18:[[2089,'21-7'],[2657,'24-4'],[3222,'26-11'],[3790,'29-7'],[4355,'32-4'],[4923,'34-11'],[5488,'37-7'],[6053,'40-3']],21:[[3832,'26-7'],[4603,'29-3'],[5374,'31-11'],[6145,'34-7'],[6916,'37-3']]}},
+    'FCHTC':{name:'FCHTC · 45° hopper · 2 stiffeners · 4″',angle:45,ringIn:44,stiff:2,clearIn:42,start:{12:3,15:3,18:3,21:3,24:3},
+      rows:{12:[[1317,'19-6','23-0'],[1666,'23-2','26-8'],[2016,'26-10','30-4'],[2365,'30-6','34-0'],[2715,'34-2','37-8'],[3064,'37-10','41-4'],[3414,'41-6','45-0'],[3763,'45-2','48-8'],[4113,'48-10','52-4'],[4462,'52-6','56-0'],[4811,'56-2','59-8']],
+        15:[[2145,'21-1','25-3'],[2691,'24-9','28-11'],[3237,'28-5','32-7'],[3783,'32-1','36-3'],[4329,'35-9','39-11'],[4875,'39-5','43-7'],[5421,'43-1','47-3'],[5967,'46-9','50-11'],[6513,'50-5','54-7'],[7059,'54-1','58-3'],[7605,'57-9','61-11']],
+        18:[[3247,'22-7','27-8'],[4033,'26-3','31-4'],[4819,'29-11','35-0'],[5605,'33-7','38-8'],[6391,'37-3','42-4'],[7178,'40-11','46-0'],[7964,'44-7','49-8'],[8750,'48-3','53-4']],
+        21:[[4637,'24-1','30-1'],[5707,'27-9','33-9'],[6778,'31-5','37-5'],[7848,'35-1','41-1'],[8918,'38-9','44-9'],[9988,'42-5','48-5'],[11058,'46-1','52-1'],[12128,'49-9','55-9']],
+        24:[[6340,'25-6','32-4'],[7738,'29-2','36-0'],[9135,'32-10','39-8'],[10533,'36-6','43-4'],[11931,'40-2','47-0'],[13329,'43-10','50-8'],[14726,'47-6','54-4'],[16124,'51-2','58-0']]}},
+    // NCHTC heavy-duty: [angle, diam, minRings, maxRings, cap at min, bushels per ring, eave at min, roof rise, hopper clearance in]
+    'NCHTC':{name:'NCHTC · heavy-duty · 2 stiffeners · 2.66″',ringIn:32,stiff:2,
+      rows:[[45,12,6,16,1794,254,'24-2','3-5',34],[45,15,4,18,2096,397,'20-2','4-4',34],[45,18,5,20,3747,572,'24-6','5-4',34],[45,21,6,20,6097,778,'28-7','6-0',34],[45,24,5,22,7229,1017,'27-5','6-10',34],[45,27,6,20,10736,1287,'31-7','7-8',34],[45,30,6,20,13721,1588,'33-0','8-8',34],[45,36,6,22,21007,2287,'36-4','10-4',38],
+        [40,27,6,20,10313,1287,'28-5','7-9',30],[40,30,6,20,13129,1588,'29-7','8-7',30],[40,36,6,18,19976,2287,'32-2','10-4',34],[60,15,4,17,2331,397,'25-3','4-2',34],[60,18,5,19,4162,572,'30-6','5-1',34],[60,21,6,20,6768,778,'35-9','6-0',34]]}
+  },
+  // ── Dryers ── portable: [model, modules, fanCount, fullHeat 20→15, 25→15, dry&cool 20→15, 25→15, holding, L, W, H, heaters, fans[{hp,dia,module}], amps 460V]
+  dryersPortable:[
+    ['1108',1,1,420,260,220,170,219,'15-2','8-0','14-6','4.5M',[[15,36,1]],'29/41'],['1112',1,1,530,340,270,210,327,'19-2','8-0','14-6','4.5M',[[15,36,1]],'29/44'],['1114',1,1,610,390,320,250,381,'21-2','8-0','14-6','5.75M',[[15,40,1]],'32/54'],
+    ['1116',1,1,710,440,370,280,436,'23-2','8-0','14-6','5.75M',[[15,40,1]],'38/60'],['1118',1,1,820,510,430,320,490,'25-2','8-0','14-6','6.75M',[[20,42,1]],'43/65'],['1120',1,1,910,560,480,360,544,'27-2','8-0','14-6','7.5M',[[25,42,1]],'56/89'],
+    ['1122',1,1,990,610,520,390,599,'29-2','8-0','14-6','8.75M',[[30,42,1]],'61/94'],['1126',1,1,1160,720,610,460,708,'33-2','8-0','14-6','10.25M',[[40,42,1]],'81/114'],
+    ['1214',1,2,680,420,400,250,381,'21-2','8-0','14-6','3.5M+3M',[[12,36,1],[12,28,1]],'52/74'],['1218',1,2,840,520,510,320,490,'25-2','8-0','14-6','4.5M+3M',[[15,36,1],[10,28,1]],'55/76'],['1222',1,2,1060,650,640,400,599,'29-2','8-0','14-6','6.75M+3M',[[20,42,1],[12,28,1]],'66/98'],['1226',1,2,1180,730,730,450,708,'33-2','8-0','14-6','7.5M+3M',[[25,42,1],[12,28,1]],'80/112'],
+    ['1220S',1,2,990,620,445,280,544,'27-2','8-8','14-6','2×4.5M',[[15,36,1],[15,36,1]],'63/96'],['1226S',1,2,1330,820,600,375,708,'33-2','8-8','14-6','2×6.75M',[[25,40,1],[25,40,1]],'94/127'],
+    ['2314',2,3,1460,900,1000,620,731,'23-10','8-8','25-11','5.5M+2×3.0M',[[15,40,2],[10,28,1],[10,28,1]],'71/93'],['2318',2,3,1810,1120,1240,770,940,'27-10','8-8','25-11','6.75M+2×3.5M',[[20,42,2],[10,36,1],[10,36,1]],'70/92'],['2320',2,3,2010,1250,1380,850,1044,'29-10','8-8','25-11','7.5M+2×4.5M',[[25,42,2],[15,36,1],[15,36,1]],'94/127'],
+    ['2322',2,3,2200,1360,1500,930,1149,'31-10','8-8','25-11','8.75M+2×4.5M',[[30,42,2],[15,36,1],[15,36,1]],'99/132'],['2326',2,3,2700,1670,1840,1130,1304,'35-10','8-8','25-11','10.25M+2×6.75M',[[40,42,2],[25,40,1],[25,40,1]],'143/176'],
+    ['2420',2,4,2010,1250,1380,850,1044,'29-10','8-8','25-11','4×4.5M',[[15,36,2],[15,36,2],[15,36,1],[15,36,1]],'101/139'],['2426',2,4,2700,1670,1840,1130,1340,'35-10','8-8','25-11','4×6.75M',[[25,40,2],[25,40,2],[25,40,1],[25,40,1]],'159/197'],
+    ['3420',3,4,2950,1830,1800,1120,1534,'29-10','8-8','37-3','2×7.5M+2×4.5M',[[25,42,3],[25,42,2],[15,36,1],[15,36,1]],'125/158'],['3422',3,4,3300,2040,2020,1250,1688,'31-10','8-8','37-3','2×8.75M+2×4.5M',[[30,42,3],[30,42,2],[15,36,1],[15,36,1]],'135/168'],['3426',3,4,4000,2480,2450,1520,1995,'35-10','8-8','37-3','2×10.25M+2×6.75M',[[40,42,3],[40,42,2],[25,40,1],[25,40,1]],'192/225'],
+    ['3620',3,6,2950,1830,1800,1120,1534,'29-10','8-8','37-3','6×4.5M',[[15,36,3],[15,36,3],[15,36,2],[15,36,2],[15,36,1],[15,36,1]],'139/177'],['3626',3,6,4000,2480,2450,1520,1995,'35-10','8-8','37-3','6×6.75M',[[25,40,3],[25,40,3],[25,40,2],[25,40,2],[25,40,1],[25,40,1]],'223/261']],
+  // T-Series towers: [model, tower dia, dia w/ catwalks, height, blower HP total, metering HP, breaker 230/460, drying CFM, wet holding, dryer holding, 20→15, 25→15, burner MBTU/hr]
+  dryersTower:[['T-1575',12,19,'59-0',75,1,'400/200',77100,302,1622,1500,900,16.654],['T-1875',12,19,'69-0',75,1,'400/200',81800,302,1915,1800,1080,17.669],['T-20100',12,19,'75-8',100,1,'400/225',98600,302,2110,2000,1200,21.298],['T-24100',12,19,'85-8',100,1,'400/225',108300,302,2401,2400,1440,23.393],['T-27125',12,19,'92-4',125,1,'NA/250',118400,302,2595,2700,1620,25.574],
+    ['T-2521',18,25,'66-0',120,1.5,'600/250',121950,731,2915,2500,1500,26.341],['T-3026',18,25,'76-0',150,1.5,'600/300',145200,731,3368,3000,1800,31.363],['T-3531',18,25,'86-0',180,1.5,'600/400',175800,731,3822,3500,2100,37.973],['T-4036',18,25,'96-0',225,1.5,'800/400',192750,731,4275,4000,2400,41.634],['T-4742',18,25,'109-4',225,1.5,'800/400',213600,731,4877,4700,2820,46.138],
+    ['T-5046',24,32,'97-10',300,2,'NA/600',282000,1279,6171,5000,3000,60.192],['T-6055',24,32,'107-10',300,2,'NA/600',304800,1279,6785,6000,3600,65.837],['T-7060',24,32,'117-10',375,2,'NA/600',337500,1279,7399,7000,4200,72.9]],
+  // Modular towers: [model, dia, height, blower HP, breaker, CFM, burner BTU, holding, 20→15 max-cool, 25→15 max-cool, 20→15 min-cool, 25→15 min-cool]
+  dryersModular:[['TM-1008','10-7','42-1',40,'225/150',38000,8200000,1049,800,480,900,542],['TM-1010','10-7','48-11',50,'300/200',45000,9700000,1223,1000,600,1125,670],['TM-1012','10-7','55-9',60,'300/200',52000,11200000,1397,1200,720,1350,810],['TM-1015','10-7','62-7',75,'400/200',66000,14300000,1571,1500,900,1690,1010]],
+  // ── Bucket elevators: [model, head pulley in, cup rows, bu/hr, pulley rpm, belt fpm, cup W×P, spacing, trunking D×E]
+  legs:[['15P16',16,1,1500,95,423,'9×5',9,'10×16'],['20P16',16,1,2000,95,423,'9×5',7,'10×16'],['25P16',16,1,2500,95,423,'9×5',6,'10×16'],['30P16',16,1,3000,95,423,'9×6',7,'10×16'],['35P16',16,1,3500,95,423,'9×6',5.5,'10×16'],
+    ['30P24',24,1,3000,73,478,'10×6',8.5,'10×16'],['40P24',24,1,4000,73,478,'10×6',7,'10×16'],['50P24',24,1,5000,73,478,'11×6 LP',5.5,'10×16'],['56P24',24,1,5600,73,478,'11×6 LP',5,'10×16'],
+    ['50P30',30,1,5000,67,544,'13×6',8,'12×18'],['60P30',30,1,6000,67,544,'13×6',7,'12×18'],['70P30',30,1,7000,67,544,'13×7',8,'12×18'],
+    ['50P36',36,1,5000,64,620,'12×6',8.5,'12×18'],['60P36',36,1,6000,64,620,'12×6',7.5,'12×18'],['70P36',36,1,7000,64,620,'13×7',9,'12×18'],['75P36',36,1,7500,64,620,'13×7',8.5,'12×18'],['80P36',36,1,8000,64,620,'13×7',8,'12×18'],['100P36',36,1,10000,64,620,'13×7 LP',6,'12×18'],
+    ['80P42',42,1,8000,60,675,'14×7',9,'14×22'],['100P42',42,1,10000,60,675,'14×8',10.5,'14×22'],['120P42',42,1,12000,60,675,'16×8',10.5,'14×22'],['150P42',42,1,15000,60,675,'16×8 LP',7.5,'14×22'],['200P42',42,1,20000,60,675,'20×8 LP',7,'14×26'],
+    ['150P48',48,1,15000,56,720,'16×8',9,'14×26'],['200P48',48,1,20000,56,720,'20×8 LP',7.5,'14×26'],
+    ['250P42',42,2,25000,60,675,'14×8 LP',7.5,'14×38'],['300P42',42,2,30000,60,675,'16×8 LP',7.5,'14×42'],['400P42',42,2,40000,60,675,'20×8 LP',7,'14×50'],['250P48',48,2,25000,56,720,'14×8',9,'14×38'],['300P48',48,2,30000,56,720,'16×8',9,'14×42'],['400P48',48,2,40000,56,720,'20×8 LP',7.5,'14×50'],['500P48',48,3,50000,56,720,'16×8 LP',7,'14×60'],['600P48',48,3,60000,56,720,'20×8 LP',7.5,'16×72']],
+  // Single-row head / boot dimensions (in) by head pulley: A B C boot, F G H I head, M head width, W head envelope
+  legDims:{16:{A:34,B:60,C:14,F:36,G:29,H:58,I:65,KL:'12×16',M:35,NO:'14×10',S:30,W:122},24:{A:42,B:60,C:22,F:36,G:33,H:66,I:69,KL:'12×16',M:42,NO:'16×13',S:30,W:122},30:{A:52,B:60,C:28,F:46.5,G:42,H:84,I:88.5,KL:'18×18',M:50,NO:'20×14',S:37,W:137},
+    36:{A:58,B:60,C:34,F:46.5,G:48,H:96,I:94.5,KL:'18×18',M:53,NO:'20×14',S:34,W:137},42:{A:67,B:72,C:39,F:58.5,G:60,H:108,I:118.5,KL:'22×22',M:62,NO:'24×16',S:50,W:171},48:{A:73,B:72,C:45,F:58.5,G:60,H:120,I:118.5,KL:'24×26',M:69,NO:'28×18',S:62,W:212}},
+  // ── Select en-masse chain conveyors: [W, H, bu/hr per ft/min, overall W, overall H]; speeds 100/140/180 fpm; max incline ~15°
+  enmasse:[[9,12,21,13,14.53],[12,12,28,16,14.61],[16,12,37,20,14.71],[16,14,47,20,16.71],[21,14,62,25,16.84],[14,20,66,18,22.66],[16,20,75,20,22.71],[20,20,94,24,22.82],[26,20,122,30,22.97],[32,20,150,36,23.13],[26,26,164,30,28.97],[32,26,202,36,29.13],[32,32,260,36,35.13],[36,32,293,40,35.24]],
+  enmasseMaxLenFt:{12:300,14:280,20:300,26:290,32:215},
+  hiflight:[[16,20,48],[32,20,96]],            // [W,H, bu/hr per ft/min], 15°–60° incline
+  underBin:[[12,12,10000,24,72],[16,12,10000,24,90],[21,12,10000,24,90]],   // [W,H,bu/hr,bin dia min,max]
+  belt:{24:[[400,8000],[630,13000]],30:[[415,13000],[640,20000]],36:[[466,20000],[700,30000]],42:[[541,30000],[721,40000]],48:[[435,30000],[580,40000],[725,50000]],54:[[480,40000],[600,50000],[720,60000]]}, // belt width in: [[fpm, bu/hr]…]
+  augers:[['8″ horizontal power head',8,2500],['8″ 25° incline power head',8,2000],['10″ horizontal power head',10,4000],['10″ 25° incline power head',10,4000],['10″ vertical power head (16′6″)',10,3750],['12″ vertical power head (16′6″)',12,5000],['6″ vertical bin unload',6,1250],['8″ vertical bin unload',8,2500],['10″ vertical bin unload',10,3750]],
+  // ── Fans (GS-042): [model, type, rpm, HP, dia in, CFM at 0,1,2,3,4,5,6,8,10 in w.c.]
+  fans:[['AF-12','axial',3450,1,12,[2200,1450,700,300]],['AF-14','axial',3450,1,14,[3500,2500,1350,820]],['AF-1.5','axial',3450,1.5,18,[5500,4330,2750,1500]],['AF-3','axial',3450,3,18,[6900,6210,4830,3150,1870]],['AF-7','axial',3450,7,24,[14000,12800,11500,10000,7400,4800]],['AF-10','axial',3450,10,24,[15300,13810,12240,10540,7580,3950]],['AF-158','axial',3450,15,28,[21500,19800,18000,16000,13600,10700,7000]],
+    ['ILC-1.5','inline',3450,1.5,12,[2650,2450,2300,2100,1850,1500]],['ILC-318','inline',3450,3,13,[4550,4300,4000,3750,3500,3100,2700]],['ILC-324','inline',3450,3,15,[5000,4725,4450,4200,3950,3600,3200]],['ILC-7','inline',3450,7,15,[5400,5150,4900,4650,4400,4100,3800]],['ILC-10','inline',3450,10,18,[6150,5950,5800,5600,5450,5250,5050,4650,4200]],['ILC-15','inline',3450,15,18,[7950,7700,7500,7250,7000,6800,6500,6000,5400]],
+    ['CF-3','centrifugal',1750,3,22,[6000,5500,5000,4500,4000,2500]],['CF-5','centrifugal',1750,5,24,[9500,8950,7750,6750,6100,5350]],['CF-7.5','centrifugal',1750,7.5,24,[12200,11600,10800,10000,9100,8000]],['CF-10','centrifugal',1750,10,27,[16050,15000,14150,13300,12400,11350,10000,3400]],['CF-15','centrifugal',1750,15,27,[18200,17100,16250,15300,14250,12700,11750,8750]],['CF-20','centrifugal',1750,20,30,[23700,22850,21850,20600,19550,18600,17200,14600]],['CF-25','centrifugal',1750,25,30,[24000,23750,22750,21750,21000,20000,19000,16000]],
+    ['CF-30','centrifugal',1750,30,33,[28100,26900,25600,24600,23600,22500,21000,19700,16000]],['CF-40','centrifugal',1750,40,33,[32750,31750,30750,29750,28750,27750,26750,24250,20250]],['CF-50','centrifugal',1750,50,33,[36680,35560,34440,33320,32200,31080,29960,27160,22680]]],
+  fanSP:[0,1,2,3,4,5,6,8,10],
+  // High-speed centrifugal (3500 rpm, not with heaters): [model, HP, wheel in, CFM at 0,4,8,12,16,20 in w.c.]
+  fansHS:[['CHS-3',3,15,[3350,2450,1750]],['CHS-5',5,15,[4900,4000,2900]],['CHS-7.5',7.5,18,[5000,4500,3900,3250]],['CHS-10',10,18,[7250,6300,5450,4300]],['CHS-15',15,18,[10100,9000,7900,6600]],['CHS-20',20,22,[10900,9850,8800,7550,6500,4000]],['CHS-30',30,22,[14500,13100,11500,10400,9100,6000]],['CHS-40',40,22,[19000,17750,16500,15000,13125,9000]],['CHS-50',50,24,[22600,20500,19000,17600,16000,13500]]],
+  fanHSSP:[0,4,8,12,16,20],
+  heaters:[['VHD-18','18″ axial, vapor/NG, 50k–1.4M BTU/hr'],['VHD-24','24″ axial, LP/vapor/NG, 100k–2.1M'],['VHD-26','26″ axial, 100k–2.7M'],['VHD-28','28″ axial, 100k–3.0M'],['CRH-26VN','Chi-Town upstream, 5–40 HP centrifugal, 500k–1.1M'],['CHD-15','centrifugal downstream, 10–15 HP, 0.8–2.3M'],['CHD-30','centrifugal downstream, 20–30 HP, 1.2–3.3M'],['CHD-40','centrifugal downstream, 40–50 HP, 1.5–4.2M']],
+  // ── Sweeps / unloads (GS-018): [model, bu/hr max, bin dia min, max, note]
+  sweeps:[['Standard carry-in sweep 6–8″',2250,15,42,'manual carry-in, 5″ flight'],['Standard carry-in sweep 10″',2250,24,48,'7″ flight'],['Direct-gear-drive sweep 8″',2500,15,48,'1,500–2,500 bu/hr'],['Direct-gear-drive sweep 10″',5000,24,72,'2,000–5,000 bu/hr'],['Chain Loop power sweep',4500,24,72,'8/10/12″ unload'],['UBC Powersweep 10″',4500,24,72,''],['U-Trough 7.25″ (9″ flight, 11″ trough)',7500,15,78,'5,000–7,500 bu/hr'],['U-Trough 8.25″',7500,30,78,'5,000–7,500 bu/hr'],['Paddle sweep, direct-gear-drive',5000,15,66,''],['Farm Duty Interceptor',5500,15,60,'1,000–5,500 bu/hr'],['Leave-In 10–12″',6500,30,105,'1,500–6,500 bu/hr'],['X-Series 12–16″',10000,30,156,'3,000–10,000 bu/hr']],
+  utroughHp:[[21,5,7.5],[24,7.5,7.5],[33,7.5,10],[42,10,10],[48,15,15],[54,15,20],[60,20,20],[78,25,25]],   // [bin dia ≤, horizontal HP, incline HP]
+  // ── QuickBolt towers / catwalks (GS-201): towers [model, footprint ft, min H, max H, single-leg pulley max, twin-leg pulley max]
+  towers:[['QB RTO 8′',8,45,100,48,30],['QB RTO 10′',10,45,140,48,42],['QB RTO 12′',12,45,150,48,48]],
+  catwalks:{HT60:[[35,425],[40,355],[45,270],[50,220],[55,180],[60,115]],HT80:[[55,425],[60,365],[65,268],[70,247],[75,185],[80,131]],HT120:[[80,460],[85,369],[90,294],[95,211],[100,160],[105,96]],HT170:[[105,349],[110,282],[115,210],[120,162],[125,105]],
+    WT180:[[100,465],[105,435],[110,410],[115,385],[120,370],[125,340],[130,315],[140,260],[150,150],[160,100]],WT200:[[120,480],[125,450],[130,430],[140,365],[150,280]],WT250:[[150,510],[160,450],[170,380],[180,260],[190,210]]},
+  spreaders:[['GSI Gravity Spreader',15,72,10000],['AD 16-3000',42,135,4000],['AD 16-5000',42,135,8000],['AD 16-12000',42,135,12000],['AD 16-2-20000',42,135,24000],['AD 16-2-40000',42,135,40000]]
+};
+// ── Catalog helpers ──
+function gsiBinDiams(model){ const m=GSI.bins[model]; if(!m) return []; return m.diams||Object.keys(m.rings).map(Number); }
+function gsiBinRingRange(model,diam){ const m=GSI.bins[model]; if(!m) return null; if(m.rings) return m.rings[diam]||null; const l=GSI.binLin[diam]; if(!l) return null; return [model==='4032'&&diam===135?19:l[0],l[1]]; }
+// Capacity, eave, peak and spec for a 40-Series bin; null when GSI does not publish that combination
+function gsiBinSpec(model,diam,rings){
+  const m=GSI.bins[model]; if(!m) return null; const rr=gsiBinRingRange(model,diam); if(!rr||rings<rr[0]||rings>rr[1]) return null;
+  let cap, rise;
+  if(m.rings){ const src=GSI.bins[m.useCapOf||model]; const row=src.cap[diam]; if(!row) return null; cap=row[1][rings-row[0]]; rise=ftIn(src.rise[diam]); }
+  else { const l=GSI.binLin[diam]; if(!l) return null; cap=l[2]+(rings-l[0])*l[3]; rise=ftIn(l[4]); }
+  if(cap==null) return null;
+  const eave=(rings*m.ringIn+m.eaveAdjIn)/12;
+  return {model,diam,rings,cap,eaveFt:eave,peakFt:eave+rise,riseFt:rise,ringIn:m.ringIn,stiff:m.stiff,corr:m.corr,roofLoad:m.roofLoad,name:m.name};
+}
+function gsiHopperDiams(model){ const h=GSI.hoppers[model]; if(!h) return []; if(h.rows&&!Array.isArray(h.rows)) return Object.keys(h.rows).map(Number); return [...new Set(h.rows.map(r=>r[1]))].sort((a,b)=>a-b); }
+function gsiHopperAngles(model,diam){ const h=GSI.hoppers[model]; if(!h) return []; if(!Array.isArray(h.rows)) return [h.angle]; return [...new Set(h.rows.filter(r=>r[1]===diam).map(r=>r[0]))]; }
+function gsiHopperRingRange(model,diam,angle){ const h=GSI.hoppers[model]; if(!h) return null; if(!Array.isArray(h.rows)){ const rows=h.rows[diam]; if(!rows) return null; const s=h.start[diam]; return [s,s+rows.length-1]; } const r=h.rows.find(x=>x[1]===diam&&x[0]===angle); return r?[r[2],r[3]]:null; }
+function gsiHopperSpec(model,diam,rings,angle){
+  const h=GSI.hoppers[model]; if(!h) return null;
+  if(model==='GHT'){ const rows=h.rows[diam]; if(!rows) return null; const i=rings-h.start[diam]; if(i<0||i>=rows.length) return null; const peak=ftIn(rows[i][1]); const rise=(diam/2)*Math.tan(Math.PI/6); return {model,diam,rings,angle:45,cap:rows[i][0],eaveFt:peak-rise,peakFt:peak,clearIn:h.clearIn,ringIn:h.ringIn,stiff:h.stiff,name:h.name}; }
+  if(model==='FCHTC'){ const rows=h.rows[diam]; if(!rows) return null; const i=rings-h.start[diam]; if(i<0||i>=rows.length) return null; return {model,diam,rings,angle:45,cap:rows[i][0],eaveFt:ftIn(rows[i][1]),peakFt:ftIn(rows[i][2]),clearIn:h.clearIn,ringIn:h.ringIn,stiff:h.stiff,name:h.name}; }
+  const r=h.rows.find(x=>x[1]===diam&&x[0]===angle); if(!r||rings<r[2]||rings>r[3]) return null;
+  const eave=ftIn(r[6])+(rings-r[2])*(32/12); return {model,diam,rings,angle,cap:r[4]+(rings-r[2])*r[5],eaveFt:eave,peakFt:eave+ftIn(r[7]),clearIn:r[8],ringIn:h.ringIn,stiff:h.stiff,name:h.name};
+}
+function gsiFan(model){ const f=GSI.fans.find(x=>x[0]===model); if(f) return {model:f[0],type:f[1],rpm:f[2],hp:f[3],dia:f[4],cfm:f[5],sp:GSI.fanSP}; const h=GSI.fansHS.find(x=>x[0]===model); return h?{model:h[0],type:'centrifugal',rpm:3500,hp:h[1],dia:h[2],cfm:h[3],sp:GSI.fanHSSP,highSpeed:true}:null; }
+// Fan CFM at a static pressure, linear between published points; 0 beyond the curve
+function fanCfmAt(fan,sp){ const xs=fan.sp.slice(0,fan.cfm.length), ys=fan.cfm; if(sp<=xs[0]) return ys[0]; for(let i=1;i<xs.length;i++){ if(sp<=xs[i]) return ys[i-1]+(ys[i]-ys[i-1])*(sp-xs[i-1])/(xs[i]-xs[i-1]); } return 0; }
+// Static pressure through shelled corn (ASAE D272.3, Shedd): ΔP/L = a·Q² / ln(1+b·Q), a=2.07e4 Pa·s²/m⁴, b=30.4
+function cornStaticInWC(cfmPerFt2, depthFt, packing=1.3){ const Q=cfmPerFt2*0.00508; if(Q<=0) return 0; const paPerM=2.07e4*Q*Q/Math.log(1+30.4*Q); return paPerM*packing*(depthFt*0.3048)/249.1; }
+// Operating point of a set of fans on a bin full of corn: total CFM where fan curve meets grain resistance
+function binAeration(bin,fans){
+  const bu=bushels(bin,'corn'); const area=Math.PI*(bin.diam/2)**2; const depth=sidewallHt(bin)*0.95+ (roofHt(bin)*0.35);
+  if(!fans.length||bu<=0) return null;
+  let lo=0, hi=fans.reduce((s,f)=>s+f.cfm[0],0), cfm=0;
+  for(let i=0;i<40;i++){ cfm=(lo+hi)/2; const sp=cornStaticInWC(cfm/area,depth); const supply=fans.reduce((s,f)=>s+fanCfmAt(f,sp),0); if(supply>cfm) lo=cfm; else hi=cfm; }
+  const sp=cornStaticInWC(cfm/area,depth); return {cfm,sp,cfmPerBu:cfm/bu,bu,depthFt:depth};
+}
+function gsiLeg(model){ const r=GSI.legs.find(x=>x[0]===model); if(!r) return null; const d=GSI.legDims[r[1]]; const t=r[8].split('×').map(Number); return {model:r[0],pulley:r[1],rows:r[2],bph:r[3],rpm:r[4],fpm:r[5],cup:r[6],spacing:r[7],trunk:r[8],trunkW:t[0],trunkD:t[1],dims:d}; }
+function gsiUtroughHp(diam,incline){ const row=GSI.utroughHp.find(r=>diam<=r[0])||GSI.utroughHp[GSI.utroughHp.length-1]; return incline?row[2]:row[1]; }
+function catwalkAllowed(truss,spanFt){ const t=GSI.catwalks[truss]; if(!t) return null; if(spanFt<t[0][0]) return t[0][1]; for(let i=1;i<t.length;i++){ if(spanFt<=t[i][0]){ const [s0,l0]=t[i-1],[s1,l1]=t[i]; return l0+(l1-l0)*(spanFt-s0)/(s1-s0); } } return null; }
+function catwalkMaxSpan(truss){ const t=GSI.catwalks[truss]; return t?t[t.length-1][0]:null; }
+
 const ROCK_TYPES = [
   { label:'Crushed Limestone',      density:1.50 },
   { label:'Dense Graded Aggregate', density:1.45 },
@@ -595,6 +734,7 @@ function coneHtCalc(bin) {
   return (bin.diam/2) * Math.tan(((bin.coneAngleDeg||45)*Math.PI/180));
 }
 function eaveHt(bin) {
+  if(bin.gsiEaveFt>0) return (bin.foundFt||0)+bin.gsiEaveFt; // GSI-published eave
   const sw=(bin.ringCount*bin.ringIn)/12;
   if ((bin.bottomType||'flat') === 'cone') {
     return (bin.foundFt||0) + (bin.coneLegHt||3) + coneHtCalc(bin) + sw;
@@ -608,6 +748,7 @@ const DEFAULT_ROOF_DEG=30;
 function isRoofAuto(bin) { return bin.roofAuto!==false; }
 function roofHtFromAngle(diam,deg) { return (diam/2)*Math.tan(((+deg||DEFAULT_ROOF_DEG)*Math.PI)/180); }
 function roofHt(bin) {
+  if(bin.gsiPeakFt>0&&bin.gsiEaveFt>0) return bin.gsiPeakFt-bin.gsiEaveFt; // GSI-published peak − eave
   if(!isRoofAuto(bin)) return +bin.roofFt||0;
   return Math.round(roofHtFromAngle(bin.diam,bin.roofDeg)*100)/100;
 }
@@ -615,6 +756,7 @@ function roofDegOf(bin) { return isRoofAuto(bin)?(+bin.roofDeg||DEFAULT_ROOF_DEG
 function peakHt(bin)  { return eaveHt(bin)+roofHt(bin); }
 function sidewallHt(bin) { return (bin.ringCount*bin.ringIn)/12; }
 function bushels(bin,gt) {
+  if(bin.gsiBu>0) return bin.gsiBu*1.2445/(GRAIN_DENS[gt]||1.2445); // GSI table bushels, scaled by the app's grain factor
   const r=bin.diam/2, h=sidewallHt(bin);
   // Hopper-bottom tanks also hold grain in the cone (full cone volume)
   const coneVol=(bin.bottomType||'flat')==='cone' ? (1/3)*Math.PI*r*r*coneHtCalc(bin) : 0;
@@ -686,6 +828,161 @@ window.setSelRemovedPhase = function(ph) {
   renderProperties(); autoSave();
 };
 
+// ── GSI bins: apply a catalog model to a bin object ───────────
+// A bin with gsiModel takes GSI's exact eave, peak and bushels; diameter and rings are limited to
+// what GSI publishes. Custom (gsiModel '') keeps the free-form geometry.
+function binSpec(bin){
+  if(!bin.gsiModel) return null;
+  if(GSI.bins[bin.gsiModel]) return gsiBinSpec(bin.gsiModel,+bin.diam,+bin.ringCount);
+  if(GSI.hoppers[bin.gsiModel]) return gsiHopperSpec(bin.gsiModel,+bin.diam,+bin.ringCount,+bin.coneAngleDeg||45);
+  return null;
+}
+function applyGsiBin(bin){
+  if(!bin.gsiModel){ delete bin.gsiEaveFt; delete bin.gsiPeakFt; delete bin.gsiBu; return; }
+  const isHop=!!GSI.hoppers[bin.gsiModel];
+  // Snap diameter and rings into the published range for this model
+  const diams=isHop?gsiHopperDiams(bin.gsiModel):gsiBinDiams(bin.gsiModel);
+  if(!diams.includes(+bin.diam)) bin.diam=diams.reduce((a,b)=>Math.abs(b-bin.diam)<Math.abs(a-bin.diam)?b:a);
+  if(isHop){ const angs=gsiHopperAngles(bin.gsiModel,+bin.diam); if(!angs.includes(+bin.coneAngleDeg)) bin.coneAngleDeg=angs[0]; }
+  const rr=isHop?gsiHopperRingRange(bin.gsiModel,+bin.diam,+bin.coneAngleDeg):gsiBinRingRange(bin.gsiModel,+bin.diam);
+  if(rr){ bin.ringCount=Math.max(rr[0],Math.min(rr[1],+bin.ringCount||rr[0])); }
+  const sp=binSpec(bin); if(!sp) return;
+  bin.ringIn=sp.ringIn; bin.stiffened=sp.stiff>0; bin.roofAuto=false; bin.roofFt=Math.round((sp.peakFt-sp.eaveFt)*100)/100;
+  bin.gsiEaveFt=sp.eaveFt; bin.gsiPeakFt=sp.peakFt; bin.gsiBu=sp.cap; bin.model=sp.model+' '+sp.diam+'′×'+sp.rings;
+  if(isHop){ bin.bottomType='cone'; bin.coneAngleDeg=sp.angle; bin.coneLegHt=Math.round(sp.clearIn/12*100)/100; }
+  else bin.bottomType='flat';
+}
+function gsiBinModelOpts(cur){
+  const g=[['','Custom (enter dimensions)']];
+  const bins=Object.keys(GSI.bins).map(k=>[k,GSI.bins[k].name]), hops=Object.keys(GSI.hoppers).map(k=>[k,GSI.hoppers[k].name]);
+  const opt=([v,l])=>`<option value="${v}"${(cur||'')===v?' selected':''}>${l}</option>`;
+  return g.map(opt).join('')+`<optgroup label="GSI 40-Series flat-bottom">${bins.map(opt).join('')}</optgroup><optgroup label="GSI hopper tanks">${hops.map(opt).join('')}</optgroup>`;
+}
+// Fan model options (GS-042) grouped by family, with Custom first
+function gsiFanOpts(cur){
+  const opt=f=>`<option value="${f[0]}"${cur===f[0]?' selected':''}>${f[0]} · ${f[3]} HP · ${f[4]}″ · ${f[5][0].toLocaleString()} cfm</option>`;
+  const grp=(lbl,list)=>`<optgroup label="${lbl}">${list.map(opt).join('')}</optgroup>`;
+  return `<option value=""${!cur?' selected':''}>Custom</option>`+grp('AF vane-axial',GSI.fans.filter(f=>f[1]==='axial'))+grp('ILC in-line centrifugal',GSI.fans.filter(f=>f[1]==='inline'))+grp('CF centrifugal 1750 rpm',GSI.fans.filter(f=>f[1]==='centrifugal'))
+    +`<optgroup label="CHS high-speed centrifugal 3500 rpm">${GSI.fansHS.map(h=>`<option value="${h[0]}"${cur===h[0]?' selected':''}>${h[0]} · ${h[1]} HP · ${h[2]}″ wheel · ${h[3][0].toLocaleString()} cfm</option>`).join('')}</optgroup>`;
+}
+function applyGsiFan(f,model){ const g=gsiFan(model); f.model=model||''; if(!g) return; f.type=g.type; f.hp=g.hp; f.diaIn=g.dia; }
+// Every fan on a bin as catalog curves (custom fans without a model are skipped)
+function binFanCurves(bin){
+  const list=[]; if(bin.showFan&&bin.fanModel){ const g=gsiFan(bin.fanModel); if(g) list.push(g); }
+  (bin.fans||[]).forEach(f=>{ if(f.model){ const g=gsiFan(f.model); if(g) list.push(g); } });
+  return list;
+}
+function gsiSweepOpts(cur,diam){
+  return `<option value=""${!cur?' selected':''}>Custom / not specified</option>`+GSI.sweeps.map(s=>{ const fits=diam>=s[2]&&diam<=s[3]; return `<option value="${s[0]}"${cur===s[0]?' selected':''}${fits?'':' disabled'}>${s[0]} · to ${s[1].toLocaleString()} bu/hr · ${s[2]}′–${s[3]}′${fits?'':' (not for this diameter)'}</option>`; }).join('');
+}
+function applyGsiSweep(bin,model){
+  bin.unloadModel=model||''; const s=GSI.sweeps.find(x=>x[0]===model); if(!s) return;
+  bin.unloadBph=s[1];
+  if(/U-Trough/.test(model)) bin.unloadHp=gsiUtroughHp(+bin.diam,false);
+}
+
+// ── GSI dryers ────────────────────────────────────────────────
+function gsiDryerOpts(cur){
+  const opt=(v,l)=>`<option value="${v}"${(cur||'')===v?' selected':''}>${l}</option>`;
+  return opt('','Custom (enter dimensions)')
+    +`<optgroup label="GSI portable dryers">${GSI.dryersPortable.map(r=>opt(r[0],`${r[0]} · ${r[1]} mod / ${r[2]} fan · dry&cool ${r[5].toLocaleString()} bph (20→15)`)).join('')}</optgroup>`
+    +`<optgroup label="GSI T-Series tower dryers">${GSI.dryersTower.map(r=>opt(r[0],`${r[0]} · ${r[1]}′ tower · ${r[10].toLocaleString()} bph (20→15)`)).join('')}</optgroup>`
+    +`<optgroup label="GSI modular tower dryers">${GSI.dryersModular.map(r=>opt(r[0],`${r[0]} · ${r[8].toLocaleString()} bph (20→15)`)).join('')}</optgroup>`;
+}
+function applyGsiDryer(d,model){
+  d.gsiModel=model||''; if(!model){ delete d.gsiSpec; return; }
+  const p=GSI.dryersPortable.find(r=>r[0]===model);
+  if(p){
+    const n=p[1], L=ftIn(p[8]), W=ftIn(p[9]), H=ftIn(p[10]);
+    d.dryerType='portable'; d.shape='rect'; d.modules=n; d.baseHtFt=3;
+    d.moduleDims=Array.from({length:n},()=>({lenFt:Math.round(L*10)/10,widFt:Math.round(W*10)/10,htFt:Math.round((H-3)/n*100)/100}));
+    d.dryerFans=p[12].map(f=>({hp:f[0],diaIn:f[1],module:f[2],side:'back',offFt:0,fanType:'axial'}));
+    d.holdBu=p[7]; d.dryBph=p[5]; d.dryBph25=p[6]; d.fullHeat20=p[3]; d.fullHeat25=p[4]; d.heaters=p[11]; d.amps460=p[13]; d.threePhase=true; d.motorHp=15;
+    d.model='GSI '+model; d.gsiSpec={kind:'portable',L:p[8],W:p[9],H:p[10]}; dryerStack(d); return;
+  }
+  const t=GSI.dryersTower.find(r=>r[0]===model);
+  if(t){
+    d.dryerType='tower'; d.shape='cylinder'; d.diamFt=t[1]; d.htFt=Math.round(ftIn(t[3])*10)/10; d.catwalkDiaFt=t[2];
+    const nf=t[1]===12?1:3; d.dryerFans=Array.from({length:nf},()=>({hp:Math.round(t[4]/nf*10)/10,diaIn:t[1]===12?60:42,module:1,side:'back',fanType:'centrifugal'}));
+    d.holdBu=t[9]; d.wetHoldBu=t[8]; d.dryBph=t[10]; d.dryBph25=t[11]; d.motorHp=t[5]; d.amps=t[6]; d.burnerMBTU=t[12]; d.dryCfm=t[7]; d.threePhase=true;
+    d.model='GSI '+model; d.gsiSpec={kind:'tower'}; return;
+  }
+  const m=GSI.dryersModular.find(r=>r[0]===model);
+  if(m){
+    d.dryerType='tower'; d.shape='cylinder'; d.diamFt=Math.round(ftIn(m[1])*10)/10; d.htFt=Math.round(ftIn(m[2])*10)/10; d.catwalkDiaFt=15.6;
+    d.dryerFans=[{hp:m[3],diaIn:m[0]==='TM-1015'?48:43,module:1,side:'back',fanType:'axial'}];
+    d.holdBu=m[7]; d.dryBph=m[8]; d.dryBph25=m[9]; d.dryBphMinCool=m[10]; d.motorHp=5; d.amps=m[4]; d.burnerBTU=m[6]; d.dryCfm=m[5]; d.threePhase=true;
+    d.model='GSI '+model; d.gsiSpec={kind:'modular'}; return;
+  }
+  d.gsiModel=''; delete d.gsiSpec;
+}
+function gsiDryerSpecHTML(d){
+  if(!d.gsiModel) return '';
+  const p=GSI.dryersPortable.find(r=>r[0]===d.gsiModel), t=GSI.dryersTower.find(r=>r[0]===d.gsiModel), m=GSI.dryersModular.find(r=>r[0]===d.gsiModel);
+  const row=(l,v)=>`<div class="crow"><span class="lbl">${l}</span><span class="val">${v}</span></div>`;
+  if(p) return `<div class="cbox" style="margin-bottom:6px">${row('Installed L × W × H',`${p[8].replace('-','′')}″ × ${p[9].replace('-','′')}″ × ${p[10].replace('-','′')}″`)}${row('Full heat',`${p[3].toLocaleString()} bph (20→15) · ${p[4].toLocaleString()} (25→15)`)}${row('Dry & cool',`${p[5].toLocaleString()} bph (20→15) · ${p[6].toLocaleString()} (25→15)`)}${row('Holding',p[7].toLocaleString()+' bu')}${row('Heaters',p[11]+' BTU/hr')}${row('Fans (3-ph)',p[12].map(f=>f[0]+' HP '+f[1]+'″').join(' + '))}${row('Amps @ 460 V',p[13])}</div>
+    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">GSI capacities are wet bushels of #2 yellow corn, "estimates based on drying principles, field results and computer simulation". Full heat assumes cooling in the bin.</p>`;
+  if(t) return `<div class="cbox" style="margin-bottom:6px">${row('Tower',`${t[1]}′ dia (${t[2]}′ with catwalks) · ${t[3].replace('-','′')}″ tall`)}${row('Throughput',`${t[10].toLocaleString()} bph (20→15) · ${t[11].toLocaleString()} (25→15)`)}${row('Holding',`${t[9].toLocaleString()} bu dryer · ${t[8]} bu wet`)}${row('Blower / metering',`${t[4]} HP${t[1]>12?' (3 blowers)':''} · ${t[5]} HP`)}${row('Main breaker 230/460 V',t[6]+' A')}${row('Burner',t[12]+' MBTU/hr · drying '+t[7].toLocaleString()+' cfm')}</div><p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Discharge 40″; height excludes the optional fill pipe. NG or LP.</p>`;
+  if(m) return `<div class="cbox" style="margin-bottom:6px">${row('Tower',`${m[1].replace('-','′')}″ dia (15′7″ with catwalks) · ${m[2].replace('-','′')}″ tall`)}${row('Throughput, max cool',`${m[8].toLocaleString()} bph (20→15) · ${m[9].toLocaleString()} (25→15)`)}${row('With dryeration',`${m[10].toLocaleString()} bph (20→15) · ${m[11].toLocaleString()} (25→15)`)}${row('Holding',m[7].toLocaleString()+' bu')}${row('Blower',m[3]+' HP axial · '+m[5].toLocaleString()+' cfm')}${row('Burner',(m[6]/1e6).toFixed(1)+' M BTU/hr')}${row('Main breaker 230/460 V',m[4]+' A')}</div>`;
+  return '';
+}
+// ── GSI bucket elevators ──────────────────────────────────────
+function gsiLegOpts(cur){
+  const groups={}; GSI.legs.forEach(r=>{ (groups[r[1]]=groups[r[1]]||[]).push(r); });
+  return `<option value=""${!cur?' selected':''}>Custom (enter capacity)</option>`+Object.keys(groups).map(p=>`<optgroup label="${p}″ head pulley">${groups[p].map(r=>`<option value="${r[0]}"${cur===r[0]?' selected':''}>${r[0]} · ${r[3].toLocaleString()} bu/hr${r[2]>1?' · '+r[2]+'-row':''} · ${r[8]} trunking</option>`).join('')}</optgroup>`).join('');
+}
+function applyGsiLeg(leg,model){
+  leg.gsiModel=model||''; const g=gsiLeg(model); if(!g){ leg.gsiModel=''; delete leg.gsiSpec; return; }
+  leg.capBph=g.bph; leg.caseDiamIn=g.trunkW; leg.trunkDIn=g.trunkD; leg.pulleyIn=g.pulley; leg.cupRows=g.rows; leg.model='GSI '+model; leg.gsiSpec=g;
+}
+function legTowerOpts(cur){ return `<option value="0"${!cur?' selected':''}>None (self-supporting / guyed)</option>`+GSI.towers.map(t=>`<option value="${t[1]}"${+cur===t[1]?' selected':''}>${t[0]} QuickBolt · ${t[1]}′×${t[1]}′ · ${t[2]}′–${t[3]}′</option>`).join(''); }
+// ── GSI conveyors ─────────────────────────────────────────────
+function gsiConvOpts(cv){
+  const cur=cv.gsiModel||''; const opt=(v,l)=>`<option value="${v}"${cur===v?' selected':''}>${l}</option>`;
+  if(cv.type==='auger') return opt('','Custom')+`<optgroup label="GSI augers &amp; power heads">${GSI.augers.map(a=>opt(a[0],`${a[0]} · ${a[2].toLocaleString()} bu/hr`)).join('')}</optgroup>`;
+  if(cv.type==='highflight') return opt('','Custom / legacy box size')+`<optgroup label="GSI Select Hi-Flight (15°–60°)">${GSI.hiflight.map(h=>opt(`HF${h[0]}x${h[1]}`,`Hi-Flight ${h[0]}″ × ${h[1]}″ · ${h[2]} bu/hr per ft/min`)).join('')}</optgroup>`;
+  if(cv.type==='drag') return opt('','Custom')+`<optgroup label="GSI Select / Select IS en-masse (≈15° max)">${GSI.enmasse.map(e=>opt(`EM${e[0]}x${e[1]}`,`Select ${e[0]}″ × ${e[1]}″ · ${(e[2]*140).toLocaleString()} bu/hr @ 140 fpm`)).join('')}</optgroup>`
+    +`<optgroup label="GSI under-bin chain conveyors">${GSI.underBin.map(u=>opt(`UB${u[0]}x${u[1]}`,`Under-bin ${u[0]}″ × ${u[1]}″ · to ${u[2].toLocaleString()} bu/hr · bins ${u[3]}′–${u[4]}′`)).join('')}</optgroup>`
+    +`<optgroup label="GSI Select enclosed belt conveyors">${Object.keys(GSI.belt).map(w=>opt(`BELT${w}`,`Select belt ${w}″ · ${GSI.belt[w][0][1].toLocaleString()}–${GSI.belt[w][GSI.belt[w].length-1][1].toLocaleString()} bu/hr`)).join('')}</optgroup>`;
+  return '';
+}
+function gsiConvSpeeds(cv){
+  const m=cv.gsiModel||'';
+  if(/^(EM|HF)/.test(m)) return [100,140,180];
+  if(/^BELT/.test(m)) return (GSI.belt[m.slice(4)]||[]).map(x=>x[0]);
+  return [];
+}
+function applyGsiConv(cv,model,fpm){
+  cv.gsiModel=model||''; if(!model){ delete cv.gsiSpec; return; }
+  if(cv.type==='auger'){ const a=GSI.augers.find(x=>x[0]===model); if(a){ cv.diamIn=a[1]; cv.capBph=a[2]; cv.model='GSI '+a[0]; cv.gsiSpec={kind:'auger'}; return; } cv.gsiModel=''; delete cv.gsiSpec; return; }
+  let mm;
+  if((mm=/^EM(\d+)x(\d+)$/.exec(model))){ const e=GSI.enmasse.find(x=>x[0]===+mm[1]&&x[1]===+mm[2]); if(e){ cv.fpm=[100,140,180].includes(+fpm)?+fpm:140; cv.boxWidIn=e[0]; cv.boxHtIn=e[1]; cv.capBph=Math.round(e[2]*cv.fpm); cv.model=`GSI Select ${e[0]}×${e[1]} en-masse`; cv.gsiSpec={kind:'enmasse',maxLenFt:GSI.enmasseMaxLenFt[e[1]]||null,maxDeg:15}; return; } }
+  if((mm=/^HF(\d+)x(\d+)$/.exec(model))){ const h=GSI.hiflight.find(x=>x[0]===+mm[1]&&x[1]===+mm[2]); if(h){ cv.fpm=[100,140,180].includes(+fpm)?+fpm:140; cv.boxWidIn=h[0]; cv.boxHtIn=h[1]; cv.capBph=Math.round(h[2]*cv.fpm); cv.model=`GSI Hi-Flight ${h[0]}×${h[1]}`; cv.gsiSpec={kind:'hiflight',minDeg:15,maxDeg:60}; return; } }
+  if((mm=/^UB(\d+)x(\d+)$/.exec(model))){ const u=GSI.underBin.find(x=>x[0]===+mm[1]&&x[1]===+mm[2]); if(u){ cv.boxWidIn=u[0]; cv.boxHtIn=u[1]; cv.capBph=u[2]; cv.model=`GSI under-bin ${u[0]}×${u[1]}`; cv.gsiSpec={kind:'underbin',binMin:u[3],binMax:u[4]}; return; } }
+  if((mm=/^BELT(\d+)$/.exec(model))){ const pts=GSI.belt[mm[1]]; if(pts){ const pick=pts.find(x=>x[0]===+fpm)||pts[0]; cv.fpm=pick[0]; cv.boxWidIn=+mm[1]+7; cv.boxHtIn=30; cv.capBph=pick[1]; cv.model=`GSI Select belt ${mm[1]}″`; cv.gsiSpec={kind:'belt',maxDeg:15}; return; } }
+  cv.gsiModel=''; delete cv.gsiSpec;
+}
+// ── GSI QuickBolt catwalk trusses ──────────────────────────────
+function trussOpts(cur){ return `<option value=""${!cur?' selected':''}>Not specified</option>`+Object.keys(GSI.catwalks).map(t=>`<option value="${t}"${cur===t?' selected':''}>${t} · spans to ${catwalkMaxSpan(t)}′</option>`).join(''); }
+// ── GSI equipment list for the report ─────────────────────────
+function gsiEquipmentHTML(){
+  const rows=[];
+  S.bins.forEach(b=>{ const sp=binSpec(b); rows.push({cat:'Bins & hopper tanks',name:b.name,model:sp?`${sp.model} ${sp.diam}′ × ${sp.rings} rings`:'Custom bin '+b.diam+'′ × '+b.ringCount,spec:sp?`${sp.cap.toLocaleString()} bu · eave ${ftInStr(sp.eaveFt)} · peak ${ftInStr(sp.peakFt)}`:Math.round(bushels(b,S.grainType)).toLocaleString()+' bu'});
+    if(b.showFan) rows.push({cat:'Aeration fans',name:b.name+' fan 1',model:b.fanModel||('Custom '+(b.fanType||'axial')),spec:(b.fanHp||0)+' HP'});
+    (b.fans||[]).forEach((f,i)=>rows.push({cat:'Aeration fans',name:b.name+' fan '+(i+2),model:f.model||('Custom '+(f.type||'axial')),spec:(f.hp||0)+' HP'}));
+    if(b.unloadModel) rows.push({cat:'Sweeps & unloads',name:b.name,model:b.unloadModel,spec:(+b.unloadBph||0).toLocaleString()+' bu/hr · '+(b.unloadHp||0)+' HP'}); });
+  S.dryers.forEach(d=>rows.push({cat:'Dryers',name:d.name,model:d.gsiModel?'GSI '+d.gsiModel:(d.model||'Custom'),spec:`${(+d.dryBph||0).toLocaleString()} bph (20→15)${d.dryBph25?' · '+(+d.dryBph25).toLocaleString()+' (25→15)':''} · ${(+d.holdBu||0).toLocaleString()} bu holding`}));
+  S.legs.forEach(l=>rows.push({cat:'Bucket elevators',name:l.name,model:l.gsiModel?'GSI '+l.gsiModel:'Custom leg',spec:`${(+l.capBph||0).toLocaleString()} bu/hr · ${l.ht}′ tall${l.towerFt?' · QuickBolt '+l.towerFt+'′ tower':''}`}));
+  S.conveyors.forEach(c=>rows.push({cat:'Conveyors',name:c.name,model:c.model||(c.type==='doublerun'?'Double-run (not a GSI product)':'Custom '+convTypeName(c.type)),spec:`${(+c.capBph||0).toLocaleString()} bu/hr${c.fpm?' @ '+c.fpm+' fpm':''}`}));
+  S.walkways.forEach(w=>rows.push({cat:'Catwalks',name:w.name,model:w.truss?'QuickBolt '+w.truss:'Catwalk (truss not specified)',spec:(w.widFt||3)+'′ wide'}));
+  if(!rows.length) return '';
+  const cats=[...new Set(rows.map(r=>r.cat))];
+  return `<div class="rpt-section">GSI Equipment List — for the dealer quote</div>
+  <table class="rpt-table"><thead><tr><th>Category</th><th>Object</th><th>Model</th><th>Spec</th></tr></thead><tbody>${cats.map(c=>rows.filter(r=>r.cat===c).map((r,i)=>`<tr><td>${i===0?c:''}</td><td>${escH(r.name)}</td><td>${escH(r.model)}</td><td>${escH(r.spec)}</td></tr>`).join('')).join('')}</tbody></table>
+  <table class="rpt-table"><thead><tr><th>Model</th><th>Qty</th></tr></thead><tbody>${Object.entries(rows.reduce((m,r)=>{ m[r.model]=(m[r.model]||0)+1; return m; },{})).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<tr><td>${escH(m)}</td><td class="num">${n}</td></tr>`).join('')}</tbody></table>
+  <p style="font-size:0.72em;color:#6b7280;margin:-8px 0 10px">Not published by GSI and needed from the dealer: leg motor HP vs. height, spout sizes, conveyor HP and max lengths, current roof load ratings, receiving pits.</p>`;
+}
+
 // ── BINS ─────────────────────────────────────────────────────
 function addBin(lat,lng) {
   const b={id:'bin_'+uid(),lat,lng,name:'Bin '+(S.bins.length+1),diam:48,ringCount:8,ringIn:42,roofDeg:DEFAULT_ROOF_DEG,roofAuto:true,roofFt:roofHtFromAngle(48,DEFAULT_ROOF_DEG),stiffened:false,
@@ -695,6 +992,7 @@ function addBin(lat,lng) {
     showStairs:false,stairsLandDeg:0,stairsWrapDeg:450,
     bottomType:'flat',coneLegHt:3,coneAngleDeg:45,
     phase:0, color:BIN_COLORS[S.bins.length%BIN_COLORS.length], cost:0, infraItems:[]};
+  b.gsiModel='4024'; applyGsiBin(b);
   S.bins.push(b); renderBin(b); select('bin',b.id); autoSave();
 }
 
@@ -770,7 +1068,7 @@ function renderBin(bin) {
   const cap=Math.round(bushels(bin,S.grainType));
   const foundLabel=bin.foundFt?` f:${bin.foundFt}′`:'';
   const coneLabel=(bin.bottomType||'flat')==='cone'?' ▽':'';
-  const lblMk=L.marker(ll,{icon:L.divIcon({html:`<div class="bin-lbl" style="color:${bin.color}">${bin.name}${coneLabel}<br><small>${bin.diam}′ · ${(cap/1000).toFixed(1)}k bu${foundLabel}</small></div>`,className:'',iconSize:[140,34],iconAnchor:[70,42]}),interactive:false}).addTo(map);
+  const lblMk=L.marker(ll,{icon:L.divIcon({html:`<div class="bin-lbl" style="color:${bin.color}">${bin.name}${coneLabel}<br><small>${bin.gsiModel?bin.gsiModel+' ':''}${bin.diam}′ · ${(cap/1000).toFixed(1)}k bu${foundLabel}</small></div>`,className:'',iconSize:[140,34],iconAnchor:[70,42]}),interactive:false}).addTo(map);
   LY.bins[bin.id]={circle,fanMk,xfanMks,unloadMk,unldLn,sdMk,sdMk2,stairArc,stairLandMk,stairEntryMk,lblMk};
   if(bin.hidden) applyLayerHidden(LY.bins[bin.id]);
 }
@@ -1179,16 +1477,8 @@ window.removeDryerFan = function(dryerId, idx) {
 // 3-phase power only.
 window.applyGsi2322 = function(dryerId) {
   const d=S.dryers.find(x=>x.id===dryerId); if(!d) return;
-  // GSI spec sheet: installed 31'10" L × 8'8" W × 25'11" H (excl. foundation supports), 14"×22' column,
-  // 1 × 30 HP 42" top fan + 2 × 15 HP 36" bottom fans, 7.5 HP top auger + 7.5 HP unload auger,
-  // 1,067 bu holding, 930 BPH (25→15%, dry & cool), 3-phase only.
-  d.dryerType='portable'; d.shape='rect'; d.modules=2; d.model='GSI 2322';
-  d.dryerFans=[{hp:30,module:2,side:'back',offFt:0,diaIn:42},{hp:15,module:1,side:'back',offFt:0,diaIn:36},{hp:15,module:1,side:'back',offFt:0,diaIn:36}];
-  d.moduleDims=[{lenFt:31.8,widFt:8.7,htFt:11.45},{lenFt:31.8,widFt:8.7,htFt:11.45}]; d.legHtFt=d.legHtFt||0; d.baseHtFt=3;
-  d.holdBu=1067; d.dryBph=930; d.threePhase=true; d.motorHp=15;
-  dryerStack(d);
-  renderDryer(d); renderProperties(); autoSave();
-  showToast('✓ GSI 2322: 31′10″ × 8′8″ × 25′11″ installed · 3 fans (60 HP) · 930 BPH · 3-phase power required');
+  applyGsiDryer(d,'2322'); renderDryer(d); renderProperties(); autoSave();
+  showToast('✓ GSI 2322 applied from the catalog');
 };
 
 // ── CONVEYOR ENDPOINT SNAP HELPERS ───────────────────────────
@@ -1756,6 +2046,9 @@ function walkwayHTML(ww) {
   <div class="fr"><label>From Bin</label><select id="wwb1">${binOpts1}</select></div>
   <div class="fr"><label>To Bin</label><select id="wwb2">${binOpts2}</select></div>
   <div class="fr"><label>Width (ft)</label><input type="number" id="wwwid" value="${ww.widFt||3}" min="2" max="12" step="0.5"/></div>
+  <div class="fr"><label>QuickBolt Truss</label><select id="wwtruss">${trussOpts(ww.truss)}</select></div>
+  <div class="fr"><label>Conveyor Load (lb/ft)</label><input type="number" id="wwload" value="${ww.loadLbFt||0}" min="0" max="2000" step="10"/></div>
+  ${ww.truss?(()=>{ const allow=catwalkAllowed(ww.truss,totalLen), mx=catwalkMaxSpan(ww.truss); const over=totalLen>mx; const heavy=allow!=null&&(+ww.loadLbFt||0)>allow; return `<p style="font-size:0.7em;color:${over||heavy?'#f59e0b':'#6b7280'};margin-bottom:3px">${ww.truss}: ${over?`⚠ ${totalLen.toFixed(0)}′ span is over the ${mx}′ limit for this truss.`:`allows ${allow!=null?Math.round(allow)+' lb/ft':'—'} of conveyor at a ${totalLen.toFixed(0)}′ span (GS-201).`}${heavy?' ⚠ The conveyor load entered exceeds that.':''} Walk-arounds add 2′; engineer-to-order spans go to 190′.</p>`; })():''}
   ${phaseRowHTML(ww.phase||0,ww.removedPhase||0)}
   <div class="cbox">
     <div class="crow"><span class="lbl">From Bin</span><span class="val">${b1?escH(b1.name):'—'}</span></div>
@@ -1777,9 +2070,10 @@ function bindWalkway(ww) {
     ww.binId1=document.getElementById('wwb1')?.value||ww.binId1;
     ww.binId2=document.getElementById('wwb2')?.value||ww.binId2;
     ww.widFt=+document.getElementById('wwwid')?.value||ww.widFt;
+    ww.truss=document.getElementById('wwtruss')?.value||''; ww.loadLbFt=+document.getElementById('wwload')?.value||0;
     renderWalkway(ww); renderProperties(); autoSave();
   }
-  ['wwn','wwb1','wwb2','wwwid'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  ['wwn','wwb1','wwb2','wwwid','wwtruss','wwload'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
 }
 
 // ── DUMP PIT ──────────────────────────────────────────────────
@@ -1829,6 +2123,7 @@ function addDryer(lat,lng) {
     moduleDims:[{lenFt:31.8,widFt:8.7,htFt:11.45},{lenFt:31.8,widFt:8.7,htFt:11.45}],legHtFt:0,baseHtFt:3,
     model:'GSI 2322',holdBu:1067,dryBph:930,threePhase:true,
     shape:'rect',htFt:25.9,widFt:8.7,lenFt:31.8,diamFt:12,headDeg:0,color:'#d97706',loadEnd:'tail',unloadEnd:'head',phase:0,foundHtFt:0,foundExtFt:0,motorHp:15,cost:0,infraItems:[]};
+  applyGsiDryer(d,'2322');
   S.dryers.push(d); renderDryer(d); select('dryer',d.id); autoSave();
 }
 function renderDryer(dr) {
@@ -2714,30 +3009,46 @@ function binHTML(bin) {
   return `<div class="ph">Grain Bin — ${bin.name}</div>
   <div class="fr"><label>Name</label><input type="text" id="pn" value="${escH(bin.name)}"/></div>
   <div class="ph">Dimensions</div>
-  <div class="fr"><label>Diameter (ft)</label><input type="number" id="pd" value="${bin.diam}" min="12" max="156" step="6"/></div>
+  <div class="fr"><label>GSI Model</label><select id="pgsi">${gsiBinModelOpts(bin.gsiModel)}</select></div>
+  ${(()=>{ const sp=binSpec(bin); if(!bin.gsiModel) return '';
+    const isHop=!!GSI.hoppers[bin.gsiModel]; const diams=isHop?gsiHopperDiams(bin.gsiModel):gsiBinDiams(bin.gsiModel);
+    const angs=isHop?gsiHopperAngles(bin.gsiModel,+bin.diam):[]; const rr=isHop?gsiHopperRingRange(bin.gsiModel,+bin.diam,+bin.coneAngleDeg):gsiBinRingRange(bin.gsiModel,+bin.diam);
+    const rings=rr?Array.from({length:rr[1]-rr[0]+1},(_,i)=>rr[0]+i):[+bin.ringCount];
+    return `<div class="fr"><label>Diameter (ft)</label><select id="pd">${diams.map(d=>`<option value="${d}"${+bin.diam===d?' selected':''}>${d}′</option>`).join('')}</select></div>
+    ${isHop&&angs.length>1?`<div class="fr"><label>Hopper Angle</label><select id="pconeang">${angs.map(a=>`<option value="${a}"${+bin.coneAngleDeg===a?' selected':''}>${a}°</option>`).join('')}</select></div>`:''}
+    <div class="fr"><label>Rings</label><select id="prc">${rings.map(n=>{ const q=isHop?gsiHopperSpec(bin.gsiModel,+bin.diam,n,+bin.coneAngleDeg):gsiBinSpec(bin.gsiModel,+bin.diam,n); return `<option value="${n}"${+bin.ringCount===n?' selected':''}>${n} rings${q?' · '+q.cap.toLocaleString()+' bu · '+ftInStr(q.eaveFt)+' eave':''}</option>`; }).join('')}</select></div>
+    ${sp?`<div class="cbox" style="margin-bottom:6px">
+      <div class="crow"><span class="lbl">GSI capacity</span><span class="val">${sp.cap.toLocaleString()} bu</span></div>
+      <div class="crow"><span class="lbl">Eave / peak</span><span class="val">${ftInStr(sp.eaveFt)} / ${ftInStr(sp.peakFt)}</span></div>
+      <div class="crow"><span class="lbl">Sheet</span><span class="val">${sp.ringIn===44?'4″ corrugation, 3′8″ rings':'2.66″ corrugation, 2′8″ rings'} · ${sp.stiff?sp.stiff+' stiffeners/sheet':'unstiffened'}</span></div>
+      ${isHop?`<div class="crow"><span class="lbl">Hopper</span><span class="val">${sp.angle}° · ${sp.clearIn}″ clearance</span></div>`:''}
+      ${sp.roofLoad?`<div class="crow"><span class="lbl">Roof load (older sheets)</span><span class="val">${sp.roofLoad.peakLb.toLocaleString()} lb peak · ${sp.roofLoad.snowPsf} psf${sp.roofLoad.note?' · '+sp.roofLoad.note:''}</span></div>`:''}
+    </div>`:`<p style="font-size:0.7em;color:#f59e0b;margin-bottom:3px">GSI does not publish this diameter × ring combination — pick from the list.</p>`}
+    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Eave, peak and bushels are GSI's published figures (≤52 lb/ft³, 28° repose, 6% compaction, 30° roof). Switch to Custom to enter your own dimensions.</p>`; })()}
+  ${bin.gsiModel?'':`<div class="fr"><label>Diameter (ft)</label><input type="number" id="pd" value="${bin.diam}" min="12" max="156" step="6"/></div>
   <div class="fr"><label>Ring Height (in)</label><input type="number" id="prh" value="${bin.ringIn}" min="24" max="72" step="6"/></div>
-  <div class="fr"><label>Ring Count</label><input type="number" id="prc" value="${bin.ringCount}" min="1" max="32"/></div>
-  <div class="fr"><label>Roof Angle (°)</label>
+  <div class="fr"><label>Ring Count</label><input type="number" id="prc" value="${bin.ringCount}" min="1" max="32"/></div>`}
+  ${bin.gsiModel?'':`<div class="fr"><label>Roof Angle (°)</label>
     <input type="number" id="proofdeg" value="${roofDegOf(bin).toFixed(1).replace(/\.0$/,'')}" min="10" max="50" step="0.5" ${isRoofAuto(bin)?'':'disabled style="opacity:0.55"'}/>
     <label style="display:flex;align-items:center;gap:3px;font-size:0.72em;color:#9ca3af;margin-left:5px;cursor:pointer"><input type="checkbox" id="proofauto" ${isRoofAuto(bin)?'checked':''}/>Auto</label>
   </div>
   <div class="fr"><label>Total Height (ground → peak, ft)</label><input type="number" id="ptot" value="${peakHt(bin).toFixed(1)}" min="8" max="250" step="0.5" ${isRoofAuto(bin)?'disabled style="opacity:0.55"':''}/></div>
   ${isRoofAuto(bin)
     ?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Roof height is calculated from the diameter: ${(bin.diam/2).toFixed(1)}′ radius × tan(${roofDegOf(bin).toFixed(1).replace(/\.0$/,'')}°) = <b>${roofHt(bin).toFixed(1)}′ roof</b>, giving a ${peakHt(bin).toFixed(1)}′ peak over the ${eaveHt(bin).toFixed(1)}′ eave. Uncheck Auto to enter the manufacturer's overall peak height instead.</p>`
-    :`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Manual: roof height is ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${roofHt(bin).toFixed(1)}′ roof</b> (≈${roofDegOf(bin).toFixed(1)}° pitch). Check Auto to size the roof from the diameter at a set angle.</p>`}
+    :`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Manual: roof height is ${peakHt(bin).toFixed(1)}′ total − ${eaveHt(bin).toFixed(1)}′ eave (rings${bin.foundFt?' + foundation':''}${(bin.bottomType||'flat')==='cone'?' + cone/legs':''}) = <b>${roofHt(bin).toFixed(1)}′ roof</b> (≈${roofDegOf(bin).toFixed(1)}° pitch). Check Auto to size the roof from the diameter at a set angle.</p>`}`}
   <div class="fr"><label>Row of Bins: count · gap (ft) · dir (°)</label><span style="display:flex;gap:3px"><input type="number" id="brn" value="4" min="2" max="30" step="1" title="How many bins in the row, counting this one" style="width:40px"/><input type="number" id="brg" value="8" min="0" max="60" step="1" title="Gap between bin walls (ft)" style="width:40px"/><input type="number" id="brb" value="90" min="0" max="359" step="15" title="Direction of the row (0°=N 90°=E)" style="width:44px"/></span></div>
   <button class="pbtn" onclick="addBinRow('${bin.id}')" title="Copy this bin's full spec in a straight line from it" style="margin-bottom:4px">⋯ Add Row of Matching Bins</button>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Count includes this bin. Gap is wall to wall. Direction 0°=N 90°=E.</p>
-  <div class="fr"><label>Sidewall Type</label><select id="pstiff">
+  ${bin.gsiModel?'':`<div class="fr"><label>Sidewall Type</label><select id="pstiff">
     <option value="0"${!bin.stiffened?' selected':''}>Unstiffened (corrugated only)</option>
     <option value="1"${bin.stiffened?' selected':''}>Stiffened (vertical stiffener channels)</option>
-  </select></div>
+  </select></div>`}
   <div class="fr"><label>Foundation Height (ft)</label><input type="number" id="pfound" value="${bin.foundFt||0}" min="0" max="20" step="0.5"/></div>
   <div class="fr"><label>Foundation Diameter (ft)</label><input type="number" id="pfodd" value="${bin.foundDiamFt||0}" min="0" max="300" step="1"/></div>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0 = auto (bin diam + 4 ft). e.g. 52 for a 48′ bin gives a 2′ overhang all around.</p>
   <div class="ph">Bottom Type</div>
-  <div class="fr"><label>Bottom Style</label><select id="pbottom"><option value="flat"${!isCone?' selected':''}>Flat Bottom</option><option value="cone"${isCone?' selected':''}>Cone Bottom</option></select></div>
-  ${isCone?`
+  ${bin.gsiModel?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">${isCone?'Hopper tank — angle and clearance from the GSI model above.':'Flat-bottom 40-Series bin.'}</p>`:`<div class="fr"><label>Bottom Style</label><select id="pbottom"><option value="flat"${!isCone?' selected':''}>Flat Bottom</option><option value="cone"${isCone?' selected':''}>Cone Bottom</option></select></div>`}
+  ${isCone&&!bin.gsiModel?`
   <div class="fr"><label>Hopper Clearance / Legs (ft)</label><input type="number" id="pconeleght" value="${legH}" min="1" max="30" step="0.5"/></div>
   <div class="fr"><label>Hopper Angle (°)</label><select id="pconeang">
     ${[40,45,60].includes(+bin.coneAngleDeg)?'':`<option value="${bin.coneAngleDeg}" selected>${bin.coneAngleDeg}° (custom)</option>`}
@@ -2775,15 +3086,23 @@ function binHTML(bin) {
   <div class="fr"><label>Primary Fan (blue)</label><input type="checkbox" id="psf" ${bin.showFan?'checked':''}></div>
   <div class="fr"><label>Primary Bearing (°)</label><input type="number" id="pfa" value="${bin.fanAng}" min="0" max="359" step="5"/></div>
   <div class="fr"><label>Primary Fan HP</label><input type="number" id="pfhp" value="${bin.fanHp||0}" min="0" max="200" step="0.5"/></div>
-  <div class="fr"><label>Primary Fan Type</label><select id="pftype">${fanTypeOpts(bin.fanType)}</select></div>
+  <div class="fr"><label>Primary GSI Fan</label><select id="pfgsi">${gsiFanOpts(bin.fanModel)}</select></div>
+  <div class="fr"><label>Primary Fan Type</label><select id="pftype" ${bin.fanModel?'disabled style="opacity:0.55"':''}>${fanTypeOpts(bin.fanType)}</select></div>
   <div id="bin-extra-fans">${(bin.fans||[]).map((f,i)=>`<div class="fr"><label>Fan ${i+2} Bearing / HP</label><input type="number" class="xfan" data-idx="${i}" value="${f.bearing}" min="0" max="359" step="5" style="width:58px"/><input type="number" class="xfanhp" data-idx="${i}" value="${f.hp||0}" min="0" max="200" step="0.5" title="Fan ${i+2} HP" style="width:48px;margin-left:3px"/><button onclick="removeBinFan('${bin.id}',${i})" style="margin-left:4px;padding:2px 6px;background:#374151;border:1px solid #6b7280;color:#d1d5db;border-radius:3px;cursor:pointer;font-size:0.7em">✕</button></div>
-  <div class="fr"><label>Fan ${i+2} Type</label><select class="xfantype" data-idx="${i}">${fanTypeOpts(f.type)}</select></div>`).join('')}</div>
+  <div class="fr"><label>Fan ${i+2} GSI Model</label><select class="xfangsi" data-idx="${i}">${gsiFanOpts(f.model)}</select></div>
+  <div class="fr"><label>Fan ${i+2} Type</label><select class="xfantype" data-idx="${i}" ${f.model?'disabled style="opacity:0.55"':''}>${fanTypeOpts(f.type)}</select></div>`).join('')}</div>
+  ${(()=>{ const curves=binFanCurves(bin); if(!curves.length) return `<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Pick GSI fan models to get an aeration check (cfm/bu at the static pressure of a full bin of corn).</p>`;
+    const a=binAeration(bin,curves); if(!a) return ''; const ok=a.cfmPerBu>=0.1; const dry=a.cfmPerBu>=1.0;
+    return `<div class="cbox" style="margin-bottom:6px"><div class="crow"><span class="lbl">Aeration, bin full of corn</span><span class="val" style="color:${ok?'#10b981':'#ef4444'}">${a.cfmPerBu.toFixed(2)} cfm/bu · ${Math.round(a.cfm).toLocaleString()} cfm @ ${a.sp.toFixed(1)}″ w.c.</span></div>
+    <div class="crow"><span class="lbl">Reads as</span><span class="val">${dry?'natural-air drying rate (≥1 cfm/bu)':a.cfmPerBu>=0.25?'aeration + conditioning (≥0.25)':ok?'storage aeration (≥0.1)':'under 0.1 cfm/bu — too little to cool this bin'}</span></div></div>`; })()}
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Vane-axial: round tube, motor in the airstream — high airflow at low static. Centrifugal: scroll housing with a side inlet — holds airflow against deep bins. In-line centrifugal: drum with the motor on top — centrifugal pressure in an axial footprint. The 3D model follows the choice.</p>
   <button class="pbtn" onclick="addBinFan('${bin.id}')" style="margin-bottom:4px">+ Add Fan</button>
   <div class="ph">Unload</div>
   <div class="fr"><label>Unload Bearing (°)</label><input type="number" id="pua" value="${bin.unloadAng}" min="0" max="359" step="5"/></div>
   <div class="fr"><label>Unloader Sticks Out (ft past wall)</label><input type="number" id="puext" value="${bin.unloadExtFt!=null?bin.unloadExtFt:4}" min="0" max="40" step="0.5"/></div>
   <div class="fr"><label>Show Unload (orange)</label><input type="checkbox" id="psu" ${bin.showUnload?'checked':''}></div>
+  <div class="fr"><label>GSI Sweep / Unload</label><select id="pusweep">${gsiSweepOpts(bin.unloadModel,+bin.diam)}</select></div>
+  ${bin.unloadModel?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">${escH(bin.unloadModel)} · up to ${(+bin.unloadBph||0).toLocaleString()} bu/hr${/U-Trough/.test(bin.unloadModel)?' · GSI U-Trough drive '+gsiUtroughHp(+bin.diam,false)+' HP horizontal / '+gsiUtroughHp(+bin.diam,true)+' HP incline':' · motor HP not published, enter below'}</p>`:''}
   <div class="fr"><label>Unload Motor HP</label><input type="number" id="puhp" value="${bin.unloadHp||0}" min="0" max="200" step="0.5"/></div>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0°=N 90°=E 180°=S 270°=W</p>
   <div class="fr"><label>Power Source</label><select id="bpsrc">${powerSrcOpts(bin.powerSrc)}</select></div>
@@ -2809,9 +3128,14 @@ function binHTML(bin) {
 function bindBin(bin) {
   function upd(){
     bin.name=document.getElementById('pn')?.value||bin.name;
+    const prevModel=bin.gsiModel||''; bin.gsiModel=document.getElementById('pgsi')?.value??prevModel;
     bin.diam=+document.getElementById('pd')?.value||bin.diam;
     bin.ringIn=+document.getElementById('prh')?.value||bin.ringIn;
     bin.ringCount=+document.getElementById('prc')?.value||bin.ringCount;
+    if(bin.gsiModel&&bin.gsiModel!==prevModel){ const isHop=!!GSI.hoppers[bin.gsiModel]; if(isHop&&!GSI.hoppers[prevModel]) bin.ringCount=Math.min(bin.ringCount,8); } // sensible start when switching families
+    const sw=document.getElementById('pusweep'); if(sw&&sw.value!==(bin.unloadModel||'')) applyGsiSweep(bin,sw.value);
+    const pfg=document.getElementById('pfgsi'); if(pfg){ if(pfg.value!==(bin.fanModel||'')){ const tmp={}; applyGsiFan(tmp,pfg.value); bin.fanModel=tmp.model; if(pfg.value){ bin.fanType=tmp.type; bin.fanHp=tmp.hp; bin.fanDiaIn=tmp.diaIn; } } }
+    document.querySelectorAll('.xfangsi').forEach(el=>{ const i=+el.dataset.idx; const f=bin.fans&&bin.fans[i]; if(f&&el.value!==(f.model||'')) applyGsiFan(f,el.value); });
     bin.foundFt=+document.getElementById('pfound')?.value||0;
     bin.foundDiamFt=+document.getElementById('pfodd')?.value||0;
     bin.fanAng=+document.getElementById('pfa')?.value||0;
@@ -2830,15 +3154,16 @@ function bindBin(bin) {
     bin.showSideDraw2=document.getElementById('pssd2')?.checked??false;
     bin.sideDrawHt2=+document.getElementById('psdh2')?.value??10;
     bin.sideDrawBearing2=+document.getElementById('psdb2')?.value||270;
-    bin.stiffened=document.getElementById('pstiff')?.value==='1';
-    bin.fanHp=+document.getElementById('pfhp')?.value||0;
-    bin.fanType=document.getElementById('pftype')?.value||bin.fanType||'axial';
-    document.querySelectorAll('.xfantype').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].type=el.value||'axial'; });
+    if(document.getElementById('pstiff')) bin.stiffened=document.getElementById('pstiff').value==='1';
+    applyGsiBin(bin); // GSI model (if any) sets rings/eave/peak/bushels and snaps to published sizes
+    if(!bin.fanModel){ bin.fanHp=+document.getElementById('pfhp')?.value||0; bin.fanType=document.getElementById('pftype')?.value||bin.fanType||'axial'; }
+    else { const g=gsiFan(bin.fanModel); if(g){ bin.fanHp=g.hp; bin.fanType=g.type; } }
+    document.querySelectorAll('.xfantype').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]&&!bin.fans[i].model) bin.fans[i].type=el.value||'axial'; });
     bin.unloadHp=+document.getElementById('puhp')?.value||0;
     bin.powerSrc=document.getElementById('bpsrc')?.value||bin.powerSrc||'utility';
     // Read extra fan bearings + HP
     document.querySelectorAll('.xfan').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].bearing=+el.value||0; });
-    document.querySelectorAll('.xfanhp').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]) bin.fans[i].hp=+el.value||0; });
+    document.querySelectorAll('.xfanhp').forEach(el=>{ const i=+el.dataset.idx; if(bin.fans&&bin.fans[i]&&!bin.fans[i].model) bin.fans[i].hp=+el.value||0; });
     // Roof: Auto sizes the roof from diameter × tan(angle), so a diameter change re-derives it.
     const wasAuto=isRoofAuto(bin);
     bin.roofAuto=document.getElementById('proofauto')?.checked??wasAuto;
@@ -2850,7 +3175,8 @@ function bindBin(bin) {
     }
     renderBin(bin); renderProperties(); autoSave();
   }
-  ['pn','pd','prh','prc','pstiff','pfound','pfa','pfhp','pua','puext','puhp','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang','proofdeg','proofauto'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  ['pn','pgsi','pd','prh','prc','pstiff','pfound','pfa','pfhp','pfgsi','pua','puext','puhp','pusweep','psdh','psdb','psdh2','psdb2','pssl','pssw','pconeleght','pconeang','proofdeg','proofauto'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  document.querySelectorAll('.xfangsi').forEach(el=>el.addEventListener('change',upd));
   // Manual mode only: Total Height edits derive the roof height (total − eave). Ring/foundation edits
   // deliberately do NOT re-derive — adding a ring raises the peak, keeping the roof.
   document.getElementById('ptot')?.addEventListener('change',e=>{
@@ -2962,8 +3288,13 @@ function legHTML(leg) {
   <div class="fr"><label>Foundation Length (ft)</label><input type="number" id="plflen" value="${leg.foundLFt||0}" min="0" max="60" step="1"/></div>
   <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">0 = auto (10 × 10 ft pad). Set both to override.</p>
   <div class="ph">Casing &amp; Capacity</div>
-  <div class="fr"><label>Casing Diameter (in)</label><input type="number" id="plcasediam" value="${leg.caseDiamIn||12}" min="4" max="48" step="1"/></div>
-  <div class="fr"><label>Capacity (BPH)</label><input type="number" id="plbph" value="${leg.capBph||0}" min="0" max="100000" step="500"/></div>
+  <div class="fr"><label>GSI Bucket Elevator</label><select id="plgsi">${gsiLegOpts(leg.gsiModel)}</select></div>
+  ${leg.gsiSpec?`<div class="cbox" style="margin-bottom:6px"><div class="crow"><span class="lbl">${escH(leg.gsiModel)}</span><span class="val">${leg.gsiSpec.bph.toLocaleString()} bu/hr · ${leg.gsiSpec.pulley}″ pulley · ${leg.gsiSpec.rpm} rpm · ${leg.gsiSpec.fpm} fpm</span></div><div class="crow"><span class="lbl">Cups / trunking</span><span class="val">${leg.gsiSpec.cup}″ @ ${leg.gsiSpec.spacing}″ · ${leg.gsiSpec.trunk}″ (10′ sections)</span></div>${leg.gsiSpec.dims?`<div class="crow"><span class="lbl">Head / boot</span><span class="val">head ${leg.gsiSpec.dims.H}″ tall × ${leg.gsiSpec.dims.M}″ wide · boot ${leg.gsiSpec.dims.A}″ tall × ${leg.gsiSpec.dims.B}″ long</span></div>`:''}</div>
+  <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">GS-019 basis: 45 lb/ft³, conservative cup fill. Motor HP vs. height and discharge height are not published — enter HP from the dealer quote.</p>`:''}
+  <div class="fr"><label>${leg.gsiModel?'Trunking Width (in)':'Casing Diameter (in)'}</label><input type="number" id="plcasediam" value="${leg.caseDiamIn||12}" min="4" max="48" step="1" ${leg.gsiModel?'disabled style="opacity:0.55"':''}/></div>
+  <div class="fr"><label>Capacity (BPH)</label><input type="number" id="plbph" value="${leg.capBph||0}" min="0" max="100000" step="500" ${leg.gsiModel?'disabled style="opacity:0.55"':''}/></div>
+  <div class="fr"><label>QuickBolt Tower</label><select id="pltower">${legTowerOpts(leg.towerFt)}</select></div>
+  ${leg.towerFt?(()=>{ const t=GSI.towers.find(x=>x[1]===+leg.towerFt); const ok=t&&leg.ht>=t[2]&&leg.ht<=t[3]; const pul=leg.gsiSpec?leg.gsiSpec.pulley:0; const pOk=!t||!pul||pul<=t[4]; return `<p style="font-size:0.7em;color:${ok&&pOk?'#6b7280':'#f59e0b'};margin-bottom:3px">${t[0]}: ${t[2]}′–${t[3]}′ tall, single leg to ${t[4]}″ pulley.${ok?'':' ⚠ This leg\'s height is outside the ready-to-order range — configure-to-order towers go to 170′.'}${pOk?'':' ⚠ Head pulley exceeds this footprint\'s single-leg limit.'}</p>`; })():''}
   <div class="fr"><label>Motor HP</label><input type="number" id="plhp" value="${leg.motorHp||0}" min="0" max="500" step="0.5"/></div>
   <div class="fr"><label>Power Source</label><select id="plsrc">${powerSrcOpts(leg.powerSrc)}</select></div>
   ${phaseRowHTML(leg.phase||0,leg.removedPhase||0)}
@@ -3043,8 +3374,9 @@ function bindLeg(leg) {
     leg.foundFt=+document.getElementById('plf')?.value||0;
     leg.foundWFt=+document.getElementById('plfwid')?.value||0;
     leg.foundLFt=+document.getElementById('plflen')?.value||0;
-    leg.caseDiamIn=+document.getElementById('plcasediam')?.value||leg.caseDiamIn||12;
-    leg.capBph=+document.getElementById('plbph')?.value||0;
+    const lg=document.getElementById('plgsi'); if(lg&&lg.value!==(leg.gsiModel||'')) applyGsiLeg(leg,lg.value);
+    if(!leg.gsiModel){ leg.caseDiamIn=+document.getElementById('plcasediam')?.value||leg.caseDiamIn||12; leg.capBph=+document.getElementById('plbph')?.value||0; }
+    leg.towerFt=+document.getElementById('pltower')?.value||0;
     leg.motorHp=+document.getElementById('plhp')?.value||0;
     leg.powerSrc=document.getElementById('plsrc')?.value||leg.powerSrc||'utility';
     leg.showSpout=document.getElementById('plss')?.checked??false;
@@ -3053,7 +3385,7 @@ function bindLeg(leg) {
     leg.spoutReachFt=Math.max(1,+document.getElementById('plsreach')?.value||20);
     renderLeg(leg); drawLegLines(leg); renderProperties(); autoSave();
   }
-  ['pln','plh','plf','plfwid','plflen','plcasediam','plbph','plhp','plsrc','plsh','plsb','plsreach'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  ['pln','plh','plf','plfwid','plflen','plgsi','pltower','plcasediam','plbph','plhp','plsrc','plsh','plsb','plsreach'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
   document.getElementById('plss')?.addEventListener('change',upd);
 
   // Routing mode toggle
@@ -3254,14 +3586,19 @@ function convHTML(cv) {
   <div class="fr"><label>Name</label><input type="text" id="cvn" value="${escH(cv.name)}"/></div>
   ${isDblCv
     ?`<div class="fr"><label>Size (diameter)</label><select id="cvdiam">${dblSizeOpts}</select></div>
-      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Capacity is set by the size: 8"=4,000 · 10"=7,500 · 12"=11,000 · 14"=15,000 BPH. Max ${DBLRUN_MAX_LEN}′ per run · operating angle ${DBLRUN_RANGE_LBL}.</p>`
+      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Capacity is set by the size: 8"=4,000 · 10"=7,500 · 12"=11,000 · 14"=15,000 BPH. Max ${DBLRUN_MAX_LEN}′ per run · operating angle ${DBLRUN_RANGE_LBL}. Double-run paddle conveyors are not a GSI product — GSI's equivalent is a Select en-masse (Drag) or Hi-Flight conveyor.</p>`
     :isHfCv
-    ?`<div class="fr"><label>Box Size (W″ × H″)</label><select id="cvbox">
+    ?`<div class="fr"><label>GSI Model</label><select id="cvgsi">${gsiConvOpts(cv)}</select></div>
+      ${gsiConvSpeeds(cv).length?`<div class="fr"><label>Chain Speed (ft/min)</label><select id="cvfpm">${gsiConvSpeeds(cv).map(f=>`<option value="${f}"${+cv.fpm===f?' selected':''}>${f} fpm → ${(GSI.hiflight.find(h=>'HF'+h[0]+'x'+h[1]===cv.gsiModel)||[0,0,0])[2]*f} bu/hr</option>`).join('')}</select></div>`:''}
+      ${cv.gsiModel?'':`<div class="fr"><label>Box Size (W″ × H″)</label><select id="cvbox">
         ${HIFLIGHT_SIZES.map(s=>`<option value="${s.w}x${s.h}"${(cv.boxWidIn||12)===s.w&&(cv.boxHtIn||12)===s.h?' selected':''}>${s.w}″ × ${s.h}″ — ${s.bph.toLocaleString()} BPH</option>`).join('')}
-      </select></div>
-      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Conveyors are rectangular chain-paddle housings (GSI Select Hi-Flight sizes). Capacity is set by the box size at full chain speed.</p>`
-    :`<div class="fr"><label>Pipe Diameter (in)</label><input type="number" id="cvdiam" value="${cv.diamIn||6}" min="2" max="30" step="1"/></div>
-  <div class="fr"><label>Capacity (BPH)</label><input type="number" id="cvbph" value="${cv.capBph||0}" min="0" max="100000" step="500"/></div>`}
+      </select></div>`}
+      <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">GSI Select Hi-Flight: 16×20 moves 48 and 32×20 moves 96 bu/hr per ft/min of chain speed, 15°–60° incline.</p>`
+    :`<div class="fr"><label>GSI Model</label><select id="cvgsi">${gsiConvOpts(cv)}</select></div>
+      ${gsiConvSpeeds(cv).length?`<div class="fr"><label>${/^BELT/.test(cv.gsiModel)?'Belt':'Chain'} Speed (ft/min)</label><select id="cvfpm">${gsiConvSpeeds(cv).map(f=>{ let b=0; const mm=/^EM(\d+)x(\d+)$/.exec(cv.gsiModel||''); if(mm){ const e=GSI.enmasse.find(x=>x[0]===+mm[1]&&x[1]===+mm[2]); b=e?e[2]*f:0; } const bm=/^BELT(\d+)$/.exec(cv.gsiModel||''); if(bm){ const pt=(GSI.belt[bm[1]]||[]).find(x=>x[0]===f); b=pt?pt[1]:0; } return `<option value="${f}"${+cv.fpm===f?' selected':''}>${f} fpm → ${b.toLocaleString()} bu/hr</option>`; }).join('')}</select></div>`:''}
+      ${cv.gsiSpec&&cv.gsiSpec.kind==='enmasse'?`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Select en-masse: ≈15° max incline${cv.gsiSpec.maxLenFt?' · about '+cv.gsiSpec.maxLenFt+'′ max horizontal length for this height (GSI regional page)':''}. HP is not published — enter it from the dealer quote.</p>`:''}
+      ${cv.type==='auger'||!cv.gsiModel?`<div class="fr"><label>Pipe Diameter (in)</label><input type="number" id="cvdiam" value="${cv.diamIn||6}" min="2" max="30" step="1" ${cv.gsiModel?'disabled style="opacity:0.55"':''}/></div>`:''}
+  <div class="fr"><label>Capacity (BPH)</label><input type="number" id="cvbph" value="${cv.capBph||0}" min="0" max="100000" step="500" ${cv.gsiModel?'disabled style="opacity:0.55"':''}/></div>`}
   <div class="fr"><label>Motor HP</label>
     <input type="number" id="cvhp" value="${convHp(cv)}" min="0" max="500" step="0.5" ${isHpAuto(cv)?'disabled style="opacity:0.55"':''}/>
     <label style="display:flex;align-items:center;gap:3px;font-size:0.72em;color:#9ca3af;margin-left:5px;cursor:pointer"><input type="checkbox" id="cvhpauto" ${isHpAuto(cv)?'checked':''}/>Auto</label>
@@ -3340,8 +3677,12 @@ function bindConv(cv) {
   function updBasic(){
     cv.name=document.getElementById('cvn')?.value||cv.name;
     cv.bootType=document.getElementById('cvbt')?.value||cv.bootType||'flat';
-    cv.diamIn=+document.getElementById('cvdiam')?.value||cv.diamIn||6;
-    if(cv.type==='doublerun'){
+    const cg=document.getElementById('cvgsi'), cf=document.getElementById('cvfpm');
+    if(cg&&cg.value!==(cv.gsiModel||'')){ applyGsiConv(cv,cg.value,cf?cf.value:null); renderConveyor(cv); renderProperties(); autoSave(); return; }
+    if(cv.gsiModel){ applyGsiConv(cv,cv.gsiModel,cf?cf.value:cv.fpm); }
+    if(!cv.gsiModel||cv.type==='doublerun') cv.diamIn=+document.getElementById('cvdiam')?.value||cv.diamIn||6;
+    if(cv.gsiModel){ /* capacity and box come from the catalog */ }
+    else if(cv.type==='doublerun'){
       // Snap to an allowed size and derive capacity from it
       if(!DBLRUN_SIZES[cv.diamIn]){
         cv.diamIn=+Object.keys(DBLRUN_SIZES).reduce((a,b)=>Math.abs(+b-cv.diamIn)<Math.abs(+a-cv.diamIn)?b:a);
@@ -3360,7 +3701,7 @@ function bindConv(cv) {
     cv.powerSrc=document.getElementById('cvsrc')?.value||cv.powerSrc||'utility';
     renderConveyor(cv); renderProperties(); autoSave();
   }
-  ['cvn','cvbt','cvdiam','cvbox','cvbph','cvhp','cvhpauto','cvsrc'].forEach(id=>document.getElementById(id)?.addEventListener('change',updBasic));
+  ['cvn','cvbt','cvgsi','cvfpm','cvdiam','cvbox','cvbph','cvhp','cvhpauto','cvsrc'].forEach(id=>document.getElementById(id)?.addEventListener('change',updBasic));
 
   document.querySelectorAll('.cv-node-ht').forEach(el=>{
     el.addEventListener('change',()=>{
@@ -3512,14 +3853,15 @@ function dryerHTML(dr) {
   const loadBear=isRect?(((lEnd==='tail'?dr.headDeg+180:dr.headDeg)%360+360)%360):null;
   return `<div class="ph">Grain Dryer — ${dr.name}</div>
   <div class="fr"><label>Name</label><input type="text" id="drn" value="${escH(dr.name)}"/></div>
-  <div class="fr"><label>Dryer Type</label><select id="drtype">
+  <div class="fr"><label>GSI Model</label><select id="drgsi">${gsiDryerOpts(dr.gsiModel)}</select></div>
+  ${gsiDryerSpecHTML(dr)}
+  <div class="fr"><label>Dryer Type</label><select id="drtype" ${dr.gsiModel?'disabled style="opacity:0.55"':''}>
     <option value="portable"${dtype==='portable'?' selected':''}>Portable — stacked modules (GSI 1100/2300/2400 style)</option>
     <option value="tower"${dtype==='tower'?' selected':''}>Tower — cylindrical</option>
   </select></div>
   ${dtype==='portable'?`<div class="fr"><label>Stacked Modules</label><select id="drmod">
     ${[1,2,3].map(n=>`<option value="${n}"${(dr.modules||2)===n?' selected':''}>${n} module${n>1?'s':''}</option>`).join('')}
-  </select></div>
-  <button class="pbtn" onclick="applyGsi2322('${dr.id}')" style="margin-bottom:4px">⭐ Load GSI 2322 Preset (2 modules · 3 fans · 60 HP)</button>`:''}
+  </select></div>`:''}
   ${dtype==='portable'
     ?`<div class="ph">Module Dimensions <span style="font-size:0.8em;text-transform:none;color:#9ca3af;font-weight:400">— per stacked module</span></div>
     ${st.dims.map((m,i)=>`<div style="border:1px solid #374151;border-radius:5px;padding:5px 7px;margin-bottom:5px">
@@ -3532,9 +3874,9 @@ function dryerHTML(dr) {
     <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Running gear, frame and the metering / unload section under the bottom module (≈3′ on GSI portables).</p>
     <div class="fr"><label>Foundation Supports / Legs (ft)</label><input type="number" id="drlegs" value="${dr.legHtFt||0}" min="0" max="30" step="0.5"/></div>
     <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">Steel stands that raise the whole dryer off the pad (0 = on its wheels). Installed height: <b>${st.totalH.toFixed(1)} ft</b> = ${st.legHt?st.legHt+'′ supports + ':''}${st.baseHt}′ base + ${st.stackH.toFixed(1)}′ of modules${dr.foundHtFt?`; top is ${dryerTopHt(dr).toFixed(1)}′ above grade with the ${dr.foundHtFt}′ pad`:''}. Conveyors and legs feeding the top follow automatically.</p>
-    <div class="fr"><label>Holding Capacity (bu)</label><input type="number" id="drhold" value="${dr.holdBu||0}" min="0" max="20000" step="10"/></div>
-    <div class="fr"><label>Drying Capacity (BPH)</label><input type="number" id="drbph" value="${dr.dryBph||0}" min="0" max="20000" step="10"/></div>
-    <p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">From the spec sheet (BPH at 25% → 15%, dry &amp; cool). Used for the summary only.</p>`
+    <div class="fr"><label>Holding Capacity (bu)</label><input type="number" id="drhold" value="${dr.holdBu||0}" min="0" max="20000" step="10" ${dr.gsiModel?'disabled style="opacity:0.55"':''}/></div>
+    <div class="fr"><label>Drying Capacity (BPH, 20→15)</label><input type="number" id="drbph" value="${dr.dryBph||0}" min="0" max="20000" step="10" ${dr.gsiModel?'disabled style="opacity:0.55"':''}/></div>
+    ${dr.gsiModel?'':`<p style="font-size:0.7em;color:#6b7280;margin-bottom:3px">From the spec sheet: dry &amp; cool bushels per hour taking corn from 20% to 15% (GSI's headline rating). Used for the summary only.</p>`}`
     :isRect?`<div class="fr"><label>Length (ft)</label><input type="number" id="drl" value="${dr.lenFt}" min="5" max="300"/></div>
   <div class="fr"><label>Width (ft)</label><input type="number" id="drw" value="${dr.widFt}" min="5" max="50"/></div>`:`<div class="fr"><label>Diameter (ft)</label><input type="number" id="drdiam" value="${dr.diamFt}" min="4" max="60"/></div>`}
   ${dtype!=='portable'?`<div class="fr"><label>Height (ft)</label><input type="number" id="drht" value="${dr.htFt}" min="5" max="120"/></div>`:''}
@@ -3615,13 +3957,14 @@ function dryerHTML(dr) {
 function bindDryer(dr) {
   function upd(){
     dr.name=document.getElementById('drn')?.value||dr.name;
+    const dg=document.getElementById('drgsi'); if(dg&&dg.value!==(dr.gsiModel||'')){ applyGsiDryer(dr,dg.value); renderDryer(dr); renderProperties(); autoSave(); return; }
     dr.dryerType=document.getElementById('drtype')?.value||dr.dryerType||'portable';
     dr.shape=dr.dryerType==='tower'?'cylinder':'rect'; // type drives geometry
     dr.modules=+document.getElementById('drmod')?.value||dr.modules||2;
     dr.legHtFt=Math.max(0,+document.getElementById('drlegs')?.value||0);
     const bse=document.getElementById('drbase'); if(bse) dr.baseHtFt=Math.max(0,+bse.value||0);
-    const hb=document.getElementById('drhold'); if(hb) dr.holdBu=Math.max(0,+hb.value||0);
-    const bp=document.getElementById('drbph'); if(bp) dr.dryBph=Math.max(0,+bp.value||0);
+    const hb=document.getElementById('drhold'); if(hb&&!dr.gsiModel) dr.holdBu=Math.max(0,+hb.value||0);
+    const bp=document.getElementById('drbph'); if(bp&&!dr.gsiModel) dr.dryBph=Math.max(0,+bp.value||0);
     document.querySelectorAll('.drfandia').forEach(el=>{ const i=+el.dataset.idx; if(dr.dryerFans&&dr.dryerFans[i]) dr.dryerFans[i].diaIn=Math.max(18,+el.value||36); });
     document.querySelectorAll('.drfantype').forEach(el=>{ const i=+el.dataset.idx; if(dr.dryerFans&&dr.dryerFans[i]) dr.dryerFans[i].fanType=el.value||'axial'; });
     document.querySelectorAll('.drmlen').forEach(el=>{ const i=+el.dataset.idx; if(dr.moduleDims&&dr.moduleDims[i]) dr.moduleDims[i].lenFt=+el.value||dr.moduleDims[i].lenFt; });
@@ -3646,7 +3989,7 @@ function bindDryer(dr) {
     dr.foundExtFt=+document.getElementById('drfext')?.value||0;
     renderDryer(dr); renderProperties(); autoSave();
   }
-  ['drn','drtype','drmod','drlegs','drbase','drhold','drbph','drl','drw','drdiam','drht','drhead','drhp','drsrc','drunde','drlde','drfht','drfext'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
+  ['drn','drgsi','drtype','drmod','drlegs','drbase','drhold','drbph','drl','drw','drdiam','drht','drhead','drhp','drsrc','drunde','drlde','drfht','drfext'].forEach(id=>document.getElementById(id)?.addEventListener('change',upd));
   document.querySelectorAll('.drfanhp,.drfandia,.drfantype,.drfanmod,.drfanside,.drfanpos,.drfanoff,.drmlen,.drmwid,.drmht').forEach(el=>el.addEventListener('change',upd));
   // Custom color: swatch click or free color picker clears the phase (manual color wins)
   document.getElementById('drclrs')?.querySelectorAll('.cswatch').forEach(sw=>sw.addEventListener('click',()=>{dr.color=sw.dataset.clr;dr.phase=0;renderDryer(dr);renderProperties();autoSave();}));
@@ -3924,6 +4267,7 @@ function hydrateData(data) {
       }
     }
     (d.dryerFans||[]).forEach(f=>{ if(!f.diaIn) f.diaIn=36; });
+    if(!d.gsiModel&&d.model==='GSI 2322'){ applyGsiDryer(d,'2322'); migrated=true; }
     dryerStack(d);
   });
   // Roof migration: bins saved before the roof-angle option carried only roofFt. Every such bin
@@ -4160,7 +4504,14 @@ function runSiteCheck(){
     if(c.type==='doublerun'&&bad!==null) add('error',`${nm(c)} runs at ${bad.toFixed(1)}° — double-runs operate at ${DBLRUN_RANGE_LBL}.`,'conveyor',c.id);
     if(c.type==='doublerun'&&tot>DBLRUN_MAX_LEN) add('error',`${nm(c)} is ${tot.toFixed(0)}′ long — over the ${DBLRUN_MAX_LEN}′ double-run limit; split it.`,'conveyor',c.id);
     convSpouts(c).problems.forEach(t=>add('error',`${nm(c)}: ${t}`,'conveyor',c.id));
+    if(c.gsiSpec){ let maxA=-1e9; for(let i=0;i<nds.length-1;i++){ const d=distFt(L.latLng(nds[i].lat,nds[i].lng),L.latLng(nds[i+1].lat,nds[i+1].lng)); maxA=Math.max(maxA,Math.abs(convAngle(nds[i].htFt,nds[i+1].htFt,d))); }
+      if(c.gsiSpec.maxDeg&&maxA>c.gsiSpec.maxDeg+0.5) add('warn',`${nm(c)} runs at ${maxA.toFixed(1)}° — ${escH(c.model||'this GSI conveyor')} is rated to about ${c.gsiSpec.maxDeg}°.`,'conveyor',c.id);
+      if(c.gsiSpec.minDeg&&maxA<c.gsiSpec.minDeg-0.5) add('note',`${nm(c)} runs at ${maxA.toFixed(1)}° — Hi-Flight is meant for ${c.gsiSpec.minDeg}°–${c.gsiSpec.maxDeg}°; a Select en-masse fits flat runs.`,'conveyor',c.id);
+      if(c.gsiSpec.maxLenFt&&tot>c.gsiSpec.maxLenFt) add('warn',`${nm(c)} is ${tot.toFixed(0)}′ — over the ≈${c.gsiSpec.maxLenFt}′ GSI lists for this en-masse height.`,'conveyor',c.id); }
   });
+  S.walkways.forEach(w=>{ if(!w.truss) return; const b1=S.bins.find(b=>b.id===w.binId1), b2=S.bins.find(b=>b.id===w.binId2); if(!b1||!b2) return; const p1=walkAttach(b1,b2), p2=walkAttach(b2,b1); const span=convLength(eaveHt(b1),eaveHt(b2),distFt(p1,p2)); const mx=catwalkMaxSpan(w.truss), allow=catwalkAllowed(w.truss,span);
+    if(span>mx) add('error',`${nm(w)}: ${span.toFixed(0)}′ span exceeds the ${mx}′ limit of a ${w.truss} truss.`,'walkway',w.id); else if(allow!=null&&(+w.loadLbFt||0)>allow) add('warn',`${nm(w)}: ${w.loadLbFt} lb/ft of conveyor on a ${w.truss} at ${span.toFixed(0)}′ — allowable is ${Math.round(allow)} lb/ft.`,'walkway',w.id); });
+  S.bins.forEach(b=>{ const curves=binFanCurves(b); if(!curves.length) return; const a=binAeration(b,curves); if(a&&a.cfmPerBu<0.1) add('warn',`${nm(b)} has ${a.cfmPerBu.toFixed(2)} cfm/bu of aeration when full (${Math.round(a.cfm).toLocaleString()} cfm at ${a.sp.toFixed(1)}″) — under the 0.1 cfm/bu storage minimum.`,'bin',b.id); });
   S.portaugers.forEach(p=>{ const ep=paEndpoints(p); if(ep.problem==='short') add('error',`${nm(p)} is too short to reach ${nm(ep.bin)}'s peak — needs about ${ep.needFt}′.`,'portauger',p.id); if(ep.problem==='steep') add('error',`${nm(p)} would cut through ${nm(ep.bin)}'s roof — needs about ${ep.needFt}′ to lay flat enough.`,'portauger',p.id); });
   S.legs.forEach(l=>{ S.bins.filter(b=>legFeedsBin(l,b.id)).forEach(b=>{ const d=distFt(L.latLng(l.lat,l.lng),L.latLng(b.lat,b.lng)); const ang=legAngle(legEffHt(l),peakHt(b),d); if(ang===null) add('error',`${nm(l)} is lower than ${nm(b)}'s peak — gravity pipe can't fall into it.`,'leg',l.id); else if(ang<TARGET_ANG-2) add('warn',`${nm(l)} → ${nm(b)} pipe falls at ${ang.toFixed(1)}°, under the ${TARGET_ANG}° target — raise the leg or move the bin closer.`,'leg',l.id); }); });
   // ── Clearances ──
@@ -4221,8 +4572,8 @@ function showSiteCheck(){
   </div>
   <div class="rpt-section">Receiving — ${fmt(t.recvTotal)} BPH · ${t.recvTotal>0?(t.recvTotal/o.truckBu).toFixed(1):'—'} trucks/hr · ${hrs?hrs.toFixed(1)+' hrs to take in a '+o.harvestBuDay.toLocaleString()+' bu day':'set pit, conveyor and leg BPH'}</div>
   <table class="rpt-table"><thead><tr><th>Pit</th><th>Rate (BPH)</th><th>Chain</th><th>Limited by</th></tr></thead><tbody>${recvRows}</tbody></table>
-  <div class="rpt-section">Drying — ${fmt(t.dryTotal)} BPH (25% → 15%)${t.recvTotal>0&&t.dryTotal>0&&t.dryTotal<t.recvTotal*0.5?' · <span style="color:#f59e0b">drying is well under receiving: wet holding will fill fast</span>':''}</div>
-  <table class="rpt-table"><thead><tr><th>Dryer</th><th>BPH</th><th>Holding (bu)</th></tr></thead><tbody>${S.dryers.map(d=>`<tr><td>${escH(d.name)}</td><td class="num">${fmt(+d.dryBph||0)}</td><td class="num">${fmt(+d.holdBu||0)}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#6b7280">No dryers on the site.</td></tr>'}</tbody></table>
+  <div class="rpt-section">Drying — ${fmt(t.dryTotal)} BPH (20% → 15%)${S.dryers.some(d=>d.dryBph25)?' · '+fmt(S.dryers.reduce((a,d)=>a+(+d.dryBph25||+d.dryBph||0),0))+' BPH at 25% → 15%':''}${t.recvTotal>0&&t.dryTotal>0&&t.dryTotal<t.recvTotal*0.5?' · <span style="color:#f59e0b">drying is well under receiving: wet holding will fill fast</span>':''}</div>
+  <table class="rpt-table"><thead><tr><th>Dryer</th><th>Model</th><th>BPH 20→15</th><th>BPH 25→15</th><th>Holding (bu)</th></tr></thead><tbody>${S.dryers.map(d=>`<tr><td>${escH(d.name)}</td><td>${escH(d.gsiModel?'GSI '+d.gsiModel:(d.model||'Custom'))}</td><td class="num">${fmt(+d.dryBph||0)}</td><td class="num">${d.dryBph25?fmt(+d.dryBph25):'—'}</td><td class="num">${fmt(+d.holdBu||0)}</td></tr>`).join('')||'<tr><td colspan="5" style="color:#6b7280">No dryers on the site.</td></tr>'}</tbody></table>
   <div class="rpt-section">Load-out — ${fmt(t.loadTotal)} BPH · ${t.loadTotal>0?(t.loadTotal/o.truckBu).toFixed(1):'—'} trucks/hr · ${t.loadTotal>0?Math.round(t.loadTotal*o.hoursDay/o.truckBu)+' trucks in a '+o.hoursDay+'-hr day':'set leg BPH on legs that feed load-outs'}</div>
   <table class="rpt-table"><thead><tr><th>Load point</th><th>Rate (BPH)</th><th>Fed by</th></tr></thead><tbody>${loadRows}</tbody></table>
   <div class="rpt-section">Storage — ${fmt(t.storeBu)} bu</div>
@@ -5101,9 +5452,24 @@ function populate3D(){
       const fW=leg.foundWFt>0?leg.foundWFt:10, fL=leg.foundLFt>0?leg.foundLFt:10;
       const fp=new THREE.Mesh(new THREE.BoxGeometry(fW,foundH,fL),new THREE.MeshLambertMaterial({color:0x9ca3af}));fp.position.set(x,foundH/2,z);fp.castShadow=fp.receiveShadow=true;add3(fp);
     }
-    const tw=new THREE.Mesh(new THREE.BoxGeometry(2.5,leg.ht,2.5),sm);tw.position.set(x,foundH+leg.ht/2,z);tw.castShadow=tw.receiveShadow=true;tw.userData={siteId:leg.id,siteType:'leg'};add3(tw);
-    const hd=new THREE.Mesh(new THREE.BoxGeometry(5,6,5),dm);hd.position.set(x,h+3,z);hd.castShadow=true;add3(hd);
-    const bt=new THREE.Mesh(new THREE.BoxGeometry(4,4,4),dm);bt.position.set(x,foundH+2,z);bt.castShadow=true;add3(bt);
+    const g=leg.gsiSpec, dims=g&&g.dims;
+    const tW=g?g.trunkW/12:1.2, tD=g?g.trunkD/12:1.2;            // one trunk (in → ft); a bucket elevator has two side by side
+    [-1,1].forEach(sgn=>{ const tr=new THREE.Mesh(new THREE.BoxGeometry(tW,leg.ht,tD),sm); tr.position.set(x+sgn*(tW/2+0.08),foundH+leg.ht/2,z); tr.castShadow=tr.receiveShadow=true; tr.userData={siteId:leg.id,siteType:'leg'}; add3(tr); });
+    const hdW=dims?dims.M/12:5, hdH=dims?dims.H/12:6, hdD=dims?dims.I/12:5;
+    const hd=new THREE.Mesh(new THREE.BoxGeometry(hdW,hdH,hdD),dm);hd.position.set(x,h+hdH/2,z);hd.castShadow=true;add3(hd);
+    const drv=new THREE.Mesh(new THREE.BoxGeometry(hdW*0.5,hdH*0.35,hdD*0.5),new THREE.MeshLambertMaterial({color:0x374151}));drv.position.set(x,h+hdH+hdH*0.17,z+hdD*0.15);add3(drv); // head drive
+    const btW=dims?(g.trunkW*2+8)/12:4, btH=dims?dims.A/12:4, btD=dims?dims.B/12:4;
+    const bt=new THREE.Mesh(new THREE.BoxGeometry(btW,btH,btD),dm);bt.position.set(x,foundH+btH/2,z);bt.castShadow=true;add3(bt);
+    // QuickBolt support tower: four corner posts with horizontals and X-bracing every 12 ft, platform at the head
+    if(leg.towerFt>0){
+      const F=leg.towerFt, half=F/2, top=foundH+leg.ht, tm=new THREE.MeshLambertMaterial({color:0x8a9299});
+      [[-half,-half],[half,-half],[-half,half],[half,half]].forEach(([ox,oz])=>{ const post=new THREE.Mesh(new THREE.BoxGeometry(0.5,leg.ht,0.5),tm); post.position.set(x+ox,foundH+leg.ht/2,z+oz); post.castShadow=true; add3(post); });
+      const lv=Math.max(1,Math.round(leg.ht/12)); const dl=Math.hypot(F,12);
+      for(let k=1;k<=lv;k++){ const y=foundH+Math.min(leg.ht,k*12);
+        [[0,-half,0],[0,half,0],[-half,0,Math.PI/2],[half,0,Math.PI/2]].forEach(([ox,oz,ry])=>{ const hb=new THREE.Mesh(new THREE.BoxGeometry(F,0.25,0.25),tm); hb.position.set(x+ox,y,z+oz); hb.rotation.y=ry; add3(hb);
+          if(k<=lv){ const yb=y-6; [1,-1].forEach(sg=>{ const db=new THREE.Mesh(new THREE.BoxGeometry(dl,0.18,0.18),tm); db.position.set(x+ox,yb,z+oz); db.rotation.y=ry; db.rotation.z=sg*Math.atan2(12,F); add3(db); }); } }); }
+      const plat=new THREE.Mesh(new THREE.BoxGeometry(F+1,0.3,F+1),new THREE.MeshLambertMaterial({color:0x6b7076})); plat.position.set(x,top+hdH+0.4,z); add3(plat);
+    }
     // Downspout — runs from leg head to discharge point at set horizontal reach
     if(leg.showSpout){
       const bR=(leg.spoutBearing||0)*Math.PI/180;
@@ -5208,8 +5574,9 @@ function populate3D(){
           seg2.castShadow=true; seg2.userData={siteId:cv.id,siteType:'conveyor'}; add3(seg2);
         } else {
           // Rectangular housing: hi-flight uses its real box W×H; drag uses a low trough
-          const bw=cv.type==='highflight'?Math.max(1,(cv.boxWidIn||12)/12):cvW;
-          const bh=cv.type==='highflight'?Math.max(1,(cv.boxHtIn||12)/12):cvW*0.55;
+          const boxed=cv.type==='highflight'||(cv.boxWidIn>0&&cv.boxHtIn>0);
+          const bw=boxed?Math.max(1,(cv.boxWidIn||12)/12):cvW;
+          const bh=boxed?Math.max(1,(cv.boxHtIn||12)/12):cvW*0.55;
           seg=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,segLen),mat);
           seg.position.copy(v.clone().add(v1).multiplyScalar(0.5));
           seg.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(zAxis,dir));
@@ -6644,6 +7011,7 @@ function showReport() {
     <tr><td>Walkways / Catwalks</td><td class="num">${S.walkways.length}</td></tr>
     <tr><td>Report Date</td><td class="num">${new Date().toLocaleDateString()}</td></tr>
   </tbody></table>`;
+  html += gsiEquipmentHTML();
   html += costReportHTML();
 
   document.getElementById('modal-title').textContent = 'Site Report'+(S.projectName?' — '+S.projectName:'');
